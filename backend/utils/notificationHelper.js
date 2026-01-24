@@ -5,6 +5,7 @@ const Pharmacist = require('../models/Pharmacist');
 // Create notification helper
 async function createNotification({ userId, type, title, message, bookingId, pharmacistId, patientId }) {
   try {
+    console.log('Creating notification:', { userId, type, title, message });
     
     const notification = new Notification({
       userId,
@@ -17,9 +18,11 @@ async function createNotification({ userId, type, title, message, bookingId, pha
     });
     await notification.save();
     
+    console.log('Notification created successfully:', notification._id);
     return notification;
   } catch (err) {
     console.error('Error creating notification:', err);
+    throw err; // Re-throw to allow calling functions to handle
   }
 }
 
