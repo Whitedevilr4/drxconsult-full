@@ -100,4 +100,22 @@ router.delete('/', auth, async (req, res) => {
   }
 });
 
+// Test notification endpoint (for debugging)
+router.post('/test', auth, async (req, res) => {
+  try {
+    const testNotification = new Notification({
+      userId: req.user.userId,
+      type: 'booking_confirmed',
+      title: 'Test Notification',
+      message: 'This is a test notification to verify the system is working.',
+    });
+    
+    await testNotification.save();
+    res.json({ message: 'Test notification created', notification: testNotification });
+  } catch (err) {
+    console.error('Error creating test notification:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 module.exports = router;
