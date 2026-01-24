@@ -1,0 +1,19 @@
+{
+  "name": "patient-counselling-app",
+  "version": "1.0.0",
+  "description": "Patient Counselling Web Platform MVP",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "dev:plain": "concurrently \"npm run server:plain\" \"npm run client\"",
+    "server": "cd backend && npm run dev",
+    "server:plain": "cd backend && npm run dev:plain",
+    "client": "cd frontend && npm run dev",
+    "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
