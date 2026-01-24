@@ -15,7 +15,7 @@ const SEO = ({
   noindex = false,
   canonical
 }) => {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://drxconsult.netlify.app'
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://drxconsult.in/'
   const fullUrl = url ? `${siteUrl}${url}` : siteUrl
   const imageUrl = image.startsWith('http') ? image : `${siteUrl}${image}`
   
@@ -63,7 +63,7 @@ const SEO = ({
     "currenciesAccepted": "INR",
     "openingHours": "Mo-Su 00:00-23:59",
     "telephone": "+91-XXXXXXXXXX",
-    "email": "support@drxconsult.com",
+    "email": "drxcall.counselling@gmail.com",
     "hasOfferCatalog": {
       "@type": "OfferCatalog",
       "name": "Pharmacy Consultation Services",
