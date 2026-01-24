@@ -16,7 +16,7 @@ const createTransporter = () => {
 // Email templates
 const emailTemplates = {
   passwordReset: (resetLink, userName) => ({
-    subject: 'Password Reset Request - Patient Counselling App',
+    subject: 'Password Reset Request -Drx Consult Patient Counselling App',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
@@ -48,7 +48,7 @@ const emailTemplates = {
   }),
 
   bookingConfirmation: (booking, patientName, pharmacistName, pharmacistEmail) => ({
-    subject: 'Booking Confirmation - Patient Counselling App',
+    subject: 'Booking Confirmation -Drx Consult Patient Counselling App',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background-color: #e8f5e8; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
@@ -89,7 +89,7 @@ const emailTemplates = {
   }),
 
   pharmacistBookingNotification: (booking, patientName, patientEmail, patientPhone) => ({
-    subject: 'New Booking Received - Patient Counselling App',
+    subject: 'New Booking Received -Drx Consult Patient Counselling App',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background-color: #fff3cd; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
@@ -144,7 +144,7 @@ const emailTemplates = {
   }),
 
   meetingLinkAdded: (booking, patientName, pharmacistName) => ({
-    subject: 'Meeting Link Added - Patient Counselling App',
+    subject: 'Meeting Link Added -Drx Consult Patient Counselling App',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background-color: #d4edda; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
@@ -171,7 +171,7 @@ const emailTemplates = {
   }),
 
   reportSubmitted: (booking, patientName, pharmacistName) => ({
-    subject: 'Counselling Report Available - Patient Counselling App',
+    subject: 'Counselling Report Available -Drx Consult Patient Counselling App',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background-color: #d1ecf1; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
@@ -199,13 +199,13 @@ const emailTemplates = {
           </a>
         </div>
         
-        <p>Thank you for using Medecil!</p>
+        <p>Thank you for using Drx Consult!</p>
       </div>
     `
   }),
 
   testResultUploaded: (booking, patientName, pharmacistName) => ({
-    subject: 'Test Results Available - Medecil',
+    subject: 'Test Results Available - Drx Consult',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background-color: #fff3cd; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
@@ -238,7 +238,7 @@ const emailTemplates = {
   }),
 
   userSuspended: (userName, reason, adminName) => ({
-    subject: 'Account Suspended - Medecil',
+    subject: 'Account Suspended - Drx Consult',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background-color: #fee; padding: 20px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid #e74c3c;">
@@ -271,13 +271,13 @@ const emailTemplates = {
         
         <p>We appreciate your understanding and cooperation.</p>
         
-        <p>Best regards,<br/>The Medecil Team</p>
+        <p>Best regards,<br/>The Drx Consult Team</p>
       </div>
     `
   }),
 
   userUnsuspended: (userName, adminName) => ({
-    subject: 'Account Reactivated - Medecil',
+    subject: 'Account Reactivated - Drx Consult',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background-color: #e8f5e8; padding: 20px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid #27ae60;">
@@ -309,7 +309,7 @@ const emailTemplates = {
         
         <p>We're glad to have you back! If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
         
-        <p>Best regards,<br/>The Medecil Team</p>
+        <p>Best regards,<br/>The Drx Consult Team</p>
       </div>
     `
   })
