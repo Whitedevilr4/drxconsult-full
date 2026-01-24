@@ -1,0 +1,16 @@
+[build]
+  base = "frontend"
+  command = "npm install && npm run build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+# Alternative configuration if the above doesn't work
+# [build]
+#   base = "."
+#   command = "npm run build"
+#   publish = "frontend/.next"
