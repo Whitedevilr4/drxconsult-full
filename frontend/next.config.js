@@ -98,7 +98,7 @@ const nextConfig = {
   
   // Experimental features for better performance
   experimental: {
-    optimizeCss: true,
+    // optimizeCss: true, // Disabled to avoid critters dependency issues in CI/CD
     scrollRestoration: true,
   },
   
