@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import Layout from '@/components/Layout'
+import SEO from '@/components/SEO'
 
 export default function FAQ() {
   const [faqs, setFaqs] = useState([])
@@ -60,7 +61,14 @@ export default function FAQ() {
   }
 
   return (
-    <Layout>
+    <>
+      <SEO
+        title="FAQ - Frequently Asked Questions | DrX Consult"
+        description="Find answers to common questions about DrX Consult's online pharmacy consultation services, booking process, payments, and medication counseling. Get help with your healthcare queries."
+        keywords="FAQ, frequently asked questions, pharmacy consultation help, online consultation questions, medication guidance FAQ, prescription review questions, healthcare support"
+        url="/faq"
+      />
+      <Layout>
       <div className="bg-gray-50 min-h-screen">
         <div className="container mx-auto px-4 py-8">
           {/* Header */}
@@ -209,5 +217,6 @@ export default function FAQ() {
         </div>
       </div>
     </Layout>
+    </>
   )
 }
