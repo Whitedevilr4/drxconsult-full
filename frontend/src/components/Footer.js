@@ -85,7 +85,7 @@ export default function Footer() {
                 )}
                 {websiteSettings.socialMedia.twitter && (
                   <a href={websiteSettings.socialMedia.twitter} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white">
-                    🐦
+                    🇽
                   </a>
                 )}
                 {websiteSettings.socialMedia.instagram && (
