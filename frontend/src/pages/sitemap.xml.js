@@ -1,5 +1,5 @@
 function generateSiteMap() {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://drxconsult.netlify.app'
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://drxconsult.in'
   
   // Static pages
   const staticPages = [
