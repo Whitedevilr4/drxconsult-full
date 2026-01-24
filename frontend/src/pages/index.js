@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import PharmacistCard from '@/components/PharmacistCard'
 import Layout from '@/components/Layout'
+import SEO from '@/components/SEO'
 
 export default function Home() {
   const [pharmacists, setPharmacists] = useState([])
@@ -212,7 +213,15 @@ export default function Home() {
   }
 
   return (
-    <Layout>
+    <>
+      <SEO
+        title="DrX Consult - Online Pharmacy Consultation & Expert Medical Counseling"
+        description="Get professional pharmaceutical counseling from certified pharmacists. Book online consultations, prescription reviews, and personalized medication guidance. Available 24/7 with secure, affordable healthcare support."
+        keywords="online pharmacy consultation, pharmacist counseling, prescription review, medication guidance, healthcare consultation, medical advice, pharmacy services, drug interaction check, medication management, online pharmacist, pharmaceutical care, medicine consultation India"
+        url="/"
+        type="website"
+      />
+      <Layout>
       <div className="bg-gray-50">
         {/* Hero Slider Section */}
         <div className="relative bg-gradient-to-r from-blue-600 to-blue-800 text-white overflow-hidden">
@@ -489,5 +498,6 @@ export default function Home() {
         </div>
       </div>
     </Layout>
+    </>
   )
 }
