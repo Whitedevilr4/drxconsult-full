@@ -8,6 +8,7 @@
     "server": "cd backend && npm run dev",
     "server:plain": "cd backend && npm run dev:plain",
     "client": "cd frontend && npm run dev",
+    "build": "cd frontend && npm install && npm run build",
     "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install"
   },
   "keywords": [],
