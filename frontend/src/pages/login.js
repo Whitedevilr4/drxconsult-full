@@ -4,6 +4,7 @@ import Link from 'next/link'
 import axios from 'axios'
 import Layout from '@/components/Layout'
 import GoogleSignInButton from '@/components/GoogleSignInButton'
+import SEO from '@/components/SEO'
 import { toast } from 'react-toastify'
 
 export default function Login() {
@@ -110,7 +111,15 @@ export default function Login() {
   }
 
   return (
-    <Layout showFooter={false}>
+    <>
+      <SEO
+        title="Login - DrX Consult | Access Your Healthcare Dashboard"
+        description="Login to your DrX Consult account to access personalized pharmacy consultations, prescription reviews, and medical history. Secure access for patients, pharmacists, and healthcare providers."
+        keywords="login, healthcare login, pharmacy consultation login, patient portal, pharmacist dashboard, medical consultation access"
+        url="/login"
+        noindex={true}
+      />
+      <Layout showFooter={false}>
       <div className="bg-gray-50 min-h-screen flex items-center justify-center py-8 sm:py-12 px-4">
         <div className="bg-white p-6 sm:p-8 rounded-lg shadow-md w-full max-w-md">
         <h2 className="text-2xl sm:text-3xl font-bold text-center mb-4 sm:mb-6">Login</h2>
@@ -248,5 +257,6 @@ export default function Login() {
         </div>
       </div>
     </Layout>
+    </>
   )
 }
