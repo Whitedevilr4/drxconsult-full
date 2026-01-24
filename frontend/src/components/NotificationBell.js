@@ -35,7 +35,7 @@ export default function NotificationBell() {
       const token = localStorage.getItem('token');
       if (!token) return;
       
-      const res = await axios.get('http://localhost:5000/api/notifications/unread-count', {
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/notifications/unread-count`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUnreadCount(res.data.count);
@@ -48,7 +48,7 @@ export default function NotificationBell() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const res = await axios.get('http://localhost:5000/api/notifications', {
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/notifications`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setNotifications(res.data);
@@ -63,7 +63,7 @@ export default function NotificationBell() {
     try {
       const token = localStorage.getItem('token');
       await axios.patch(
-        `http://localhost:5000/api/notifications/${notificationId}/read`,
+        `${process.env.NEXT_PUBLIC_API_URL}/notifications/${notificationId}/read`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -81,7 +81,7 @@ export default function NotificationBell() {
     try {
       const token = localStorage.getItem('token');
       await axios.patch(
-        'http://localhost:5000/api/notifications/mark-all-read',
+        `${process.env.NEXT_PUBLIC_API_URL}/notifications/mark-all-read`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -97,7 +97,7 @@ export default function NotificationBell() {
     try {
       const token = localStorage.getItem('token');
       await axios.delete(
-        `http://localhost:5000/api/notifications/${notificationId}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/notifications/${notificationId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
@@ -117,7 +117,7 @@ export default function NotificationBell() {
     try {
       const token = localStorage.getItem('token');
       await axios.delete(
-        'http://localhost:5000/api/notifications',
+        `${process.env.NEXT_PUBLIC_API_URL}/notifications`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
@@ -142,6 +142,10 @@ export default function NotificationBell() {
         return '✔️';
       case 'payment_approved':
         return '💰';
+      case 'new_complaint':
+        return '📝';
+      case 'complaint_updated':
+        return '🔄';
       default:
         return '🔔';
     }
