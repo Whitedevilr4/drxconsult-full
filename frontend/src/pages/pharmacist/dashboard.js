@@ -61,9 +61,15 @@ export default function PharmacistDashboard() {
     const token = localStorage.getItem('token')
     const userData = JSON.parse(localStorage.getItem('user') || '{}')
     
-    if (!token && !userData.name) {
-      setUser({ name: 'Dr. Demo Pharmacist', email: 'demo@example.com', role: 'pharmacist' })
-      setBookings(dummyBookings)
+    // Check if user is logged in
+    if (!token || !userData.role) {
+      router.push('/login?redirect=/pharmacist/dashboard')
+      return
+    }
+    
+    // Check if user has pharmacist or admin role
+    if (userData.role !== 'pharmacist' && userData.role !== 'admin') {
+      setAccessDenied(true)
       setLoading(false)
       return
     }
@@ -76,7 +82,7 @@ export default function PharmacistDashboard() {
       setBookings(dummyBookings)
       setLoading(false)
     }
-  }, [activeTab])
+  }, [activeTab, router])
 
   // Recalculate payment stats whenever bookings change
   useEffect(() => {
@@ -1344,4 +1350,3 @@ export default function PharmacistDashboard() {
     </Layout>
   )
 }
-
