@@ -7,6 +7,7 @@ import SimplePdfViewer from '@/components/SimplePdfViewer'
 import ComplaintList from '@/components/ComplaintList'
 import ComplaintForm from '@/components/ComplaintForm'
 import ComplaintDetail from '@/components/ComplaintDetail'
+import SubscriptionStatus from '@/components/SubscriptionStatus'
 import { toast } from 'react-toastify'
 
 export default function PatientDashboard() {
@@ -194,6 +195,12 @@ export default function PatientDashboard() {
       <div className="bg-gray-50 min-h-screen">
         <div className="container mx-auto px-4 py-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-6">Patient Dashboard</h1>
+          
+          {/* Subscription Status */}
+          <div className="mb-6">
+            <SubscriptionStatus />
+          </div>
+          
         {typeof window !== 'undefined' && !localStorage.getItem('token') && (
           <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
             <div className="flex">
