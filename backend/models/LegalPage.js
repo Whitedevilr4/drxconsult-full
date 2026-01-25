@@ -38,7 +38,6 @@ const legalPageSchema = new mongoose.Schema({
 });
 
 // Index for better query performance
-legalPageSchema.index({ pageType: 1 });
 legalPageSchema.index({ isActive: 1 });
 
 module.exports = mongoose.model('LegalPage', legalPageSchema);
