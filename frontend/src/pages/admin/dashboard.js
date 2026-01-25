@@ -15,6 +15,7 @@ export default function AdminDashboard() {
   const [pharmacists, setPharmacists] = useState([])
   const [patients, setPatients] = useState([])
   const [loading, setLoading] = useState(true)
+  const [accessDenied, setAccessDenied] = useState(false)
   
   // Complaints state
   const [complaints, setComplaints] = useState([])
@@ -22,17 +23,28 @@ export default function AdminDashboard() {
   const [complaintsLoading, setComplaintsLoading] = useState(false)
 
   useEffect(() => {
+    // Only run on client side
+    if (typeof window === 'undefined') return;
+    
     const token = localStorage.getItem('token')
     const userData = JSON.parse(localStorage.getItem('user') || '{}')
     
-    if (!token || userData.role !== 'admin') {
-      router.push('/login')
+    // Check if user is logged in
+    if (!token || !userData.role) {
+      router.push('/login?redirect=/admin/dashboard')
+      return
+    }
+    
+    // Check if user has admin role
+    if (userData.role !== 'admin') {
+      setAccessDenied(true)
+      setLoading(false)
       return
     }
 
     fetchData(token)
     fetchComplaints(token)
-  }, [])
+  }, [router])
 
   const fetchData = async (token) => {
     try {
@@ -87,7 +99,59 @@ export default function AdminDashboard() {
 
   return (
     <Layout>
-      <div className="bg-gray-50 min-h-screen">
+      {/* Access Denied Screen */}
+      {accessDenied && (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+            <div className="mb-6">
+              <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
+              <p className="text-gray-600 mb-6">
+                You don't have permission to access the admin dashboard. This area is restricted to administrators only.
+              </p>
+            </div>
+            
+            <div className="space-y-3">
+              <button
+                onClick={() => router.push('/patient/dashboard')}
+                className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Go to Patient Dashboard
+              </button>
+              <button
+                onClick={() => router.push('/')}
+                className="w-full bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                Go to Home
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.removeItem('token')
+                  localStorage.removeItem('user')
+                  router.push('/login')
+                }}
+                className="w-full text-gray-600 py-2 px-4 rounded-lg hover:text-gray-800 transition-colors text-sm"
+              >
+                Login as Different User
+              </button>
+            </div>
+            
+            <div className="mt-6 p-4 bg-yellow-50 rounded-lg">
+              <p className="text-sm text-yellow-800">
+                <strong>Are you an administrator?</strong> Please contact the system administrator to get admin access.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Normal Dashboard Content */}
+      {!accessDenied && (
+        <div className="bg-gray-50 min-h-screen">
         <div className="container mx-auto px-4 py-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-6">Admin Dashboard</h1>
 
@@ -156,6 +220,7 @@ export default function AdminDashboard() {
                   <option value="complaints">📝 Complaints</option>
                   <option value="website">🌐 Website</option>
                   <option value="users">👥 User Management</option>
+                  <option value="subscriptions">💳 Subscriptions</option>
                 </select>
               </div>
 
@@ -261,6 +326,16 @@ export default function AdminDashboard() {
                 >
                   👥 Users
                 </button>
+                <button
+                  onClick={() => setActiveTab('subscriptions')}
+                  className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
+                    activeTab === 'subscriptions'
+                      ? 'border-b-2 border-purple-600 text-purple-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  💳 Subscriptions
+                </button>
               </nav>
             </div>
 
@@ -276,6 +351,7 @@ export default function AdminDashboard() {
               {activeTab === 'complaints' && <ComplaintsTab complaints={complaints} loading={complaintsLoading} onComplaintClick={handleComplaintClick} onRefresh={() => fetchComplaints(localStorage.getItem('token'))} />}
               {activeTab === 'website' && <WebsiteTab />}
               {activeTab === 'users' && <UserManagementTab />}
+              {activeTab === 'subscriptions' && <SubscriptionManagementTab />}
             </div>
           </div>
         </div>
@@ -289,7 +365,8 @@ export default function AdminDashboard() {
             isAdmin={true}
           />
         )}
-      </div>
+        </div>
+      )}
     </Layout>
   )
 }
@@ -2824,6 +2901,424 @@ function UserManagementTab() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// Subscription Management Tab Component
+function SubscriptionManagementTab() {
+  const [subscriptions, setSubscriptions] = useState([])
+  const [analytics, setAnalytics] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [planFilter, setPlanFilter] = useState('all')
+
+  useEffect(() => {
+    fetchSubscriptionData()
+  }, [])
+
+  const fetchSubscriptionData = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const [subscriptionsRes, analyticsRes] = await Promise.all([
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/subscriptions/admin/all`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/subscriptions/admin/analytics`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ])
+      
+      setSubscriptions(subscriptionsRes.data.subscriptions)
+      setAnalytics(analyticsRes.data.analytics)
+      setLoading(false)
+    } catch (err) {
+      console.error('Error fetching subscription data:', err)
+      toast.error('Failed to load subscription data')
+      setLoading(false)
+    }
+  }
+
+  const filteredSubscriptions = subscriptions.filter(subscription => {
+    const matchesSearch = subscription.userId?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         subscription.userId?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         subscription.planName.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesStatus = statusFilter === 'all' || subscription.status === statusFilter
+    const matchesPlan = planFilter === 'all' || subscription.planType === planFilter
+    return matchesSearch && matchesStatus && matchesPlan
+  })
+
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+        <p className="mt-2 text-gray-600">Loading subscription data...</p>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 space-y-4 sm:space-y-0">
+        <h2 className="text-2xl font-bold">💳 Subscription Management</h2>
+        <button
+          onClick={fetchSubscriptionData}
+          className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 flex items-center space-x-2"
+        >
+          <span>🔄</span>
+          <span>Refresh</span>
+        </button>
+      </div>
+
+      {/* Analytics Cards */}
+      {analytics && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-lg shadow-lg text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-blue-100 text-sm font-medium">Total Subscriptions</p>
+                <p className="text-4xl font-bold mt-2">{analytics.totalSubscriptions}</p>
+              </div>
+              <div className="bg-white bg-opacity-20 p-3 rounded-full">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-green-500 to-green-600 p-6 rounded-lg shadow-lg text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-green-100 text-sm font-medium">Active Subscriptions</p>
+                <p className="text-4xl font-bold mt-2">{analytics.activeSubscriptions}</p>
+              </div>
+              <div className="bg-white bg-opacity-20 p-3 rounded-full">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-lg shadow-lg text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-purple-100 text-sm font-medium">Monthly Revenue</p>
+                <p className="text-4xl font-bold mt-2">₹{analytics.revenue.totalRecurring.toLocaleString()}</p>
+              </div>
+              <div className="bg-white bg-opacity-20 p-3 rounded-full">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-yellow-500 to-orange-500 p-6 rounded-lg shadow-lg text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-yellow-100 text-sm font-medium">Conversion Rate</p>
+                <p className="text-4xl font-bold mt-2">
+                  {analytics.totalSubscriptions > 0 
+                    ? Math.round((analytics.activeSubscriptions / analytics.totalSubscriptions) * 100)
+                    : 0}%
+                </p>
+              </div>
+              <div className="bg-white bg-opacity-20 p-3 rounded-full">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Plan Breakdown */}
+      {analytics && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="text-lg font-semibold mb-4">Plan Distribution</h3>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Essential Care</span>
+                <div className="flex items-center space-x-2">
+                  <div className="w-32 bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-green-500 h-2 rounded-full" 
+                      style={{ 
+                        width: `${analytics.activeSubscriptions > 0 
+                          ? (analytics.planBreakdown.essential / analytics.activeSubscriptions) * 100 
+                          : 0}%` 
+                      }}
+                    ></div>
+                  </div>
+                  <span className="font-semibold">{analytics.planBreakdown.essential}</span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Family & Chronic Care</span>
+                <div className="flex items-center space-x-2">
+                  <div className="w-32 bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-500 h-2 rounded-full" 
+                      style={{ 
+                        width: `${analytics.activeSubscriptions > 0 
+                          ? (analytics.planBreakdown.family / analytics.activeSubscriptions) * 100 
+                          : 0}%` 
+                      }}
+                    ></div>
+                  </div>
+                  <span className="font-semibold">{analytics.planBreakdown.family}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="text-lg font-semibold mb-4">Billing Cycle Distribution</h3>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Monthly</span>
+                <div className="flex items-center space-x-2">
+                  <div className="w-32 bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-purple-500 h-2 rounded-full" 
+                      style={{ 
+                        width: `${analytics.activeSubscriptions > 0 
+                          ? (analytics.billingBreakdown.monthly / analytics.activeSubscriptions) * 100 
+                          : 0}%` 
+                      }}
+                    ></div>
+                  </div>
+                  <span className="font-semibold">{analytics.billingBreakdown.monthly}</span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Yearly</span>
+                <div className="flex items-center space-x-2">
+                  <div className="w-32 bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-orange-500 h-2 rounded-full" 
+                      style={{ 
+                        width: `${analytics.activeSubscriptions > 0 
+                          ? (analytics.billingBreakdown.yearly / analytics.activeSubscriptions) * 100 
+                          : 0}%` 
+                      }}
+                    ></div>
+                  </div>
+                  <span className="font-semibold">{analytics.billingBreakdown.yearly}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="bg-white p-4 rounded-lg shadow mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+            <input
+              type="text"
+              placeholder="Search subscriptions..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="all">All Status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="expired">Expired</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Plan Type</label>
+            <select
+              value={planFilter}
+              onChange={(e) => setPlanFilter(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="all">All Plans</option>
+              <option value="essential">Essential Care</option>
+              <option value="family">Family & Chronic Care</option>
+            </select>
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={() => {
+                setSearchTerm('')
+                setStatusFilter('all')
+                setPlanFilter('all')
+              }}
+              className="w-full bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600"
+            >
+              Clear Filters
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Subscriptions List */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium">
+            Subscriptions ({filteredSubscriptions.length} of {subscriptions.length})
+          </h3>
+        </div>
+
+        {/* Mobile Card View */}
+        <div className="md:hidden">
+          {filteredSubscriptions.map((subscription) => (
+            <div key={subscription._id} className="border-b border-gray-200 p-4">
+              <div className="flex items-start space-x-3">
+                <img
+                  className="h-12 w-12 rounded-full object-cover flex-shrink-0"
+                  src={subscription.userId?.profilePicture || `https://ui-avatars.com/api/?name=${encodeURIComponent(subscription.userId?.name || 'User')}&size=48`}
+                  alt={subscription.userId?.name}
+                  onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(subscription.userId?.name || 'User')}&size=48` }}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium text-gray-900 truncate">
+                      {subscription.userId?.name}
+                    </h3>
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      subscription.status === 'active' ? 'bg-green-100 text-green-800' :
+                      subscription.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                      subscription.status === 'expired' ? 'bg-gray-100 text-gray-800' :
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {subscription.status}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-500 truncate">{subscription.userId?.email}</p>
+                  <div className="mt-2">
+                    <p className="text-sm font-medium text-purple-600">{subscription.planName}</p>
+                    <p className="text-xs text-gray-500">
+                      ₹{subscription.price}/{subscription.billingCycle}
+                    </p>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-500">
+                    <div>Sessions: {subscription.sessionsUsed}/{subscription.sessionsLimit}</div>
+                    {subscription.doctorConsultationsLimit > 0 && (
+                      <div>Doctor: {subscription.doctorConsultationsUsed}/{subscription.doctorConsultationsLimit}</div>
+                    )}
+                    <div>Started: {new Date(subscription.startDate).toLocaleDateString()}</div>
+                    <div>Next: {new Date(subscription.nextBillingDate).toLocaleDateString()}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  User
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Plan
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Usage
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Billing
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Dates
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredSubscriptions.map((subscription) => (
+                <tr key={subscription._id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 h-10 w-10">
+                        <img
+                          className="h-10 w-10 rounded-full object-cover"
+                          src={subscription.userId?.profilePicture || `https://ui-avatars.com/api/?name=${encodeURIComponent(subscription.userId?.name || 'User')}&size=40`}
+                          alt={subscription.userId?.name}
+                          onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(subscription.userId?.name || 'User')}&size=40` }}
+                        />
+                      </div>
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900">
+                          {subscription.userId?.name}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {subscription.userId?.email}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900">
+                      {subscription.planName}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {subscription.planType} • {subscription.billingCycle}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      subscription.status === 'active' ? 'bg-green-100 text-green-800' :
+                      subscription.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                      subscription.status === 'expired' ? 'bg-gray-100 text-gray-800' :
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {subscription.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <div>Sessions: {subscription.sessionsUsed}/{subscription.sessionsLimit}</div>
+                    {subscription.doctorConsultationsLimit > 0 && (
+                      <div className="text-xs text-gray-500">
+                        Doctor: {subscription.doctorConsultationsUsed}/{subscription.doctorConsultationsLimit}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <div>₹{subscription.price}</div>
+                    <div className="text-xs text-gray-500">per {subscription.billingCycle}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <div>Started: {new Date(subscription.startDate).toLocaleDateString()}</div>
+                    <div>Next: {new Date(subscription.nextBillingDate).toLocaleDateString()}</div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {filteredSubscriptions.length === 0 && (
+          <div className="text-center py-8">
+            <p className="text-gray-500">No subscriptions found matching your criteria.</p>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
