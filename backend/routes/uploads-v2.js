@@ -175,7 +175,7 @@ router.post('/pdf', auth, pdfUpload.single('file'), async (req, res) => {
     }
 
     // Generate signed URL for immediate access (1 hour expiry)
-    const signedUrlResult = await generateSignedUrl(uploadResult.data.path, bucketName, 60 * 60 * 24 * 30 );
+    const signedUrlResult = await generateSignedUrl(uploadResult.data.path, bucketName, 3600);
 
     res.json({ 
       url: signedUrlResult.success ? signedUrlResult.signedUrl : uploadResult.data.publicUrl,
