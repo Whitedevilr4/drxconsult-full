@@ -76,7 +76,7 @@ const uploadPdfToSupabase = async (file, bucketName = 'pdfs', folder = '') => {
 /**
  * Generate signed URL for private PDF access
  */
-const generateSignedUrl = async (filePath, bucketName = 'pdfs', expiresIn = 60 * 60 * 24 * 30 ) => {
+const generateSignedUrl = async (filePath, bucketName = 'pdfs', expiresIn = 3600) => {
   try {
     if (!supabase) {
       throw new Error('Supabase not configured');
