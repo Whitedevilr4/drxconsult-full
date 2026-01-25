@@ -159,95 +159,197 @@ export default function BookPharmacist() {
             slotTime: selectedSlot.startTime,
             paymentId: 'FREE_TEST_USER',
             serviceType: selectedService.id,
-            patientDetails
+            patientDetails,
+            bookingType: 'test_user',
+            actualPrice: 0
           },
           { headers: { Authorization: `Bearer ${token}` } }
         )
         toast.success('Booking confirmed! (Free for test users)')
         router.push('/patient/dashboard')
+        return
+      }
+
+      // Check subscription status for regular users
+      const subscriptionCheck = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/can-book-session`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      let bookingPrice = selectedService.price;
+      let bookingType = 'normal_price';
+      let paymentRequired = true;
+
+      if (subscriptionCheck.data.canBookWithSubscription) {
+        bookingPrice = 0;
+        bookingType = 'subscription';
+        paymentRequired = false;
+        
+        // Show confirmation for free subscription booking
+        const confirmFreeBooking = window.confirm(
+          `Great! This session will be covered by your ${subscriptionCheck.data.subscription.planName} subscription.\n\n` +
+          `Sessions used: ${subscriptionCheck.data.sessionsUsed}/${subscriptionCheck.data.sessionsLimit}\n\n` +
+          `Click OK to confirm your booking.`
+        );
+        
+        if (!confirmFreeBooking) {
+          setLoading(false);
+          return;
+        }
+      } else if (subscriptionCheck.data.subscription) {
+        // Show pricing info when subscription limit exceeded
+        const confirmPaidBooking = window.confirm(
+          `Your ${subscriptionCheck.data.subscription.planName} subscription limit has been reached.\n\n` +
+          `Sessions used: ${subscriptionCheck.data.sessionsUsed}/${subscriptionCheck.data.sessionsLimit}\n\n` +
+          `This session will be charged at normal price: ₹${selectedService.price}\n\n` +
+          `Click OK to proceed with payment.`
+        );
+        
+        if (!confirmPaidBooking) {
+          setLoading(false);
+          return;
+        }
       } else {
-        // Regular payment flow for other users
-        const orderRes = await axios.post(
-          `${process.env.NEXT_PUBLIC_API_URL}/payments/create-order`,
-          { amount: selectedService.price, currency: 'INR' },
+        // Show pricing info for users without subscription
+        const confirmPaidBooking = window.confirm(
+          `You don't have an active subscription.\n\n` +
+          `This session will be charged at normal price: ₹${selectedService.price}\n\n` +
+          `Consider subscribing for discounted sessions!\n\n` +
+          `Click OK to proceed with payment.`
+        );
+        
+        if (!confirmPaidBooking) {
+          setLoading(false);
+          return;
+        }
+      }
+
+      // If no payment required (subscription covers it)
+      if (!paymentRequired) {
+        await axios.post(
+          `${process.env.NEXT_PUBLIC_API_URL}/bookings`,
+          {
+            pharmacistId: id,
+            slotDate: selectedSlot.date,
+            slotTime: selectedSlot.startTime,
+            paymentId: 'SUBSCRIPTION_COVERED',
+            serviceType: selectedService.id,
+            patientDetails,
+            bookingType,
+            actualPrice: bookingPrice
+          },
           { headers: { Authorization: `Bearer ${token}` } }
         )
 
-        // Check if Razorpay is loaded
-        let razorpayLoaded = typeof window !== 'undefined' && typeof window.Razorpay !== 'undefined'
-        if (!razorpayLoaded) {
-          
-          for (let i = 0; i < 10; i++) {
-            await new Promise(resolve => setTimeout(resolve, 500))
-            if (typeof window !== 'undefined' && typeof window.Razorpay !== 'undefined') {
-              razorpayLoaded = true
-              break
-            }
-          }
-        }
-        
-        if (!razorpayLoaded) {
-          toast.error('Payment system failed to load. Please refresh the page and try again.')
-          setLoading(false)
-          return
-        }
-
-        // Initialize Razorpay
-        const options = {
-          key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-          amount: orderRes.data.amount,
-          currency: orderRes.data.currency,
-          order_id: orderRes.data.id,
-          name: 'Patient Counselling',
-          description: `${selectedService.title} - ₹${selectedService.price}`,
-          handler: async (response) => {
-            try {
-              
-              // Create booking after payment
-              await axios.post(
-                `${process.env.NEXT_PUBLIC_API_URL}/bookings`,
-                {
-                  pharmacistId: id,
-                  slotDate: selectedSlot.date,
-                  slotTime: selectedSlot.startTime,
-                  paymentId: response.razorpay_payment_id,
-                  serviceType: selectedService.id,
-                  patientDetails
-                },
-                { headers: { Authorization: `Bearer ${token}` } }
-              )
-              toast.success('Booking confirmed successfully!')
-              router.push('/patient/dashboard')
-            } catch (bookingErr) {
-              console.error('Booking error:', bookingErr)
-              toast.error('Booking failed: ' + (bookingErr.response?.data?.message || bookingErr.message))
-              fetchPharmacist()
-            }
-          },
-          modal: {
-            ondismiss: function() {
-              
-              setLoading(false)
-            }
-          },
-          theme: {
-            color: '#2563eb'
-          }
-        }
-
+        // Update subscription usage
         try {
-          const razorpay = new window.Razorpay(options)
-          razorpay.on('payment.failed', function (response) {
-            console.error('Payment failed:', response.error)
-            toast.error('Payment failed: ' + response.error.description)
-            setLoading(false)
-          })
-          razorpay.open()
-        } catch (razorpayErr) {
-          console.error('Razorpay initialization error:', razorpayErr)
-          toast.error('Payment system error: ' + razorpayErr.message)
-          setLoading(false)
+          await axios.post(
+            `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/use-session`,
+            { bookingType },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        } catch (sessionErr) {
+          console.warn('Failed to update session usage:', sessionErr);
         }
+
+        toast.success('Booking confirmed using your subscription!')
+        router.push('/patient/dashboard')
+        return
+      }
+
+      // Regular payment flow for paid bookings
+      const orderRes = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/payments/create-order`,
+        { amount: bookingPrice, currency: 'INR' },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+
+      // Check if Razorpay is loaded
+      let razorpayLoaded = typeof window !== 'undefined' && typeof window.Razorpay !== 'undefined'
+      if (!razorpayLoaded) {
+        
+        for (let i = 0; i < 10; i++) {
+          await new Promise(resolve => setTimeout(resolve, 500))
+          if (typeof window !== 'undefined' && typeof window.Razorpay !== 'undefined') {
+            razorpayLoaded = true
+            break
+          }
+        }
+      }
+      
+      if (!razorpayLoaded) {
+        toast.error('Payment system failed to load. Please refresh the page and try again.')
+        setLoading(false)
+        return
+      }
+
+      // Initialize Razorpay
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        amount: orderRes.data.amount,
+        currency: orderRes.data.currency,
+        order_id: orderRes.data.id,
+        name: 'Patient Counselling',
+        description: `${selectedService.title} - ₹${bookingPrice}`,
+        handler: async (response) => {
+          try {
+            // Create booking after payment with pre-determined booking type
+            await axios.post(
+              `${process.env.NEXT_PUBLIC_API_URL}/bookings`,
+              {
+                pharmacistId: id,
+                slotDate: selectedSlot.date,
+                slotTime: selectedSlot.startTime,
+                paymentId: response.razorpay_payment_id,
+                serviceType: selectedService.id,
+                patientDetails,
+                bookingType,
+                actualPrice: bookingPrice
+              },
+              { headers: { Authorization: `Bearer ${token}` } }
+            )
+
+            // Update session usage based on booking type
+            try {
+              await axios.post(
+                `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/use-session`,
+                { bookingType },
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+            } catch (sessionErr) {
+              console.warn('Failed to update session usage:', sessionErr);
+            }
+
+            toast.success('Booking confirmed successfully!')
+            router.push('/patient/dashboard')
+          } catch (bookingErr) {
+            console.error('Booking error:', bookingErr)
+            toast.error('Booking failed: ' + (bookingErr.response?.data?.message || bookingErr.message))
+            fetchPharmacist()
+          }
+        },
+        modal: {
+          ondismiss: function() {
+            setLoading(false)
+          }
+        },
+        theme: {
+          color: '#2563eb'
+        }
+      }
+
+      try {
+        const razorpay = new window.Razorpay(options)
+        razorpay.on('payment.failed', function (response) {
+          console.error('Payment failed:', response.error)
+          toast.error('Payment failed: ' + response.error.description)
+          setLoading(false)
+        })
+        razorpay.open()
+      } catch (razorpayErr) {
+        console.error('Razorpay initialization error:', razorpayErr)
+        toast.error('Payment system error: ' + razorpayErr.message)
+        setLoading(false)
       }
     } catch (err) {
       console.error(err)
