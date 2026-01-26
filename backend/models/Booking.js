@@ -2,7 +2,8 @@ const mongoose = require('mongoose');
 
 const bookingSchema = new mongoose.Schema({
   patientId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  pharmacistId: { type: mongoose.Schema.Types.ObjectId, ref: 'Pharmacist', required: true },
+  pharmacistId: { type: mongoose.Schema.Types.ObjectId, ref: 'Pharmacist' },
+  doctorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Doctor' },
   slotDate: { type: Date, required: true },
   slotTime: { type: String, required: true },
   meetLink: String,
@@ -27,6 +28,14 @@ const bookingSchema = new mongoose.Schema({
     }
   },
   
+  // Provider type
+  providerType: {
+    type: String,
+    enum: ['pharmacist', 'doctor'],
+    required: true,
+    default: 'pharmacist'
+  },
+  
   // Patient Details
   patientDetails: {
     age: { type: Number, required: true },
@@ -48,7 +57,14 @@ const bookingSchema = new mongoose.Schema({
       return this.serviceType === 'prescription_review' ? 100 : 250; // 50% share
     }
   },
+  doctorShare: { 
+    type: Number, 
+    default: function() {
+      return this.serviceType === 'prescription_review' ? 100 : 250; // 50% share
+    }
+  },
   pharmacistPaid: { type: Boolean, default: false },
+  doctorPaid: { type: Boolean, default: false },
   paidAt: Date,
   paidBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   
