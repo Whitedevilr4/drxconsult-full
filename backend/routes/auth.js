@@ -385,13 +385,30 @@ router.post('/firebase-login', [
     
     const { email, uid } = decodedToken;
     
-    // Check if user exists
-    let user = await User.findOne({ 
-      $or: [
-        { email: email },
-        { firebaseUid: uid }
-      ]
-    });
+    // Check if user exists with timeout
+    let user;
+    try {
+      user = await Promise.race([
+        User.findOne({ 
+          $or: [
+            { email: email },
+            { firebaseUid: uid }
+          ]
+        }).maxTimeMS(8000), // 8 second timeout
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Database query timeout')), 8000)
+        )
+      ]);
+    } catch (dbError) {
+      console.error('Database query error:', dbError);
+      if (dbError.message === 'Database query timeout') {
+        return res.status(503).json({ 
+          message: 'Database connection timeout. Please try again.',
+          retryable: true 
+        });
+      }
+      throw dbError;
+    }
     
     if (!user) {
       return res.status(404).json({ 
@@ -404,7 +421,22 @@ router.post('/firebase-login', [
     if (!user.firebaseUid) {
       user.firebaseUid = uid;
       user.isEmailVerified = true; // Firebase emails are pre-verified
-      await user.save();
+      try {
+        await Promise.race([
+          user.save(),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Database save timeout')), 5000)
+          )
+        ]);
+      } catch (saveError) {
+        console.error('User save error:', saveError);
+        if (saveError.message === 'Database save timeout') {
+          // Continue with login even if save fails
+          console.warn('⚠️  User save timeout, continuing with login');
+        } else {
+          throw saveError;
+        }
+      }
     }
     
     // Generate JWT token
