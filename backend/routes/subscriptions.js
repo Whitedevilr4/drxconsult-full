@@ -1,8 +1,9 @@
 const express = require('express');
+const { body, validationResult } = require('express-validator');
 const Subscription = require('../models/Subscription');
 const User = require('../models/User');
 const { auth, isAdmin } = require('../middleware/auth');
-const { body, validationResult } = require('express-validator');
+const { sendSubscriptionWelcomeEmail } = require('../utils/emailService');
 
 const router = express.Router();
 
@@ -157,6 +158,18 @@ router.post('/create', [
 
     await subscription.save();
 
+    // Send subscription welcome email
+    try {
+      const user = await User.findById(req.user.userId);
+      if (user) {
+        await sendSubscriptionWelcomeEmail(user.email, user.name, subscription);
+        console.log(`✅ Subscription welcome email sent to ${user.email}`);
+      }
+    } catch (emailError) {
+      console.error(`❌ Failed to send subscription welcome email:`, emailError);
+      // Don't fail the subscription creation if email fails
+    }
+
     res.status(201).json({
       message: 'Subscription created successfully',
       subscription
@@ -259,6 +272,8 @@ router.post('/cancel', auth, async (req, res) => {
 // Check if user can book a session
 router.get('/can-book-session', auth, async (req, res) => {
   try {
+    const { professionalType } = req.query; // 'pharmacist' or 'doctor'
+    
     const subscription = await Subscription.findOne({
       userId: req.user.userId,
       status: 'active'
@@ -276,15 +291,35 @@ router.get('/can-book-session', auth, async (req, res) => {
 
     await subscription.resetMonthlyUsage();
     
-    const canBookWithSubscription = subscription.canBookSession();
+    let canBookWithSubscription = false;
+    let reason = null;
+    let sessionsUsed = 0;
+    let sessionsLimit = 0;
+    
+    if (professionalType === 'doctor') {
+      // Doctor consultations are only available for family plan
+      canBookWithSubscription = subscription.canBookDoctorConsultation();
+      reason = canBookWithSubscription ? null : 
+        subscription.planType !== 'family' ? 'Doctor consultations require Family plan' :
+        'Doctor consultation limit exceeded - will be charged normal price';
+      sessionsUsed = subscription.doctorConsultationsUsed;
+      sessionsLimit = subscription.doctorConsultationsLimit;
+    } else {
+      // Regular pharmacist sessions
+      canBookWithSubscription = subscription.canBookSession();
+      reason = canBookWithSubscription ? null : 'Session limit exceeded - will be charged normal price';
+      sessionsUsed = subscription.sessionsUsed;
+      sessionsLimit = subscription.sessionsLimit;
+    }
     
     res.json({
       canBook: true, // Always allow booking
       canBookWithSubscription,
-      reason: canBookWithSubscription ? null : 'Session limit exceeded - will be charged normal price',
-      sessionsUsed: subscription.sessionsUsed,
-      sessionsLimit: subscription.sessionsLimit,
+      reason,
+      sessionsUsed,
+      sessionsLimit,
       bookingType: canBookWithSubscription ? 'subscription' : 'normal_price',
+      professionalType: professionalType || 'pharmacist',
       subscription: {
         planName: subscription.planName,
         planType: subscription.planType
@@ -299,7 +334,7 @@ router.get('/can-book-session', auth, async (req, res) => {
 // Use a session (called when booking is confirmed)
 router.post('/use-session', auth, async (req, res) => {
   try {
-    const { bookingType } = req.body; // 'subscription' or 'normal_price'
+    const { bookingType, professionalType } = req.body; // 'subscription' or 'normal_price', 'pharmacist' or 'doctor'
     
     const subscription = await Subscription.findOne({
       userId: req.user.userId,
@@ -311,30 +346,61 @@ router.post('/use-session', auth, async (req, res) => {
       return res.json({
         message: 'Booking confirmed at normal price',
         bookingType: 'normal_price',
-        sessionsUsed: subscription ? subscription.sessionsUsed : 0,
-        sessionsLimit: subscription ? subscription.sessionsLimit : 0
+        professionalType: professionalType || 'pharmacist',
+        sessionsUsed: subscription ? 
+          (professionalType === 'doctor' ? subscription.doctorConsultationsUsed : subscription.sessionsUsed) : 0,
+        sessionsLimit: subscription ? 
+          (professionalType === 'doctor' ? subscription.doctorConsultationsLimit : subscription.sessionsLimit) : 0
       });
     }
 
     // If booking with subscription, try to use subscription session
     await subscription.resetMonthlyUsage();
     
-    if (subscription.canBookSession()) {
-      await subscription.useSession();
-      res.json({
-        message: 'Session used from subscription',
-        bookingType: 'subscription',
-        sessionsUsed: subscription.sessionsUsed,
-        sessionsLimit: subscription.sessionsLimit
-      });
+    if (professionalType === 'doctor') {
+      // Use doctor consultation
+      if (subscription.canBookDoctorConsultation()) {
+        await subscription.useDoctorConsultation();
+        res.json({
+          message: 'Doctor consultation used from subscription',
+          bookingType: 'subscription',
+          professionalType: 'doctor',
+          sessionsUsed: subscription.doctorConsultationsUsed,
+          sessionsLimit: subscription.doctorConsultationsLimit
+        });
+      } else {
+        // Doctor consultation limit exceeded, book at normal price
+        res.json({
+          message: subscription.planType !== 'family' ? 
+            'Doctor consultations require Family plan - booked at normal price' :
+            'Doctor consultation limit exceeded - booked at normal price',
+          bookingType: 'normal_price',
+          professionalType: 'doctor',
+          sessionsUsed: subscription.doctorConsultationsUsed,
+          sessionsLimit: subscription.doctorConsultationsLimit
+        });
+      }
     } else {
-      // Subscription limit exceeded, book at normal price
-      res.json({
-        message: 'Subscription limit exceeded - booked at normal price',
-        bookingType: 'normal_price',
-        sessionsUsed: subscription.sessionsUsed,
-        sessionsLimit: subscription.sessionsLimit
-      });
+      // Use regular pharmacist session
+      if (subscription.canBookSession()) {
+        await subscription.useSession();
+        res.json({
+          message: 'Session used from subscription',
+          bookingType: 'subscription',
+          professionalType: 'pharmacist',
+          sessionsUsed: subscription.sessionsUsed,
+          sessionsLimit: subscription.sessionsLimit
+        });
+      } else {
+        // Subscription limit exceeded, book at normal price
+        res.json({
+          message: 'Subscription limit exceeded - booked at normal price',
+          bookingType: 'normal_price',
+          professionalType: 'pharmacist',
+          sessionsUsed: subscription.sessionsUsed,
+          sessionsLimit: subscription.sessionsLimit
+        });
+      }
     }
   } catch (err) {
     console.error('Error using session:', err);
