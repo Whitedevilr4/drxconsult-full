@@ -21,33 +21,43 @@ const mongooseOptions = {
   minPoolSize: 1, // Reduced from 2 for serverless
   maxIdleTimeMS: 30000, // Close connections after 30 seconds of inactivity
   family: 4, // Use IPv4, skip trying IPv6
-  bufferCommands: false, // Disable mongoose buffering
-  bufferMaxEntries: 0 // Disable mongoose buffering
+  bufferCommands: false // Disable mongoose buffering
+  // Removed bufferMaxEntries as it's not supported in newer versions
 };
 
-mongoose.connect(process.env.MONGODB_URI, mongooseOptions)
-  .then(() => {
+// Initialize MongoDB connection
+let isConnected = false;
+
+const connectDB = async () => {
+  if (isConnected) {
+    return;
+  }
+  
+  try {
+    await mongoose.connect(process.env.MONGODB_URI, mongooseOptions);
+    isConnected = true;
     console.log('✅ MongoDB connected successfully');
-  })
-  .catch(err => {
+  } catch (err) {
     console.error('❌ MongoDB connection error:', err);
-    // Don't exit in production, let Vercel handle it
-    if (process.env.NODE_ENV !== 'production') {
-      process.exit(1);
-    }
-  });
+    isConnected = false;
+    throw err;
+  }
+};
 
 // Handle MongoDB connection events
 mongoose.connection.on('error', (err) => {
   console.error('❌ MongoDB connection error:', err);
+  isConnected = false;
 });
 
 mongoose.connection.on('disconnected', () => {
   console.warn('⚠️  MongoDB disconnected');
+  isConnected = false;
 });
 
 mongoose.connection.on('reconnected', () => {
   console.log('✅ MongoDB reconnected');
+  isConnected = true;
 });
 
 // Routes
@@ -72,7 +82,8 @@ app.get('/', (req, res) => {
     message: 'Patient Counselling API',
     status: 'running',
     environment: process.env.NODE_ENV || 'development',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    mongodb: isConnected ? 'connected' : 'disconnected'
   });
 });
 
@@ -98,54 +109,86 @@ app.use('*', (req, res) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, async () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-
-  // Test Supabase connection with timeout
-  try {
-    console.log('🔍 Testing Supabase connection...');
-    const supabaseTest = await Promise.race([
-      testSupabaseConnection(),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Supabase connection timeout')), 10000)
-      )
-    ]);
-    
-    if (supabaseTest.success) {
-      console.log('✅ Supabase connected successfully');
-      // Initialize storage buckets
-      await initializeStorageBuckets();
-    } else {
-      console.warn('⚠️  Supabase connection failed:', supabaseTest.error);
+// For Vercel serverless functions, we need to export the app
+if (process.env.NODE_ENV === 'production') {
+  // Connect to database on first request
+  app.use(async (req, res, next) => {
+    try {
+      await connectDB();
+      next();
+    } catch (error) {
+      console.error('❌ Database connection failed:', error);
+      res.status(503).json({ 
+        message: 'Database connection failed. Please try again.',
+        retryable: true 
+      });
     }
-  } catch (error) {
-    console.warn('⚠️  Supabase initialization error:', error.message);
-  }
+  });
   
-  // Run cleanup on server start
-  cleanupExpiredSlots()
-    .then(count => {
-      if (count > 0) {
-        console.log(`🧹 Cleaned up ${count} expired slots`);
-      }
-    })
-    .catch(err => console.error('Initial cleanup error:', err));
+  module.exports = app;
+} else {
+  // Development server
+  const PORT = process.env.PORT || 5000;
   
-  // Initial OTP cleanup
-  cleanupExpiredOTPs()
-    .then(count => {
-      if (count > 0) {
-        console.log(`🧹 Cleaned up ${count} expired OTPs`);
-      }
-    })
-    .catch(err => console.error('Initial OTP cleanup error:', err));
+  const startServer = async () => {
+    try {
+      await connectDB();
+      
+      app.listen(PORT, async () => {
+        console.log(`🚀 Server running on port ${PORT}`);
+
+        // Test Supabase connection with timeout
+        try {
+          console.log('🔍 Testing Supabase connection...');
+          const supabaseTest = await Promise.race([
+            testSupabaseConnection(),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Supabase connection timeout')), 10000)
+            )
+          ]);
+          
+          if (supabaseTest.success) {
+            console.log('✅ Supabase connected successfully');
+            // Initialize storage buckets
+            await initializeStorageBuckets();
+          } else {
+            console.warn('⚠️  Supabase connection failed:', supabaseTest.error);
+          }
+        } catch (error) {
+          console.warn('⚠️  Supabase initialization error:', error.message);
+        }
+        
+        // Run cleanup on server start
+        cleanupExpiredSlots()
+          .then(count => {
+            if (count > 0) {
+              console.log(`🧹 Cleaned up ${count} expired slots`);
+            }
+          })
+          .catch(err => console.error('Initial cleanup error:', err));
+        
+        // Initial OTP cleanup
+        cleanupExpiredOTPs()
+          .then(count => {
+            if (count > 0) {
+              console.log(`🧹 Cleaned up ${count} expired OTPs`);
+            }
+          })
+          .catch(err => console.error('Initial OTP cleanup error:', err));
+        
+        // Schedule cleanup to run every hour
+        setInterval(() => {
+          cleanupExpiredSlots();
+          cleanupExpiredOTPs();
+        }, 60 * 60 * 1000); // 1 hour
+        
+        console.log('✅ Server initialization complete');
+      });
+    } catch (error) {
+      console.error('❌ Failed to start server:', error);
+      process.exit(1);
+    }
+  };
   
-  // Schedule cleanup to run every hour
-  setInterval(() => {
-    cleanupExpiredSlots();
-    cleanupExpiredOTPs();
-  }, 60 * 60 * 1000); // 1 hour
-  
-  console.log('✅ Server initialization complete');
-});
+  startServer();
+}
