@@ -1,11 +1,12 @@
 const express = require('express');
 const Booking = require('../models/Booking');
 const Pharmacist = require('../models/Pharmacist');
+const Doctor = require('../models/Doctor');
 const User = require('../models/User');
 const { auth, isPharmacist } = require('../middleware/auth');
 const { createMeetLink } = require('../utils/googleMeet');
 const { cleanupExpiredSlotsForPharmacist } = require('../utils/slotCleanup');
-const { notifyBookingConfirmed, notifyMeetingLinkAdded, notifyTestResultUploaded } = require('../utils/notificationHelper');
+const { notifyBookingConfirmed, notifyMeetingLinkAdded, notifyTestResultUploaded, notifyReviewSubmitted } = require('../utils/notificationHelper');
 const { 
   sendBookingConfirmationEmail, 
   sendPharmacistBookingNotification, 
@@ -16,22 +17,41 @@ const {
 
 const router = express.Router();
 
-// Get available slots for a pharmacist (public)
-router.get('/available-slots/:pharmacistId', async (req, res) => {
+// Get available slots for a professional (public) - supports both pharmacists and doctors
+router.get('/available-slots/:professionalId', async (req, res) => {
   try {
-    // Clean up expired slots first
-    await cleanupExpiredSlotsForPharmacist(req.params.pharmacistId);
+    const { professionalId } = req.params;
+    const { type } = req.query; // 'pharmacist' or 'doctor'
     
-    const pharmacist = await Pharmacist.findById(req.params.pharmacistId);
-    if (!pharmacist) {
-      return res.status(404).json({ message: 'Pharmacist not found' });
+    let professional;
+    let activeBookings;
+    
+    if (type === 'doctor') {
+      professional = await Doctor.findById(professionalId);
+      if (!professional) {
+        return res.status(404).json({ message: 'Doctor not found' });
+      }
+      
+      // Get all active bookings for this doctor
+      activeBookings = await Booking.find({
+        doctorId: professionalId,
+        status: { $in: ['confirmed', 'pending'] }
+      });
+    } else {
+      // Default to pharmacist for backward compatibility
+      await cleanupExpiredSlotsForPharmacist(professionalId);
+      
+      professional = await Pharmacist.findById(professionalId);
+      if (!professional) {
+        return res.status(404).json({ message: 'Pharmacist not found' });
+      }
+      
+      // Get all active bookings for this pharmacist
+      activeBookings = await Booking.find({
+        pharmacistId: professionalId,
+        status: { $in: ['confirmed', 'pending'] }
+      });
     }
-    
-    // Get all active bookings for this pharmacist
-    const activeBookings = await Booking.find({
-      pharmacistId: req.params.pharmacistId,
-      status: { $in: ['confirmed', 'pending'] }
-    });
     
     // Create a map of booked slots
     const bookedSlots = new Map();
@@ -41,7 +61,7 @@ router.get('/available-slots/:pharmacistId', async (req, res) => {
     });
     
     // Update slot availability based on actual bookings
-    const availableSlots = pharmacist.availableSlots.map(slot => {
+    const availableSlots = professional.availableSlots.map(slot => {
       const key = `${slot.date.toISOString()}_${slot.startTime}`;
       return {
         date: slot.date,
@@ -58,11 +78,12 @@ router.get('/available-slots/:pharmacistId', async (req, res) => {
   }
 });
 
-// Create booking (patient)
+// Create booking (patient) - supports both pharmacists and doctors
 router.post('/', auth, async (req, res) => {
   try {
     const { 
       pharmacistId, 
+      doctorId,
       slotDate, 
       slotTime, 
       paymentId,
@@ -84,10 +105,34 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ message: 'Invalid service type' });
     }
     
-    // Check if pharmacist exists
-    const pharmacist = await Pharmacist.findById(pharmacistId);
-    if (!pharmacist) {
-      return res.status(404).json({ message: 'Pharmacist not found' });
+    // Ensure either pharmacistId or doctorId is provided, but not both
+    if (!pharmacistId && !doctorId) {
+      return res.status(400).json({ message: 'Either pharmacistId or doctorId is required' });
+    }
+    
+    if (pharmacistId && doctorId) {
+      return res.status(400).json({ message: 'Cannot book with both pharmacist and doctor' });
+    }
+    
+    let professional;
+    let professionalUser;
+    let professionalType;
+    
+    // Check if professional exists
+    if (pharmacistId) {
+      professional = await Pharmacist.findById(pharmacistId);
+      if (!professional) {
+        return res.status(404).json({ message: 'Pharmacist not found' });
+      }
+      professionalUser = await User.findById(professional.userId);
+      professionalType = 'pharmacist';
+    } else {
+      professional = await Doctor.findById(doctorId);
+      if (!professional) {
+        return res.status(404).json({ message: 'Doctor not found' });
+      }
+      professionalUser = await User.findById(professional.userId);
+      professionalType = 'doctor';
     }
     
     // Check if there's an active booking for this slot (primary check)
@@ -95,23 +140,29 @@ router.post('/', auth, async (req, res) => {
     const startOfDay = new Date(bookingDate.setHours(0, 0, 0, 0));
     const endOfDay = new Date(bookingDate.setHours(23, 59, 59, 999));
     
-    const existingBooking = await Booking.findOne({
-      pharmacistId,
+    const existingBookingQuery = {
       slotDate: {
         $gte: startOfDay,
         $lte: endOfDay
       },
       slotTime,
       status: { $in: ['confirmed', 'pending'] }
-    });
+    };
+    
+    if (pharmacistId) {
+      existingBookingQuery.pharmacistId = pharmacistId;
+    } else {
+      existingBookingQuery.doctorId = doctorId;
+    }
+    
+    const existingBooking = await Booking.findOne(existingBookingQuery);
     
     if (existingBooking) {
-      
       return res.status(400).json({ message: 'This slot is already booked. Please select another slot.' });
     }
     
-    // Check if slot exists in pharmacist's availableSlots and if it's booked
-    const slot = pharmacist.availableSlots.find(s => 
+    // Check if slot exists in professional's availableSlots and if it's booked
+    const slot = professional.availableSlots.find(s => 
       s.date.toISOString() === new Date(slotDate).toISOString() && s.startTime === slotTime
     );
     if (slot && slot.isBooked) {
@@ -120,12 +171,11 @@ router.post('/', auth, async (req, res) => {
     
     // Calculate payment amounts based on service type
     const paymentAmount = serviceType === 'prescription_review' ? 200 : 500;
-    const pharmacistShare = serviceType === 'prescription_review' ? 100 : 250;
+    const professionalShare = serviceType === 'prescription_review' ? 100 : 250;
     
     // Create booking with enhanced details
-    const booking = new Booking({
+    const bookingData = {
       patientId: req.user.userId,
-      pharmacistId,
       slotDate,
       slotTime,
       meetLink: '', // Empty initially
@@ -138,25 +188,42 @@ router.post('/', auth, async (req, res) => {
         prescriptionUrl: patientDetails.prescriptionUrl,
         additionalNotes: patientDetails.additionalNotes || ''
       },
-      paymentAmount,
-      pharmacistShare
-    });
+      paymentAmount
+    };
     
+    // Add professional-specific fields and validate
+    if (pharmacistId && doctorId) {
+      return res.status(400).json({ message: 'Cannot have both pharmacistId and doctorId' });
+    }
+    if (!pharmacistId && !doctorId) {
+      return res.status(400).json({ message: 'Either pharmacistId or doctorId must be provided' });
+    }
+    
+    if (pharmacistId) {
+      bookingData.pharmacistId = pharmacistId;
+      bookingData.pharmacistShare = professionalShare;
+      bookingData.providerType = 'pharmacist';
+    } else {
+      bookingData.doctorId = doctorId;
+      bookingData.doctorShare = professionalShare;
+      bookingData.providerType = 'doctor';
+    }
+    
+    const booking = new Booking(bookingData);
     await booking.save();
     
     // Mark slot as booked if it exists in the availableSlots array
     if (slot) {
       slot.isBooked = true;
-      await pharmacist.save();
+      await professional.save();
     }
     
     // Send notifications
     const patient = await User.findById(req.user.userId);
-    const pharmacistUser = await User.findById(pharmacist.userId);
     await notifyBookingConfirmed({
       booking,
       patientName: patient?.name || 'Patient',
-      pharmacistName: pharmacistUser?.name || 'Pharmacist'
+      pharmacistName: professionalUser?.name || professionalType
     });
     
     // Send email notifications with service type info
@@ -165,13 +232,13 @@ router.post('/', auth, async (req, res) => {
         patient.email, 
         booking, 
         patient.name,
-        pharmacistUser?.name || 'Pharmacist'
+        professionalUser?.name || professionalType
       );
     }
     
-    if (pharmacistUser?.email) {
+    if (professionalUser?.email) {
       await sendPharmacistBookingNotification(
-        pharmacistUser.email,
+        professionalUser.email,
         booking,
         patient?.name || 'Patient',
         patient?.email || '',
@@ -189,7 +256,6 @@ router.post('/', auth, async (req, res) => {
 // Get user bookings
 router.get('/my-bookings', auth, async (req, res) => {
   try {
-
     let query;
     if (req.user.role === 'patient') {
       query = { patientId: req.user.userId };
@@ -197,18 +263,37 @@ router.get('/my-bookings', auth, async (req, res) => {
       // For pharmacist, first find their pharmacist profile
       const pharmacist = await Pharmacist.findOne({ userId: req.user.userId });
       if (!pharmacist) {
-        
         return res.json([]);
       }
-      
       query = { pharmacistId: pharmacist._id };
+    } else if (req.user.role === 'doctor') {
+      // For doctor, first find their doctor profile
+      const doctor = await Doctor.findOne({ userId: req.user.userId });
+      if (!doctor) {
+        return res.json([]);
+      }
+      query = { doctorId: doctor._id };
     } else {
       query = { patientId: req.user.userId };
     }
     
     const bookings = await Booking.find(query)
       .populate('patientId', 'name email phone')
-      .populate('pharmacistId');
+      .populate({
+        path: 'pharmacistId',
+        populate: {
+          path: 'userId',
+          select: 'name email phone'
+        }
+      })
+      .populate({
+        path: 'doctorId',
+        populate: {
+          path: 'userId',
+          select: 'name email phone'
+        }
+      })
+      .sort({ createdAt: -1 });
 
     res.json(bookings);
   } catch (err) {
@@ -217,12 +302,40 @@ router.get('/my-bookings', auth, async (req, res) => {
   }
 });
 
-// Upload counselling report (pharmacist)
-router.put('/:id/report', auth, isPharmacist, async (req, res) => {
+// Upload counselling report (pharmacist or doctor)
+router.put('/:id/report', auth, async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
     if (!booking) {
       return res.status(404).json({ message: 'Booking not found' });
+    }
+    
+    let professional = null;
+    let professionalUser = null;
+    let isAuthorized = false;
+    
+    // Check if user is the pharmacist for this booking
+    if (booking.pharmacistId) {
+      const pharmacist = await Pharmacist.findOne({ userId: req.user.userId });
+      if (pharmacist && booking.pharmacistId.toString() === pharmacist._id.toString()) {
+        professional = pharmacist;
+        professionalUser = await User.findById(pharmacist.userId);
+        isAuthorized = true;
+      }
+    }
+    
+    // Check if user is the doctor for this booking
+    if (booking.doctorId && !isAuthorized) {
+      const doctor = await Doctor.findOne({ userId: req.user.userId });
+      if (doctor && booking.doctorId.toString() === doctor._id.toString()) {
+        professional = doctor;
+        professionalUser = await User.findById(doctor.userId);
+        isAuthorized = true;
+      }
+    }
+    
+    if (!isAuthorized) {
+      return res.status(403).json({ message: 'Not authorized to update this booking' });
     }
     
     booking.counsellingReport = req.body.reportUrl;
@@ -231,15 +344,13 @@ router.put('/:id/report', auth, isPharmacist, async (req, res) => {
     
     // Send email notification to patient
     const patient = await User.findById(booking.patientId);
-    const pharmacist = await Pharmacist.findById(booking.pharmacistId);
-    const pharmacistUser = await User.findById(pharmacist?.userId);
     
     if (patient?.email) {
       await sendReportSubmittedEmail(
         patient.email,
         booking,
         patient.name,
-        pharmacistUser?.name || 'Pharmacist'
+        professionalUser?.name || (booking.doctorId ? 'Doctor' : 'Pharmacist')
       );
     }
     
@@ -249,12 +360,40 @@ router.put('/:id/report', auth, isPharmacist, async (req, res) => {
   }
 });
 
-// Upload test result for booked patient (pharmacist)
-router.put('/:id/test-result', auth, isPharmacist, async (req, res) => {
+// Upload test result for booked patient (pharmacist or doctor)
+router.put('/:id/test-result', auth, async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
     if (!booking) {
       return res.status(404).json({ message: 'Booking not found' });
+    }
+    
+    let professional = null;
+    let professionalUser = null;
+    let isAuthorized = false;
+    
+    // Check if user is the pharmacist for this booking
+    if (booking.pharmacistId) {
+      const pharmacist = await Pharmacist.findOne({ userId: req.user.userId });
+      if (pharmacist && booking.pharmacistId.toString() === pharmacist._id.toString()) {
+        professional = pharmacist;
+        professionalUser = await User.findById(pharmacist.userId);
+        isAuthorized = true;
+      }
+    }
+    
+    // Check if user is the doctor for this booking
+    if (booking.doctorId && !isAuthorized) {
+      const doctor = await Doctor.findOne({ userId: req.user.userId });
+      if (doctor && booking.doctorId.toString() === doctor._id.toString()) {
+        professional = doctor;
+        professionalUser = await User.findById(doctor.userId);
+        isAuthorized = true;
+      }
+    }
+    
+    if (!isAuthorized) {
+      return res.status(403).json({ message: 'Not authorized to update this booking' });
     }
     
     const { testResultUrl } = req.body;
@@ -265,22 +404,20 @@ router.put('/:id/test-result', auth, isPharmacist, async (req, res) => {
     await booking.save();
     
     // Send notifications
-    const pharmacist = await Pharmacist.findById(booking.pharmacistId);
     await notifyTestResultUploaded({
       booking,
-      pharmacistName: pharmacist?.name || 'Pharmacist'
+      pharmacistName: professionalUser?.name || (booking.doctorId ? 'Doctor' : 'Pharmacist')
     });
     
     // Send email notification to patient
     const patient = await User.findById(booking.patientId);
-    const pharmacistUser = await User.findById(pharmacist?.userId);
     
     if (patient?.email) {
       await sendTestResultEmail(
         patient.email,
         booking,
         patient.name,
-        pharmacistUser?.name || 'Pharmacist'
+        professionalUser?.name || (booking.doctorId ? 'Doctor' : 'Pharmacist')
       );
     }
     
@@ -293,8 +430,8 @@ router.put('/:id/test-result', auth, isPharmacist, async (req, res) => {
   }
 });
 
-// Add meeting link (pharmacist only)
-router.patch('/:id/meeting-link', auth, isPharmacist, async (req, res) => {
+// Add meeting link (pharmacist or doctor)
+router.patch('/:id/meeting-link', auth, async (req, res) => {
   try {
     const { meetLink } = req.body;
     
@@ -307,9 +444,31 @@ router.patch('/:id/meeting-link', auth, isPharmacist, async (req, res) => {
       return res.status(404).json({ message: 'Booking not found' });
     }
     
-    // Verify pharmacist owns this booking
-    const pharmacist = await Pharmacist.findOne({ userId: req.user.userId });
-    if (!pharmacist || booking.pharmacistId.toString() !== pharmacist._id.toString()) {
+    let professional = null;
+    let professionalUser = null;
+    let isAuthorized = false;
+    
+    // Check if user is the pharmacist for this booking
+    if (booking.pharmacistId) {
+      const pharmacist = await Pharmacist.findOne({ userId: req.user.userId });
+      if (pharmacist && booking.pharmacistId.toString() === pharmacist._id.toString()) {
+        professional = pharmacist;
+        professionalUser = await User.findById(pharmacist.userId);
+        isAuthorized = true;
+      }
+    }
+    
+    // Check if user is the doctor for this booking
+    if (booking.doctorId && !isAuthorized) {
+      const doctor = await Doctor.findOne({ userId: req.user.userId });
+      if (doctor && booking.doctorId.toString() === doctor._id.toString()) {
+        professional = doctor;
+        professionalUser = await User.findById(doctor.userId);
+        isAuthorized = true;
+      }
+    }
+    
+    if (!isAuthorized) {
       return res.status(403).json({ message: 'Not authorized to update this booking' });
     }
     
@@ -317,10 +476,9 @@ router.patch('/:id/meeting-link', auth, isPharmacist, async (req, res) => {
     await booking.save();
     
     // Send notifications
-    const pharmacistUser = await User.findById(pharmacist.userId);
     await notifyMeetingLinkAdded({
       booking,
-      pharmacistName: pharmacistUser?.name || 'Pharmacist'
+      pharmacistName: professionalUser?.name || (booking.doctorId ? 'Doctor' : 'Pharmacist')
     });
     
     // Send email notification to patient
@@ -331,7 +489,7 @@ router.patch('/:id/meeting-link', auth, isPharmacist, async (req, res) => {
         patient.email,
         booking,
         patient.name,
-        pharmacistUser?.name || 'Pharmacist'
+        professionalUser?.name || (booking.doctorId ? 'Doctor' : 'Pharmacist')
       );
     }
     
@@ -345,12 +503,34 @@ router.patch('/:id/meeting-link', auth, isPharmacist, async (req, res) => {
   }
 });
 
-// Update treatment status (pharmacist)
-router.patch('/:id/treatment-status', auth, isPharmacist, async (req, res) => {
+// Update treatment status (pharmacist or doctor)
+router.patch('/:id/treatment-status', auth, async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
     if (!booking) {
       return res.status(404).json({ message: 'Booking not found' });
+    }
+    
+    let isAuthorized = false;
+    
+    // Check if user is the pharmacist for this booking
+    if (booking.pharmacistId) {
+      const pharmacist = await Pharmacist.findOne({ userId: req.user.userId });
+      if (pharmacist && booking.pharmacistId.toString() === pharmacist._id.toString()) {
+        isAuthorized = true;
+      }
+    }
+    
+    // Check if user is the doctor for this booking
+    if (booking.doctorId && !isAuthorized) {
+      const doctor = await Doctor.findOne({ userId: req.user.userId });
+      if (doctor && booking.doctorId.toString() === doctor._id.toString()) {
+        isAuthorized = true;
+      }
+    }
+    
+    if (!isAuthorized) {
+      return res.status(403).json({ message: 'Not authorized to update this booking' });
     }
     
     booking.treatmentStatus = req.body.treatmentStatus;
@@ -390,16 +570,19 @@ router.patch('/:id/cancel', auth, async (req, res) => {
       return res.status(400).json({ message: 'Cannot cancel a completed booking' });
     }
     
-    // Verify user is either the patient or the pharmacist
+    // Verify user is either the patient, pharmacist, or doctor
     const isPatient = booking.patientId.toString() === req.user.userId;
-    let isPharmacist = false;
+    let isProfessional = false;
     
-    if (req.user.role === 'pharmacist') {
+    if (req.user.role === 'pharmacist' && booking.pharmacistId) {
       const pharmacist = await Pharmacist.findOne({ userId: req.user.userId });
-      isPharmacist = pharmacist && booking.pharmacistId.toString() === pharmacist._id.toString();
+      isProfessional = pharmacist && booking.pharmacistId.toString() === pharmacist._id.toString();
+    } else if (req.user.role === 'doctor' && booking.doctorId) {
+      const doctor = await Doctor.findOne({ userId: req.user.userId });
+      isProfessional = doctor && booking.doctorId.toString() === doctor._id.toString();
     }
     
-    if (!isPatient && !isPharmacist) {
+    if (!isPatient && !isProfessional) {
       return res.status(403).json({ message: 'Not authorized to cancel this booking' });
     }
     
@@ -430,8 +613,8 @@ router.patch('/:id/cancel', auth, async (req, res) => {
   }
 });
 
-// Reschedule booking (pharmacist only)
-router.patch('/:id/reschedule', auth, isPharmacist, async (req, res) => {
+// Reschedule booking (pharmacist or doctor)
+router.patch('/:id/reschedule', auth, async (req, res) => {
   try {
     const { newDate, newTime } = req.body;
     
@@ -444,21 +627,40 @@ router.patch('/:id/reschedule', auth, isPharmacist, async (req, res) => {
       return res.status(404).json({ message: 'Booking not found' });
     }
     
-    // Verify pharmacist owns this booking
-    const pharmacist = await Pharmacist.findOne({ userId: req.user.userId });
-    if (!pharmacist || booking.pharmacistId.toString() !== pharmacist._id.toString()) {
+    let professional = null;
+    let isAuthorized = false;
+    
+    // Check if user is the pharmacist for this booking
+    if (booking.pharmacistId) {
+      const pharmacist = await Pharmacist.findOne({ userId: req.user.userId });
+      if (pharmacist && booking.pharmacistId.toString() === pharmacist._id.toString()) {
+        professional = pharmacist;
+        isAuthorized = true;
+      }
+    }
+    
+    // Check if user is the doctor for this booking
+    if (booking.doctorId && !isAuthorized) {
+      const doctor = await Doctor.findOne({ userId: req.user.userId });
+      if (doctor && booking.doctorId.toString() === doctor._id.toString()) {
+        professional = doctor;
+        isAuthorized = true;
+      }
+    }
+    
+    if (!isAuthorized) {
       return res.status(403).json({ message: 'Not authorized to reschedule this booking' });
     }
     
     // Free up old slot
-    const oldSlot = pharmacist.availableSlots.find(s => 
+    const oldSlot = professional.availableSlots.find(s => 
       s.date.toISOString() === new Date(booking.slotDate).toISOString() && 
       s.startTime === booking.slotTime
     );
     if (oldSlot) oldSlot.isBooked = false;
     
     // Book new slot
-    const newSlot = pharmacist.availableSlots.find(s => 
+    const newSlot = professional.availableSlots.find(s => 
       s.date.toISOString() === new Date(newDate).toISOString() && 
       s.startTime === newTime
     );
@@ -469,7 +671,7 @@ router.patch('/:id/reschedule', auth, isPharmacist, async (req, res) => {
       newSlot.isBooked = true;
     }
     
-    await pharmacist.save();
+    await professional.save();
     
     // Update booking
     booking.slotDate = newDate;
@@ -523,6 +725,20 @@ router.post('/:id/review', auth, async (req, res) => {
     
     await booking.save();
     
+    // Send notification to professional
+    try {
+      const patient = await User.findById(booking.patientId);
+      await notifyReviewSubmitted({
+        booking,
+        patientName: patient?.name || 'Patient',
+        rating,
+        feedback
+      });
+    } catch (notificationError) {
+      console.error('Failed to send review notification:', notificationError);
+      // Don't fail the review submission if notification fails
+    }
+    
     res.json({
       message: 'Review submitted successfully',
       booking
@@ -533,17 +749,30 @@ router.post('/:id/review', auth, async (req, res) => {
   }
 });
 
-// Get reviews for a pharmacist (public)
-router.get('/reviews/:pharmacistId', async (req, res) => {
+// Get reviews for a professional (pharmacist or doctor) (public)
+router.get('/reviews/:professionalId', async (req, res) => {
   try {
-    const reviews = await Booking.find({
-      pharmacistId: req.params.pharmacistId,
-      status: 'completed',
-      'review.rating': { $exists: true }
-    })
-    .populate('patientId', 'name')
-    .select('review slotDate')
-    .sort({ 'review.submittedAt': -1 });
+    const { type } = req.query; // 'doctor' or default to 'pharmacist'
+    
+    let query;
+    if (type === 'doctor') {
+      query = {
+        doctorId: req.params.professionalId,
+        status: 'completed',
+        'review.rating': { $exists: true }
+      };
+    } else {
+      query = {
+        pharmacistId: req.params.professionalId,
+        status: 'completed',
+        'review.rating': { $exists: true }
+      };
+    }
+    
+    const reviews = await Booking.find(query)
+      .populate('patientId', 'name')
+      .select('review slotDate')
+      .sort({ 'review.submittedAt': -1 });
     
     const totalReviews = reviews.length;
     const averageRating = totalReviews > 0
