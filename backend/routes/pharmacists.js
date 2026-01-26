@@ -2,7 +2,6 @@ const express = require('express');
 const Pharmacist = require('../models/Pharmacist');
 const User = require('../models/User');
 const { auth, isPharmacist } = require('../middleware/auth');
-const { withSlotCleanup } = require('../utils/slotCleanup');
 const { cleanupExpiredSlotsForPharmacist } = require('../utils/slotCleanup');
 
 const router = express.Router();
@@ -10,68 +9,46 @@ const router = express.Router();
 // Get all pharmacists (public)
 router.get('/', async (req, res) => {
   try {
-    const pharmacists = await Promise.race([
-      Pharmacist.find().populate('userId', 'name email').maxTimeMS(5000),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Database query timeout')), 5000)
-      )
-    ]);
+    const pharmacists = await Pharmacist.find().populate('userId', 'name email');
     
-    // RELIABLE cleanup - ALWAYS filters expired slots
-    const cleanedPharmacists = await withSlotCleanup(pharmacists, 'pharmacist');
+    // Clean up expired slots for each pharmacist before returning
+    for (const pharmacist of pharmacists) {
+      if (pharmacist.availableSlots && pharmacist.availableSlots.length > 0) {
+        await cleanupExpiredSlotsForPharmacist(pharmacist._id);
+      }
+    }
+    
+    // Fetch again after cleanup and add rating/session data
+    const updatedPharmacists = await Pharmacist.find().populate('userId', 'name email');
     
     // Add rating and completed sessions data
     const Booking = require('../models/Booking');
     const pharmacistsWithStats = await Promise.all(
-      cleanedPharmacists.map(async (pharmacist) => {
-        try {
-          // Get completed bookings with reviews with timeout
-          const completedBookings = await Promise.race([
-            Booking.find({
-              pharmacistId: pharmacist._id,
-              status: 'completed'
-            }).maxTimeMS(3000),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Booking query timeout')), 3000)
-            )
-          ]);
-          
-          const reviewedBookings = completedBookings.filter(b => b.review && b.review.rating);
-          
-          const averageRating = reviewedBookings.length > 0
-            ? reviewedBookings.reduce((sum, b) => sum + b.review.rating, 0) / reviewedBookings.length
-            : 0;
-          
-          const pharmacistObj = pharmacist.toObject();
-          pharmacistObj.averageRating = Math.round(averageRating * 10) / 10;
-          pharmacistObj.totalReviews = reviewedBookings.length;
-          pharmacistObj.completedSessions = completedBookings.length;
-          
-          return pharmacistObj;
-        } catch (statsError) {
-          console.error(`Error fetching stats for pharmacist ${pharmacist._id}:`, statsError);
-          // Return pharmacist without stats if stats query fails
-          const pharmacistObj = pharmacist.toObject();
-          pharmacistObj.averageRating = 0;
-          pharmacistObj.totalReviews = 0;
-          pharmacistObj.completedSessions = 0;
-          return pharmacistObj;
-        }
+      updatedPharmacists.map(async (pharmacist) => {
+        // Get completed bookings with reviews
+        const completedBookings = await Booking.find({
+          pharmacistId: pharmacist._id,
+          status: 'completed'
+        });
+        
+        const reviewedBookings = completedBookings.filter(b => b.review && b.review.rating);
+        
+        const averageRating = reviewedBookings.length > 0
+          ? reviewedBookings.reduce((sum, b) => sum + b.review.rating, 0) / reviewedBookings.length
+          : 0;
+        
+        const pharmacistObj = pharmacist.toObject();
+        pharmacistObj.averageRating = Math.round(averageRating * 10) / 10;
+        pharmacistObj.totalReviews = reviewedBookings.length;
+        pharmacistObj.completedSessions = completedBookings.length;
+        
+        return pharmacistObj;
       })
     );
     
     res.json(pharmacistsWithStats);
   } catch (err) {
-    console.error('Error fetching pharmacists:', err);
-    
-    if (err.message === 'Database query timeout' || err.name === 'MongooseError') {
-      return res.status(503).json({ 
-        message: 'Database connection timeout. Please try again.',
-        retryable: true 
-      });
-    }
-    
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
