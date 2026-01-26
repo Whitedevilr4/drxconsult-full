@@ -5,7 +5,8 @@ import { toast } from 'react-toastify';
 export default function TimeSlotManagement() {
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [pharmacistId, setPharmacistId] = useState(null);
+  const [professionalId, setProfessionalId] = useState(null);
+  const [professionalType, setProfessionalType] = useState('pharmacist');
   const [newSlot, setNewSlot] = useState({
     date: '',
     startTime: '',
@@ -22,66 +23,56 @@ export default function TimeSlotManagement() {
       const token = localStorage.getItem('token');
       const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-      // Get all pharmacists
+      // Determine professional type based on user role
+      const profType = user.role === 'doctor' ? 'doctor' : 'pharmacist';
+      setProfessionalType(profType);
+
+      // Get all professionals of the appropriate type
+      const endpoint = profType === 'doctor' ? 'doctors' : 'pharmacists';
       const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/pharmacists`,
+        `${process.env.NEXT_PUBLIC_API_URL}/${endpoint}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // Find current pharmacist's data - try multiple matching strategies
-      let currentPharmacist = null;
+      // Find current professional's data - try multiple matching strategies
+      let currentProfessional = null;
       const userId = user.id || user._id;
       
       // Strategy 1: Match by email (most reliable)
-      currentPharmacist = res.data.find(p => {
-        const match = p.userId?.email?.toLowerCase() === user.email?.toLowerCase();
-        if (match) {
-          console.log('✅ Found pharmacist by email match');
-        }
-        return match;
+      currentProfessional = res.data.find(p => {
+        return p.userId?.email?.toLowerCase() === user.email?.toLowerCase();
       });
       
       // Strategy 2: Match by user ID (convert both to strings for comparison)
-      if (!currentPharmacist && userId) {
-        currentPharmacist = res.data.find(p => {
-          const pharmacistUserId = p.userId?._id?.toString();
+      if (!currentProfessional && userId) {
+        currentProfessional = res.data.find(p => {
+          const professionalUserId = p.userId?._id?.toString();
           const currentUserId = userId.toString();
-          const match = pharmacistUserId === currentUserId;
-          if (match) {
-            console.log('✅ Found pharmacist by user ID match');
-          }
-          return match;
+          return professionalUserId === currentUserId;
         });
       }
       
       // Strategy 3: Match by name (case insensitive, exact match)
-      if (!currentPharmacist && user.name) {
-        currentPharmacist = res.data.find(p => {
-          const match = p.userId?.name?.toLowerCase().trim() === user.name?.toLowerCase().trim();
-          if (match) {
-            console.log('✅ Found pharmacist by name match');
-          }
-          return match;
+      if (!currentProfessional && user.name) {
+        currentProfessional = res.data.find(p => {
+          return p.userId?.name?.toLowerCase().trim() === user.name?.toLowerCase().trim();
         });
       }
       
-      // Strategy 4: If only one pharmacist, use that
-      if (!currentPharmacist && res.data.length === 1) {
-        console.log('✅ Using single pharmacist available');
-        currentPharmacist = res.data[0];
+      // Strategy 4: If only one professional, use that
+      if (!currentProfessional && res.data.length === 1) {
+        currentProfessional = res.data[0];
       }
 
-      if (currentPharmacist) {
-        console.log('✅ Pharmacist found:', currentPharmacist.userId?.name);
-        setPharmacistId(currentPharmacist._id);
-        setSlots(currentPharmacist.availableSlots || []);
+      if (currentProfessional) {
+        setProfessionalId(currentProfessional._id);
+        setSlots(currentProfessional.availableSlots || []);
       } else {
-        console.error('❌ No pharmacist profile found for user:', user);
-        toast.error('Unable to load your pharmacist profile. Please log out and log in again.');
+        toast.error(`Unable to load your ${profType} profile. Please log out and log in again.`);
       }
       setLoading(false);
     } catch (err) {
-      console.error('❌ Error fetching slots:', err);
+      console.error('Error fetching slots:', err);
       setLoading(false);
     }
   };
@@ -108,8 +99,10 @@ export default function TimeSlotManagement() {
         }
       ];
 
-      await axios.put(
-        `${process.env.NEXT_PUBLIC_API_URL}/pharmacists/slots`,
+      const endpoint = professionalType === 'doctor' ? 'doctors' : 'pharmacists';
+      
+      const response = await axios.put(
+        `${process.env.NEXT_PUBLIC_API_URL}/${endpoint}/slots`,
         { slots: updatedSlots },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -120,9 +113,9 @@ export default function TimeSlotManagement() {
       toast.success('Slot added successfully!');
       setTimeout(() => setMessage(''), 3000);
     } catch (err) {
-      console.error(err);
+      console.error('Error adding slot:', err);
       setMessage('Failed to add slot');
-      toast.error('Failed to add slot');
+      toast.error('Failed to add slot: ' + (err.response?.data?.message || err.message));
     }
   };
 
@@ -133,8 +126,9 @@ export default function TimeSlotManagement() {
       const token = localStorage.getItem('token');
       const updatedSlots = slots.filter((_, i) => i !== index);
 
+      const endpoint = professionalType === 'doctor' ? 'doctors' : 'pharmacists';
       await axios.put(
-        `${process.env.NEXT_PUBLIC_API_URL}/pharmacists/slots`,
+        `${process.env.NEXT_PUBLIC_API_URL}/${endpoint}/slots`,
         { slots: updatedSlots },
         { headers: { Authorization: `Bearer ${token}` } }
       );
