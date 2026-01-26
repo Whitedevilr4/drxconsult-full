@@ -4,7 +4,6 @@ const Doctor = require('../models/Doctor');
 const User = require('../models/User');
 const Booking = require('../models/Booking');
 const { auth } = require('../middleware/auth');
-const { withSlotCleanup } = require('../utils/slotCleanup');
 
 // Get all doctors
 router.get('/', async (req, res) => {
@@ -13,49 +12,36 @@ router.get('/', async (req, res) => {
       .populate('userId', 'name email phone profilePicture')
       .sort({ createdAt: -1 });
     
-    // Simple cleanup - just filter expired slots in memory
-    const cleanedDoctors = await withSlotCleanup(doctors, 'doctor');
-    
     // Calculate rating and session statistics for each doctor
-    const doctorsWithStats = await Promise.all(cleanedDoctors.map(async (doctor) => {
-      try {
-        // Get all completed bookings for this doctor
-        const completedBookings = await Booking.find({ 
-          doctorId: doctor._id, 
-          status: 'completed' 
-        });
-        
-        // Calculate rating statistics
-        const reviewedBookings = completedBookings.filter(booking => 
-          booking.review && booking.review.rating
+    const doctorsWithStats = await Promise.all(doctors.map(async (doctor) => {
+      // Get all completed bookings for this doctor
+      const completedBookings = await Booking.find({ 
+        doctorId: doctor._id, 
+        status: 'completed' 
+      });
+      
+      // Calculate rating statistics
+      const reviewedBookings = completedBookings.filter(booking => 
+        booking.review && booking.review.rating
+      );
+      
+      let averageRating = 0;
+      let totalReviews = reviewedBookings.length;
+      
+      if (totalReviews > 0) {
+        const totalRating = reviewedBookings.reduce((sum, booking) => 
+          sum + booking.review.rating, 0
         );
-        
-        let averageRating = 0;
-        let totalReviews = reviewedBookings.length;
-        
-        if (totalReviews > 0) {
-          const totalRating = reviewedBookings.reduce((sum, booking) => 
-            sum + booking.review.rating, 0
-          );
-          averageRating = totalRating / totalReviews;
-        }
-        
-        // Convert to plain object and add statistics
-        const doctorObj = doctor.toObject();
-        doctorObj.averageRating = Math.round(averageRating * 10) / 10; // Round to 1 decimal
-        doctorObj.totalReviews = totalReviews;
-        doctorObj.completedSessions = completedBookings.length;
-        
-        return doctorObj;
-      } catch (statsError) {
-        console.error(`Error fetching stats for doctor ${doctor._id}:`, statsError);
-        // Return doctor without stats if stats query fails
-        const doctorObj = doctor.toObject();
-        doctorObj.averageRating = 0;
-        doctorObj.totalReviews = 0;
-        doctorObj.completedSessions = 0;
-        return doctorObj;
+        averageRating = totalRating / totalReviews;
       }
+      
+      // Convert to plain object and add statistics
+      const doctorObj = doctor.toObject();
+      doctorObj.averageRating = Math.round(averageRating * 10) / 10; // Round to 1 decimal
+      doctorObj.totalReviews = totalReviews;
+      doctorObj.completedSessions = completedBookings.length;
+      
+      return doctorObj;
     }));
     
     res.json(doctorsWithStats);
