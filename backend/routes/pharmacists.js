@@ -10,9 +10,14 @@ const router = express.Router();
 // Get all pharmacists (public)
 router.get('/', async (req, res) => {
   try {
-    const pharmacists = await Pharmacist.find().populate('userId', 'name email');
+    const pharmacists = await Promise.race([
+      Pharmacist.find().populate('userId', 'name email').maxTimeMS(5000),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database query timeout')), 5000)
+      )
+    ]);
     
-    // Simple cleanup - just filter expired slots in memory
+    // RELIABLE cleanup - ALWAYS filters expired slots
     const cleanedPharmacists = await withSlotCleanup(pharmacists, 'pharmacist');
     
     // Add rating and completed sessions data
@@ -20,11 +25,16 @@ router.get('/', async (req, res) => {
     const pharmacistsWithStats = await Promise.all(
       cleanedPharmacists.map(async (pharmacist) => {
         try {
-          // Get completed bookings with reviews
-          const completedBookings = await Booking.find({
-            pharmacistId: pharmacist._id,
-            status: 'completed'
-          });
+          // Get completed bookings with reviews with timeout
+          const completedBookings = await Promise.race([
+            Booking.find({
+              pharmacistId: pharmacist._id,
+              status: 'completed'
+            }).maxTimeMS(3000),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Booking query timeout')), 3000)
+            )
+          ]);
           
           const reviewedBookings = completedBookings.filter(b => b.review && b.review.rating);
           
@@ -53,6 +63,14 @@ router.get('/', async (req, res) => {
     res.json(pharmacistsWithStats);
   } catch (err) {
     console.error('Error fetching pharmacists:', err);
+    
+    if (err.message === 'Database query timeout' || err.name === 'MongooseError') {
+      return res.status(503).json({ 
+        message: 'Database connection timeout. Please try again.',
+        retryable: true 
+      });
+    }
+    
     res.status(500).json({ message: 'Server error' });
   }
 });
