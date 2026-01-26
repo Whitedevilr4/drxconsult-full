@@ -45,8 +45,8 @@ function isSlotExpired(slot, now = new Date()) {
 }
 
 /**
- * Simple slot cleanup that only filters expired slots in memory
- * No database operations - just ensures users don't see expired slots
+ * RELIABLE slot cleanup that ALWAYS filters expired slots
+ * This function ensures expired slots are removed every single time
  */
 async function withSlotCleanup(professionals, type = 'mixed') {
   if (!Array.isArray(professionals)) {
@@ -54,17 +54,42 @@ async function withSlotCleanup(professionals, type = 'mixed') {
   }
   
   const now = new Date();
+  const cleanedProfessionals = [];
   
   for (const professional of professionals) {
     if (professional && professional.availableSlots && professional.availableSlots.length > 0) {
-      // Simply filter expired slots in memory - no database operations
+      const originalCount = professional.availableSlots.length;
+      
+      // ALWAYS filter expired slots - this happens in memory first
+      // This ensures users NEVER see expired slots, even if save fails
       professional.availableSlots = professional.availableSlots.filter(slot => {
         return !isSlotExpired(slot, now);
       });
+      
+      const cleanedCount = originalCount - professional.availableSlots.length;
+      
+      // If slots were cleaned, save immediately (with timeout protection)
+      if (cleanedCount > 0) {
+        try {
+          await Promise.race([
+            professional.save(),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Database save timeout')), 3000)
+            )
+          ]);
+          console.log(`🧹 Cleaned ${cleanedCount} expired slots for ${type} ${professional._id}`);
+        } catch (saveError) {
+          console.error(`❌ Failed to save cleaned slots for ${type} ${professional._id}:`, saveError);
+          // Continue anyway - the slots are still filtered in memory
+          // This ensures users don't see expired slots even if database save fails
+        }
+      }
     }
+    
+    cleanedProfessionals.push(professional);
   }
   
-  return professionals.length === 1 ? professionals[0] : professionals;
+  return cleanedProfessionals.length === 1 ? cleanedProfessionals[0] : cleanedProfessionals;
 }
 
 /**
