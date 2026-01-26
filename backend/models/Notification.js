@@ -20,6 +20,7 @@ const notificationSchema = new mongoose.Schema({
   message: { type: String, required: true },
   bookingId: { type: mongoose.Schema.Types.ObjectId, ref: 'Booking' },
   pharmacistId: { type: mongoose.Schema.Types.ObjectId, ref: 'Pharmacist' },
+  doctorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Doctor' },
   patientId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   isRead: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now }
