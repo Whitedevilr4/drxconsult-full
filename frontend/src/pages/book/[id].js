@@ -5,13 +5,14 @@ import Layout from '@/components/Layout'
 import PdfUploader from '@/components/EnhancedUploader'
 import { toast } from 'react-toastify'
 
-export default function BookPharmacist() {
+export default function BookProfessional() {
   const router = useRouter()
-  const { id } = router.query
-  const [pharmacist, setPharmacist] = useState(null)
+  const { id, type } = router.query // Add type parameter to distinguish between pharmacist and doctor
+  const [professional, setProfessional] = useState(null)
   const [selectedSlot, setSelectedSlot] = useState(null)
   const [loading, setLoading] = useState(false)
   const [pageLoading, setPageLoading] = useState(true)
+  const [professionalType, setProfessionalType] = useState('pharmacist') // Default to pharmacist
   
   // Service selection and patient details
   const [showServiceModal, setShowServiceModal] = useState(false)
@@ -59,11 +60,14 @@ export default function BookPharmacist() {
 
   useEffect(() => {
     if (id) {
-      fetchPharmacist()
+      // Determine professional type from query parameter or default to pharmacist
+      const profType = type === 'doctor' ? 'doctor' : 'pharmacist'
+      setProfessionalType(profType)
+      fetchProfessional(profType)
     }
-  }, [id])
+  }, [id, type])
 
-  const fetchPharmacist = async () => {
+  const fetchProfessional = async (profType) => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL
       if (!apiUrl) {
@@ -72,21 +76,22 @@ export default function BookPharmacist() {
         return
       }
       
-      // Fetch pharmacist details
-      const pharmacistRes = await axios.get(`${apiUrl}/pharmacists/${id}`)
+      // Fetch professional details based on type
+      const endpoint = profType === 'doctor' ? 'doctors' : 'pharmacists'
+      const professionalRes = await axios.get(`${apiUrl}/${endpoint}/${id}`)
       
-      // Fetch available slots with booking status
-      const slotsRes = await axios.get(`${apiUrl}/bookings/available-slots/${id}`)
+      // Fetch available slots with booking status - include type parameter
+      const slotsRes = await axios.get(`${apiUrl}/bookings/available-slots/${id}?type=${profType}`)
       
-      if (pharmacistRes.data) {
+      if (professionalRes.data) {
         // Use slots from the dedicated endpoint (real data only)
-        pharmacistRes.data.availableSlots = slotsRes.data || []
-        setPharmacist(pharmacistRes.data)
+        professionalRes.data.availableSlots = slotsRes.data || []
+        setProfessional(professionalRes.data)
       }
       setPageLoading(false)
     } catch (err) {
-      console.error('Error fetching pharmacist:', err)
-      toast.error('Failed to load pharmacist details. Please make sure the backend server is running.')
+      console.error(`Error fetching ${profType}:`, err)
+      toast.error(`Failed to load ${profType} details. Please make sure the backend server is running.`)
       setPageLoading(false)
     }
   }
@@ -151,18 +156,26 @@ export default function BookPharmacist() {
 
       if (isTestUser) {
         // Free booking for test users
+        const bookingData = {
+          slotDate: selectedSlot.date,
+          slotTime: selectedSlot.startTime,
+          paymentId: 'FREE_TEST_USER',
+          serviceType: selectedService.id,
+          patientDetails,
+          bookingType: 'test_user',
+          actualPrice: 0
+        }
+        
+        // Add the appropriate ID based on professional type
+        if (professionalType === 'doctor') {
+          bookingData.doctorId = id
+        } else {
+          bookingData.pharmacistId = id
+        }
+
         await axios.post(
           `${process.env.NEXT_PUBLIC_API_URL}/bookings`,
-          {
-            pharmacistId: id,
-            slotDate: selectedSlot.date,
-            slotTime: selectedSlot.startTime,
-            paymentId: 'FREE_TEST_USER',
-            serviceType: selectedService.id,
-            patientDetails,
-            bookingType: 'test_user',
-            actualPrice: 0
-          },
+          bookingData,
           { headers: { Authorization: `Bearer ${token}` } }
         )
         toast.success('Booking confirmed! (Free for test users)')
@@ -172,7 +185,7 @@ export default function BookPharmacist() {
 
       // Check subscription status for regular users
       const subscriptionCheck = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/can-book-session`,
+        `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/can-book-session?professionalType=${professionalType}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -186,9 +199,10 @@ export default function BookPharmacist() {
         paymentRequired = false;
         
         // Show confirmation for free subscription booking
+        const sessionType = professionalType === 'doctor' ? 'doctor consultation' : 'pharmacist session';
         const confirmFreeBooking = window.confirm(
-          `Great! This session will be covered by your ${subscriptionCheck.data.subscription.planName} subscription.\n\n` +
-          `Sessions used: ${subscriptionCheck.data.sessionsUsed}/${subscriptionCheck.data.sessionsLimit}\n\n` +
+          `Great! This ${sessionType} will be covered by your ${subscriptionCheck.data.subscription.planName} subscription.\n\n` +
+          `${professionalType === 'doctor' ? 'Doctor consultations' : 'Sessions'} used: ${subscriptionCheck.data.sessionsUsed}/${subscriptionCheck.data.sessionsLimit}\n\n` +
           `Click OK to confirm your booking.`
         );
         
@@ -198,10 +212,13 @@ export default function BookPharmacist() {
         }
       } else if (subscriptionCheck.data.subscription) {
         // Show pricing info when subscription limit exceeded
+        const sessionType = professionalType === 'doctor' ? 'doctor consultation' : 'pharmacist session';
+        const limitType = professionalType === 'doctor' ? 'Doctor consultation' : 'Session';
         const confirmPaidBooking = window.confirm(
           `Your ${subscriptionCheck.data.subscription.planName} subscription limit has been reached.\n\n` +
-          `Sessions used: ${subscriptionCheck.data.sessionsUsed}/${subscriptionCheck.data.sessionsLimit}\n\n` +
-          `This session will be charged at normal price: ₹${selectedService.price}\n\n` +
+          `${limitType} limit: ${subscriptionCheck.data.sessionsUsed}/${subscriptionCheck.data.sessionsLimit}\n\n` +
+          `This ${sessionType} will be charged at normal price: ₹${selectedService.price}\n\n` +
+          `${subscriptionCheck.data.reason || ''}\n\n` +
           `Click OK to proceed with payment.`
         );
         
@@ -211,9 +228,10 @@ export default function BookPharmacist() {
         }
       } else {
         // Show pricing info for users without subscription
+        const sessionType = professionalType === 'doctor' ? 'doctor consultation' : 'pharmacist session';
         const confirmPaidBooking = window.confirm(
           `You don't have an active subscription.\n\n` +
-          `This session will be charged at normal price: ₹${selectedService.price}\n\n` +
+          `This ${sessionType} will be charged at normal price: ₹${selectedService.price}\n\n` +
           `Consider subscribing for discounted sessions!\n\n` +
           `Click OK to proceed with payment.`
         );
@@ -226,18 +244,26 @@ export default function BookPharmacist() {
 
       // If no payment required (subscription covers it)
       if (!paymentRequired) {
+        const bookingData = {
+          slotDate: selectedSlot.date,
+          slotTime: selectedSlot.startTime,
+          paymentId: 'SUBSCRIPTION_COVERED',
+          serviceType: selectedService.id,
+          patientDetails,
+          bookingType,
+          actualPrice: bookingPrice
+        }
+        
+        // Add the appropriate ID based on professional type
+        if (professionalType === 'doctor') {
+          bookingData.doctorId = id
+        } else {
+          bookingData.pharmacistId = id
+        }
+
         await axios.post(
           `${process.env.NEXT_PUBLIC_API_URL}/bookings`,
-          {
-            pharmacistId: id,
-            slotDate: selectedSlot.date,
-            slotTime: selectedSlot.startTime,
-            paymentId: 'SUBSCRIPTION_COVERED',
-            serviceType: selectedService.id,
-            patientDetails,
-            bookingType,
-            actualPrice: bookingPrice
-          },
+          bookingData,
           { headers: { Authorization: `Bearer ${token}` } }
         )
 
@@ -245,14 +271,14 @@ export default function BookPharmacist() {
         try {
           await axios.post(
             `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/use-session`,
-            { bookingType },
+            { bookingType, professionalType },
             { headers: { Authorization: `Bearer ${token}` } }
           );
         } catch (sessionErr) {
           console.warn('Failed to update session usage:', sessionErr);
         }
 
-        toast.success('Booking confirmed using your subscription!')
+        toast.success(`Booking confirmed using your subscription!`)
         router.push('/patient/dashboard')
         return
       }
@@ -294,18 +320,26 @@ export default function BookPharmacist() {
         handler: async (response) => {
           try {
             // Create booking after payment with pre-determined booking type
+            const bookingData = {
+              slotDate: selectedSlot.date,
+              slotTime: selectedSlot.startTime,
+              paymentId: response.razorpay_payment_id,
+              serviceType: selectedService.id,
+              patientDetails,
+              bookingType,
+              actualPrice: bookingPrice
+            }
+            
+            // Add the appropriate ID based on professional type
+            if (professionalType === 'doctor') {
+              bookingData.doctorId = id
+            } else {
+              bookingData.pharmacistId = id
+            }
+
             await axios.post(
               `${process.env.NEXT_PUBLIC_API_URL}/bookings`,
-              {
-                pharmacistId: id,
-                slotDate: selectedSlot.date,
-                slotTime: selectedSlot.startTime,
-                paymentId: response.razorpay_payment_id,
-                serviceType: selectedService.id,
-                patientDetails,
-                bookingType,
-                actualPrice: bookingPrice
-              },
+              bookingData,
               { headers: { Authorization: `Bearer ${token}` } }
             )
 
@@ -325,7 +359,7 @@ export default function BookPharmacist() {
           } catch (bookingErr) {
             console.error('Booking error:', bookingErr)
             toast.error('Booking failed: ' + (bookingErr.response?.data?.message || bookingErr.message))
-            fetchPharmacist()
+            fetchProfessional(professionalType)
           }
         },
         modal: {
@@ -357,7 +391,7 @@ export default function BookPharmacist() {
       toast.error('Booking failed: ' + errorMessage)
       
       if (errorMessage.includes('already booked')) {
-        fetchPharmacist()
+        fetchProfessional(professionalType)
         setSelectedSlot(null)
       }
     } finally {
@@ -379,7 +413,7 @@ export default function BookPharmacist() {
     setShowPrescriptionUploader(false)
   }
 
-  if (pageLoading || !pharmacist) {
+  if (pageLoading || !professional) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -406,8 +440,8 @@ export default function BookPharmacist() {
             <h1 className="text-3xl font-bold mb-6">Book Appointment</h1>
             
             <div className="mb-6">
-              <h2 className="text-xl font-semibold mb-2">{pharmacist.userId?.name}</h2>
-              <p className="text-gray-600">{pharmacist.designation}</p>
+              <h2 className="text-xl font-semibold mb-2">{professional.userId?.name}</h2>
+              <p className="text-gray-600">{professional.designation}</p>
             </div>
 
             {/* Booking Progress */}
@@ -439,19 +473,19 @@ export default function BookPharmacist() {
               <h3 className="text-lg font-semibold mb-3">Available Time Slots</h3>
               
               <div className="mb-3 text-sm text-gray-600">
-                {pharmacist.availableSlots?.filter(slot => !slot.isBooked).length || 0} slots available
+                {professional.availableSlots?.filter(slot => !slot.isBooked).length || 0} slots available
               </div>
               
-              {pharmacist.availableSlots?.filter(slot => !slot.isBooked).length === 0 ? (
+              {professional.availableSlots?.filter(slot => !slot.isBooked).length === 0 ? (
                 <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
                   <p className="text-yellow-800">
                     <strong>No available slots</strong> - All slots are currently booked. 
-                    Please check back later or contact the pharmacist.
+                    Please check back later or contact the {professionalType}.
                   </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {pharmacist.availableSlots
+                  {professional.availableSlots
                     .filter(slot => !slot.isBooked)
                     .sort((a, b) => new Date(a.date) - new Date(b.date))
                     .map((slot, index) => (
@@ -694,7 +728,7 @@ export default function BookPharmacist() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       value={patientDetails.additionalNotes}
                       onChange={(e) => setPatientDetails(prev => ({ ...prev, additionalNotes: e.target.value }))}
-                      placeholder="Any additional information you'd like to share with the pharmacist..."
+                      placeholder="Any additional information you'd like to share with the professional..."
                     />
                   </div>
                   
