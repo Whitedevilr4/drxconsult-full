@@ -15,7 +15,7 @@ export default function Home() {
 
   const slides = [
     {
-      title: "Talk To A Health Care Professional About Your Prescription",
+      title: "Patient Counselling Platform",
       subtitle: "Your Health, Our Priority",
       description: "Connect with expert pharmacists for personalized counselling sessions",
       icon: "🛡️",
