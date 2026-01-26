@@ -29,6 +29,7 @@ mongoose.connect(process.env.MONGODB_URI)
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/pharmacists', require('./routes/pharmacists'));
+app.use('/api/doctors', require('./routes/doctors'));
 app.use('/api/bookings', require('./routes/bookings'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/medical-history', require('./routes/medicalHistory'));
