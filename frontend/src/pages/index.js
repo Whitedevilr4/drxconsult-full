@@ -39,7 +39,7 @@ export default function Home() {
     },
     {
       title: "Professional Counseling",
-      description: "Get personalized advice from certified pharmacists",
+      description: "Get personalized advice from certified pharmacists & Doctors",
       icon: "👨‍⚕️"
     },
     {
