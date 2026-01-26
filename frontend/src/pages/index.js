@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import PharmacistCard from '@/components/PharmacistCard'
+import DoctorCard from '@/components/DoctorCard'
 import Layout from '@/components/Layout'
 import SEO from '@/components/SEO'
 
 export default function Home() {
   const [pharmacists, setPharmacists] = useState([])
+  const [doctors, setDoctors] = useState([])
   const [websiteSettings, setWebsiteSettings] = useState(null)
   const [loading, setLoading] = useState(true)
   const [currentSlide, setCurrentSlide] = useState(0)
@@ -161,12 +163,22 @@ export default function Home() {
     axios.get(`${apiUrl}/pharmacists`)
       .then(res => {
         setPharmacists(res.data.length > 0 ? res.data : dummyPharmacists)
-        setLoading(false)
       })
       .catch(err => {
         console.error(err)
         // Fallback to dummy data on error
         setPharmacists(dummyPharmacists)
+      })
+
+    // Fetch doctors
+    axios.get(`${apiUrl}/doctors`)
+      .then(res => {
+        setDoctors(res.data || [])
+        setLoading(false)
+      })
+      .catch(err => {
+        console.error('Error fetching doctors:', err)
+        setDoctors([])
         setLoading(false)
       })
   }, [])
@@ -320,10 +332,10 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Our Pharmacists Section */}
-        <div id="pharmacists" className="container mx-auto px-4 py-8 sm:py-12">
+        {/* Our Healthcare Professionals Section */}
+        <div id="professionals" className="container mx-auto px-4 py-8 sm:py-12">
           <div className="text-center mb-8 sm:mb-12">
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-800 mb-3 sm:mb-4">Our Expert Pharmacists</h2>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-800 mb-3 sm:mb-4">Our Healthcare Professionals</h2>
             <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-2xl mx-auto px-4">
               Certified professionals dedicated to your health and wellness
             </p>
@@ -332,13 +344,52 @@ export default function Home() {
           {loading ? (
             <div className="text-center py-8 sm:py-12">
               <div className="inline-block animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-blue-600"></div>
-              <p className="mt-4 text-gray-600">Loading pharmacists...</p>
+              <p className="mt-4 text-gray-600">Loading healthcare professionals...</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 sm:gap-6">
-              {pharmacists.map(pharmacist => (
-                <PharmacistCard key={pharmacist._id} pharmacist={pharmacist} />
-              ))}
+            <div className="space-y-12">
+              {/* Pharmacists Section */}
+              {pharmacists.length > 0 && (
+                <div>
+                  <div className="text-center mb-8">
+                    <h3 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">
+                      💊 Pharmacists
+                    </h3>
+                    <p className="text-gray-600">Expert pharmaceutical counseling and medication guidance</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 sm:gap-6">
+                    {pharmacists.map(pharmacist => (
+                      <PharmacistCard key={pharmacist._id} pharmacist={pharmacist} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Doctors Section */}
+              {doctors.length > 0 && (
+                <div>
+                  <div className="text-center mb-8">
+                    <h3 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">
+                      🩺 Doctors
+                    </h3>
+                    <p className="text-gray-600">Professional medical consultations and healthcare advice</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 sm:gap-6">
+                    {doctors.map(doctor => (
+                      <DoctorCard key={doctor._id} doctor={doctor} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* No professionals available */}
+              {pharmacists.length === 0 && doctors.length === 0 && (
+                <div className="text-center py-12">
+                  <div className="text-6xl mb-4">🏥</div>
+                  <h3 className="text-xl font-semibold text-gray-800 mb-2">No Healthcare Professionals Available</h3>
+                  <p className="text-gray-600">Please check back later for available consultations.</p>
+                </div>
+              )}
             </div>
           )}
         </div>
