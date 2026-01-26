@@ -27,21 +27,35 @@ const mongooseOptions = {
 
 // Initialize MongoDB connection
 let isConnected = false;
+let connectionPromise = null;
 
 const connectDB = async () => {
-  if (isConnected) {
+  if (isConnected && mongoose.connection.readyState === 1) {
     return;
   }
   
-  try {
-    await mongoose.connect(process.env.MONGODB_URI, mongooseOptions);
-    isConnected = true;
-    console.log('✅ MongoDB connected successfully');
-  } catch (err) {
-    console.error('❌ MongoDB connection error:', err);
-    isConnected = false;
-    throw err;
+  // If there's already a connection attempt in progress, wait for it
+  if (connectionPromise) {
+    return connectionPromise;
   }
+  
+  connectionPromise = (async () => {
+    try {
+      if (mongoose.connection.readyState === 0) {
+        await mongoose.connect(process.env.MONGODB_URI, mongooseOptions);
+      }
+      isConnected = true;
+      console.log('✅ MongoDB connected successfully');
+      return true;
+    } catch (err) {
+      console.error('❌ MongoDB connection error:', err);
+      isConnected = false;
+      connectionPromise = null; // Reset promise so we can retry
+      throw err;
+    }
+  })();
+  
+  return connectionPromise;
 };
 
 // Handle MongoDB connection events
@@ -111,16 +125,32 @@ app.use('*', (req, res) => {
 
 // For Vercel serverless functions, we need to export the app
 if (process.env.NODE_ENV === 'production') {
-  // Connect to database on first request
+  // Connect to database on first request with better error handling
   app.use(async (req, res, next) => {
     try {
-      await connectDB();
+      await Promise.race([
+        connectDB(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Database connection timeout')), 8000)
+        )
+      ]);
       next();
     } catch (error) {
       console.error('❌ Database connection failed:', error);
+      
+      // Return specific error for timeout issues
+      if (error.message.includes('timeout') || error.name === 'MongooseError') {
+        return res.status(503).json({ 
+          message: 'Database connection timeout. Please try again in a moment.',
+          retryable: true,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
       res.status(503).json({ 
         message: 'Database connection failed. Please try again.',
-        retryable: true 
+        retryable: true,
+        timestamp: new Date().toISOString()
       });
     }
   });
