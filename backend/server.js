@@ -139,11 +139,13 @@ app.listen(PORT, async () => {
     })
     .catch(err => console.error('Initial OTP cleanup error:', err));
   
-  // Schedule cleanup to run every hour
-  setInterval(() => {
-    cleanupExpiredSlots();
-    cleanupExpiredOTPs();
-  }, 60 * 60 * 1000); // 1 hour
+  // Schedule cleanup to run every hour (disabled for serverless compatibility)
+  // Note: In Vercel serverless environment, setInterval doesn't work
+  // Cleanup now happens on-demand in route handlers
+  // setInterval(() => {
+  //   cleanupExpiredSlots();
+  //   cleanupExpiredOTPs();
+  // }, 60 * 60 * 1000); // 1 hour
   
   console.log('✅ Server initialization complete');
 });
