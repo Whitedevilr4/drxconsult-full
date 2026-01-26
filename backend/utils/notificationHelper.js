@@ -1,9 +1,10 @@
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 const Pharmacist = require('../models/Pharmacist');
+const Doctor = require('../models/Doctor');
 
 // Create notification helper
-async function createNotification({ userId, type, title, message, bookingId, pharmacistId, patientId }) {
+async function createNotification({ userId, type, title, message, bookingId, pharmacistId, doctorId, patientId }) {
   try {
     console.log('Creating notification:', { userId, type, title, message });
     
@@ -14,6 +15,7 @@ async function createNotification({ userId, type, title, message, bookingId, pha
       message,
       bookingId,
       pharmacistId,
+      doctorId,
       patientId
     });
     await notification.save();
@@ -29,26 +31,38 @@ async function createNotification({ userId, type, title, message, bookingId, pha
 // Notify on booking confirmation
 async function notifyBookingConfirmed({ booking, patientName, pharmacistName }) {
   try {
+    const professionalName = pharmacistName; // This parameter name is kept for backward compatibility
+    const professionalType = booking.pharmacistId ? 'pharmacist' : 'doctor';
+    const professionalId = booking.pharmacistId || booking.doctorId;
 
     // Notify patient
     await createNotification({
       userId: booking.patientId,
       type: 'booking_confirmed',
       title: 'Booking Confirmed',
-      message: `Your booking with ${pharmacistName} on ${new Date(booking.slotDate).toLocaleDateString()} at ${booking.slotTime} has been confirmed.`,
+      message: `Your booking with ${professionalName} on ${new Date(booking.slotDate).toLocaleDateString()} at ${booking.slotTime} has been confirmed.`,
       bookingId: booking._id,
-      pharmacistId: booking.pharmacistId
+      pharmacistId: booking.pharmacistId,
+      doctorId: booking.doctorId
     });
 
-    // Notify pharmacist
-    const pharmacist = await Pharmacist.findById(booking.pharmacistId);
-    if (pharmacist && pharmacist.userId) {
+    // Notify professional (pharmacist or doctor)
+    let professional;
+    if (professionalType === 'doctor') {
+      professional = await Doctor.findById(professionalId);
+    } else {
+      professional = await Pharmacist.findById(professionalId);
+    }
+    
+    if (professional && professional.userId) {
       await createNotification({
-        userId: pharmacist.userId,
+        userId: professional.userId,
         type: 'new_booking',
         title: 'New Booking Received',
         message: `You have a new booking from ${patientName} on ${new Date(booking.slotDate).toLocaleDateString()} at ${booking.slotTime}.`,
         bookingId: booking._id,
+        pharmacistId: booking.pharmacistId,
+        doctorId: booking.doctorId,
         patientId: booking.patientId
       });
       
@@ -62,9 +76,10 @@ async function notifyBookingConfirmed({ booking, patientName, pharmacistName }) 
         userId: admin._id,
         type: 'new_booking',
         title: 'New Booking Created',
-        message: `${patientName} booked an appointment with ${pharmacistName} on ${new Date(booking.slotDate).toLocaleDateString()} at ${booking.slotTime}.`,
+        message: `${patientName} booked an appointment with ${professionalName} on ${new Date(booking.slotDate).toLocaleDateString()} at ${booking.slotTime}.`,
         bookingId: booking._id,
         pharmacistId: booking.pharmacistId,
+        doctorId: booking.doctorId,
         patientId: booking.patientId
       });
     }
@@ -77,15 +92,17 @@ async function notifyBookingConfirmed({ booking, patientName, pharmacistName }) 
 // Notify on meeting link added
 async function notifyMeetingLinkAdded({ booking, pharmacistName }) {
   try {
+    const professionalName = pharmacistName; // Keep parameter name for backward compatibility
 
     // Notify patient
     await createNotification({
       userId: booking.patientId,
       type: 'meeting_link_added',
       title: 'Meeting Link Available',
-      message: `${pharmacistName} has added the meeting link for your appointment on ${new Date(booking.slotDate).toLocaleDateString()} at ${booking.slotTime}.`,
+      message: `${professionalName} has added the meeting link for your appointment on ${new Date(booking.slotDate).toLocaleDateString()} at ${booking.slotTime}.`,
       bookingId: booking._id,
-      pharmacistId: booking.pharmacistId
+      pharmacistId: booking.pharmacistId,
+      doctorId: booking.doctorId
     });
 
     // Notify all admins
@@ -95,9 +112,10 @@ async function notifyMeetingLinkAdded({ booking, pharmacistName }) {
         userId: admin._id,
         type: 'meeting_link_added',
         title: 'Meeting Link Added',
-        message: `${pharmacistName} has added a meeting link for the appointment on ${new Date(booking.slotDate).toLocaleDateString()} at ${booking.slotTime}.`,
+        message: `${professionalName} has added a meeting link for the appointment on ${new Date(booking.slotDate).toLocaleDateString()} at ${booking.slotTime}.`,
         bookingId: booking._id,
         pharmacistId: booking.pharmacistId,
+        doctorId: booking.doctorId,
         patientId: booking.patientId
       });
     }
@@ -110,15 +128,17 @@ async function notifyMeetingLinkAdded({ booking, pharmacistName }) {
 // Notify on test result uploaded
 async function notifyTestResultUploaded({ booking, pharmacistName }) {
   try {
+    const professionalName = pharmacistName; // Keep parameter name for backward compatibility
 
     // Notify patient
     await createNotification({
       userId: booking.patientId,
       type: 'test_result_uploaded',
       title: 'Test Result Uploaded',
-      message: `${pharmacistName} has uploaded your test result. You can view it in your dashboard.`,
+      message: `${professionalName} has uploaded your test result. You can view it in your dashboard.`,
       bookingId: booking._id,
-      pharmacistId: booking.pharmacistId
+      pharmacistId: booking.pharmacistId,
+      doctorId: booking.doctorId
     });
 
     // Notify all admins
@@ -129,9 +149,10 @@ async function notifyTestResultUploaded({ booking, pharmacistName }) {
         userId: admin._id,
         type: 'session_completed',
         title: 'Session Completed',
-        message: `${pharmacistName} has completed the session with ${patient?.name || 'patient'} and uploaded test results.`,
+        message: `${professionalName} has completed the session with ${patient?.name || 'patient'} and uploaded test results.`,
         bookingId: booking._id,
         pharmacistId: booking.pharmacistId,
+        doctorId: booking.doctorId,
         patientId: booking.patientId
       });
     }
@@ -141,19 +162,51 @@ async function notifyTestResultUploaded({ booking, pharmacistName }) {
   }
 }
 
-// Notify on payment approval
-async function notifyPaymentApproved({ pharmacistUserId, pharmacistName, amount, bookingCount }) {
+// Notify on payment approval - updated to support both pharmacists and doctors
+async function notifyPaymentApproved({ professionalUserId, professionalName, amount, bookingCount, professionalType = 'pharmacist' }) {
   try {
-
     await createNotification({
-      userId: pharmacistUserId,
+      userId: professionalUserId,
       type: 'payment_approved',
-      title: 'Payment Approved',
-      message: `Your payment of ₹${amount} for ${bookingCount} session(s) has been approved by admin.`,
+      title: 'Payment Received',
+      message: `Great news! Your payment of ₹${amount} for ${bookingCount} completed session(s) has been processed and credited to your account.`,
     });
     
   } catch (err) {
     console.error('Error in notifyPaymentApproved:', err);
+  }
+}
+
+// Notify on review submission
+async function notifyReviewSubmitted({ booking, patientName, rating, feedback }) {
+  try {
+    const professionalId = booking.pharmacistId || booking.doctorId;
+    const professionalType = booking.pharmacistId ? 'pharmacist' : 'doctor';
+    
+    // Find the professional's user ID
+    let professional;
+    if (booking.pharmacistId) {
+      professional = await Pharmacist.findById(booking.pharmacistId).populate('userId');
+    } else if (booking.doctorId) {
+      professional = await Doctor.findById(booking.doctorId).populate('userId');
+    }
+    
+    if (professional && professional.userId) {
+      const stars = '⭐'.repeat(rating);
+      await createNotification({
+        userId: professional.userId._id,
+        type: 'review_received',
+        title: 'New Review Received',
+        message: `${patientName} rated your consultation ${stars} (${rating}/5)${feedback ? ': "' + feedback.substring(0, 100) + (feedback.length > 100 ? '..."' : '"') : ''}`,
+        bookingId: booking._id,
+        pharmacistId: booking.pharmacistId,
+        doctorId: booking.doctorId,
+        patientId: booking.patientId
+      });
+    }
+    
+  } catch (err) {
+    console.error('Error in notifyReviewSubmitted:', err);
   }
 }
 
@@ -210,6 +263,7 @@ module.exports = {
   notifyMeetingLinkAdded,
   notifyTestResultUploaded,
   notifyPaymentApproved,
+  notifyReviewSubmitted,
   notifyComplaintSubmitted,
   notifyComplaintUpdated
 };
