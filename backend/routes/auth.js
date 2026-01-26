@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
-const { sendPasswordResetEmail } = require('../utils/emailService');
+const { sendPasswordResetEmail, sendWelcomeEmail } = require('../utils/emailService');
 const { createAndSendOTP, verifyOTP, getOTPStatus } = require('../utils/otpService');
 const { admin, isFirebaseInitialized, getFirebaseAuth } = require('../config/firebase-admin');
 
@@ -106,6 +106,15 @@ router.post('/signup/verify-otp', [
     });
     
     await user.save();
+
+    // Send welcome email
+    try {
+      await sendWelcomeEmail(user.email, user.name);
+      console.log(`✅ Welcome email sent to ${user.email}`);
+    } catch (emailError) {
+      console.error(`❌ Failed to send welcome email to ${user.email}:`, emailError);
+      // Don't fail the registration if email fails
+    }
 
     // Generate JWT token
     const token = jwt.sign(
