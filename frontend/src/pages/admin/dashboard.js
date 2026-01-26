@@ -13,6 +13,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview')
   const [users, setUsers] = useState([])
   const [pharmacists, setPharmacists] = useState([])
+  const [doctors, setDoctors] = useState([])
   const [patients, setPatients] = useState([])
   const [loading, setLoading] = useState(true)
   const [accessDenied, setAccessDenied] = useState(false)
@@ -48,11 +49,14 @@ export default function AdminDashboard() {
 
   const fetchData = async (token) => {
     try {
-      const [usersRes, pharmacistsRes, patientsRes] = await Promise.all([
+      const [usersRes, pharmacistsRes, doctorsRes, patientsRes] = await Promise.all([
         axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/users`, {
           headers: { Authorization: `Bearer ${token}` }
         }),
         axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/pharmacists`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/doctors`, {
           headers: { Authorization: `Bearer ${token}` }
         }),
         axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/patients`, {
@@ -62,6 +66,7 @@ export default function AdminDashboard() {
       
       setUsers(usersRes.data)
       setPharmacists(pharmacistsRes.data)
+      setDoctors(doctorsRes.data)
       setPatients(patientsRes.data)
       setLoading(false)
     } catch (err) {
@@ -212,11 +217,14 @@ export default function AdminDashboard() {
                 >
                   <option value="overview">Overview</option>
                   <option value="add-pharmacist">Add Pharmacist</option>
+                  <option value="add-doctor">Add Doctor</option>
+                  <option value="manage-pharmacists">Manage Pharmacists</option>
+                  <option value="manage-doctors">Manage Doctors</option>
                   <option value="upload-results">Upload Test Results</option>
                   <option value="analytics">📊 Analytics</option>
-                  <option value="payments">💰 Payments</option>
+                  <option value="payments">💰 Pharmacist Payments</option>
+                  <option value="doctor-payments">💰 Doctor Payments</option>
                   <option value="reviews">⭐ Reviews</option>
-                  <option value="manage">Manage Pharmacists</option>
                   <option value="complaints">📝 Complaints</option>
                   <option value="website">🌐 Website</option>
                   <option value="users">👥 User Management</option>
@@ -247,6 +255,36 @@ export default function AdminDashboard() {
                   Add Pharmacist
                 </button>
                 <button
+                  onClick={() => setActiveTab('add-doctor')}
+                  className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
+                    activeTab === 'add-doctor'
+                      ? 'border-b-2 border-blue-600 text-blue-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Add Doctor
+                </button>
+                <button
+                  onClick={() => setActiveTab('manage-pharmacists')}
+                  className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
+                    activeTab === 'manage-pharmacists'
+                      ? 'border-b-2 border-blue-600 text-blue-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Manage Pharmacists
+                </button>
+                <button
+                  onClick={() => setActiveTab('manage-doctors')}
+                  className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
+                    activeTab === 'manage-doctors'
+                      ? 'border-b-2 border-blue-600 text-blue-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Manage Doctors
+                </button>
+                <button
                   onClick={() => setActiveTab('upload-results')}
                   className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
                     activeTab === 'upload-results'
@@ -274,7 +312,17 @@ export default function AdminDashboard() {
                       : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  💰 Payments
+                  💰 Pharmacist Payments
+                </button>
+                <button
+                  onClick={() => setActiveTab('doctor-payments')}
+                  className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
+                    activeTab === 'doctor-payments'
+                      ? 'border-b-2 border-yellow-600 text-yellow-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  💰 Doctor Payments
                 </button>
                 <button
                   onClick={() => setActiveTab('reviews')}
@@ -342,11 +390,15 @@ export default function AdminDashboard() {
             <div className="p-6">
               {activeTab === 'overview' && <OverviewTab users={users} pharmacists={pharmacists} patients={patients} />}
               {activeTab === 'add-pharmacist' && <AddPharmacistTab onSuccess={() => fetchData(localStorage.getItem('token'))} />}
+              {activeTab === 'add-doctor' && <AddDoctorTab onSuccess={() => fetchData(localStorage.getItem('token'))} />}
+              {activeTab === 'manage-pharmacists' && <ManageUsersTab users={users} pharmacists={pharmacists} onUpdate={() => fetchData(localStorage.getItem('token'))} />}
+              {activeTab === 'manage-doctors' && <ManageDoctorsTab onUpdate={() => fetchData(localStorage.getItem('token'))} />}
               {activeTab === 'upload-results' && <UploadResultsTab patients={patients} />}
 
               {activeTab === 'analytics' && <AnalyticsTab />}
               {activeTab === 'payments' && <PaymentsTab />}
-              {activeTab === 'reviews' && <ReviewsTab pharmacists={pharmacists} />}
+              {activeTab === 'doctor-payments' && <DoctorPaymentsTab />}
+              {activeTab === 'reviews' && <ReviewsTab pharmacists={pharmacists} doctors={doctors} />}
               {activeTab === 'manage' && <ManageUsersTab users={users} pharmacists={pharmacists} onUpdate={() => fetchData(localStorage.getItem('token'))} />}
               {activeTab === 'complaints' && <ComplaintsTab complaints={complaints} loading={complaintsLoading} onComplaintClick={handleComplaintClick} onRefresh={() => fetchComplaints(localStorage.getItem('token'))} />}
               {activeTab === 'website' && <WebsiteTab />}
@@ -1222,27 +1274,31 @@ function PaymentsTab() {
 }
 
 // Reviews Tab Component
-function ReviewsTab({ pharmacists }) {
+function ReviewsTab({ pharmacists, doctors }) {
   const [allReviews, setAllReviews] = useState([])
   const [loading, setLoading] = useState(true)
-  const [selectedPharmacist, setSelectedPharmacist] = useState('all')
+  const [selectedProfessional, setSelectedProfessional] = useState('all')
+  const [professionalType, setProfessionalType] = useState('all') // 'all', 'pharmacist', 'doctor'
 
   useEffect(() => {
     fetchAllReviews()
-  }, [pharmacists])
+  }, [pharmacists, doctors])
 
   const fetchAllReviews = async () => {
     try {
-      const reviewsPromises = pharmacists.map(async (pharmacist) => {
+      // Fetch pharmacist reviews
+      const pharmacistReviewsPromises = pharmacists.map(async (pharmacist) => {
         try {
           const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/bookings/reviews/${pharmacist._id}`)
           return {
-            pharmacist: pharmacist,
+            professional: pharmacist,
+            type: 'pharmacist',
             ...res.data
           }
         } catch (err) {
           return {
-            pharmacist: pharmacist,
+            professional: pharmacist,
+            type: 'pharmacist',
             reviews: [],
             totalReviews: 0,
             averageRating: 0
@@ -1250,8 +1306,33 @@ function ReviewsTab({ pharmacists }) {
         }
       })
 
-      const results = await Promise.all(reviewsPromises)
-      setAllReviews(results)
+      // Fetch doctor reviews
+      const doctorReviewsPromises = doctors.map(async (doctor) => {
+        try {
+          const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/bookings/reviews/${doctor._id}?type=doctor`)
+          return {
+            professional: doctor,
+            type: 'doctor',
+            ...res.data
+          }
+        } catch (err) {
+          return {
+            professional: doctor,
+            type: 'doctor',
+            reviews: [],
+            totalReviews: 0,
+            averageRating: 0
+          }
+        }
+      })
+
+      const [pharmacistResults, doctorResults] = await Promise.all([
+        Promise.all(pharmacistReviewsPromises),
+        Promise.all(doctorReviewsPromises)
+      ])
+
+      const allResults = [...pharmacistResults, ...doctorResults]
+      setAllReviews(allResults)
       setLoading(false)
     } catch (err) {
       console.error('Error fetching reviews:', err)
@@ -1259,13 +1340,15 @@ function ReviewsTab({ pharmacists }) {
     }
   }
 
-  const filteredReviews = selectedPharmacist === 'all' 
-    ? allReviews 
-    : allReviews.filter(r => r.pharmacist._id === selectedPharmacist)
+  const filteredReviews = allReviews.filter(r => {
+    const typeMatch = professionalType === 'all' || r.type === professionalType
+    const professionalMatch = selectedProfessional === 'all' || r.professional._id === selectedProfessional
+    return typeMatch && professionalMatch
+  })
 
-  const totalReviewsCount = allReviews.reduce((sum, r) => sum + r.totalReviews, 0)
-  const overallAverage = allReviews.length > 0
-    ? allReviews.reduce((sum, r) => sum + (r.averageRating * r.totalReviews), 0) / totalReviewsCount
+  const totalReviewsCount = filteredReviews.reduce((sum, r) => sum + r.totalReviews, 0)
+  const overallAverage = filteredReviews.length > 0 && totalReviewsCount > 0
+    ? filteredReviews.reduce((sum, r) => sum + (r.averageRating * r.totalReviews), 0) / totalReviewsCount
     : 0
 
   if (loading) {
@@ -1281,8 +1364,42 @@ function ReviewsTab({ pharmacists }) {
     <div>
       <h2 className="text-2xl font-bold mb-6">All Reviews & Feedback</h2>
 
+      {/* Filter Controls */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Professional Type</label>
+          <select
+            value={professionalType}
+            onChange={(e) => {
+              setProfessionalType(e.target.value)
+              setSelectedProfessional('all')
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">All Professionals</option>
+            <option value="pharmacist">Pharmacists Only</option>
+            <option value="doctor">Doctors Only</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Specific Professional</label>
+          <select
+            value={selectedProfessional}
+            onChange={(e) => setSelectedProfessional(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">All</option>
+            {filteredReviews.map(r => (
+              <option key={r.professional._id} value={r.professional._id}>
+                {r.professional.userId?.name || r.professional.name} ({r.type === 'pharmacist' ? '💊' : '🩺'})
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       {/* Overall Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-gradient-to-r from-yellow-50 to-orange-50 p-6 rounded-lg shadow">
           <p className="text-gray-600 text-sm font-medium">Overall Average Rating</p>
           <div className="flex items-center mt-2">
@@ -1301,49 +1418,46 @@ function ReviewsTab({ pharmacists }) {
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg shadow">
           <p className="text-gray-600 text-sm font-medium">Total Reviews</p>
           <p className="text-4xl font-bold text-blue-600 mt-2">{totalReviewsCount}</p>
-          <p className="text-xs text-gray-500 mt-1">across all pharmacists</p>
         </div>
         <div className="bg-gradient-to-r from-green-50 to-teal-50 p-6 rounded-lg shadow">
-          <p className="text-gray-600 text-sm font-medium">Active Pharmacists</p>
+          <p className="text-gray-600 text-sm font-medium">Active Professionals</p>
           <p className="text-4xl font-bold text-green-600 mt-2">
-            {allReviews.filter(r => r.totalReviews > 0).length}
+            {filteredReviews.filter(r => r.totalReviews > 0).length}
           </p>
           <p className="text-xs text-gray-500 mt-1">with reviews</p>
         </div>
+        <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-6 rounded-lg shadow">
+          <p className="text-gray-600 text-sm font-medium">Satisfaction Rate</p>
+          <p className="text-4xl font-bold text-purple-600 mt-2">
+            {totalReviewsCount > 0 ? Math.round((overallAverage / 5) * 100) : 0}%
+          </p>
+          <p className="text-xs text-gray-500 mt-1">overall satisfaction</p>
+        </div>
       </div>
 
-      {/* Filter */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Pharmacist:</label>
-        <select
-          className="w-full md:w-64 px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-orange-600"
-          value={selectedPharmacist}
-          onChange={(e) => setSelectedPharmacist(e.target.value)}
-        >
-          <option value="all">All Pharmacists ({totalReviewsCount} reviews)</option>
-          {allReviews.map((item) => (
-            <option key={item.pharmacist._id} value={item.pharmacist._id}>
-              {item.pharmacist.userId?.name} ({item.totalReviews} reviews)
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Pharmacist Reviews */}
+      {/* Professional Reviews */}
       {filteredReviews.length === 0 ? (
         <div className="bg-white p-8 rounded-lg shadow text-center">
-          <p className="text-gray-600">No reviews found</p>
+          <p className="text-gray-600">No reviews found for the selected filters</p>
         </div>
       ) : (
         <div className="space-y-6">
           {filteredReviews.map((item) => (
-            <div key={item.pharmacist._id} className="bg-white rounded-lg shadow-lg overflow-hidden">
-              {/* Pharmacist Header */}
-              <div className="bg-gradient-to-r from-orange-500 to-yellow-500 p-4 text-white">
+            <div key={item.professional._id} className="bg-white rounded-lg shadow-lg overflow-hidden">
+              {/* Professional Header */}
+              <div className={`p-4 text-white ${
+                item.type === 'doctor' 
+                  ? 'bg-gradient-to-r from-red-500 to-pink-500' 
+                  : 'bg-gradient-to-r from-orange-500 to-yellow-500'
+              }`}>
                 <div className="flex justify-between items-center">
                   <div>
-                    <h3 className="text-xl font-bold">{item.pharmacist.userId?.name}</h3>
-                    <p className="text-sm opacity-90">{item.pharmacist.designation}</p>
+                    <h3 className="text-xl font-bold">
+                      {item.type === 'doctor' ? 'Dr. ' : ''}{item.professional.userId?.name}
+                    </h3>
+                    <p className="text-sm opacity-90">
+                      {item.type === 'doctor' ? '🩺 Doctor' : '💊 Pharmacist'} • {item.professional.specialization || item.professional.designation}
+                    </p>
                   </div>
                   <div className="text-right">
                     <div className="flex items-center justify-end">
@@ -1370,7 +1484,9 @@ function ReviewsTab({ pharmacists }) {
                 ) : (
                   <div className="space-y-3">
                     {item.reviews.slice(0, 5).map((review) => (
-                      <div key={review._id} className="border-l-4 border-orange-400 pl-4 py-2 bg-gray-50 rounded">
+                      <div key={review._id} className={`border-l-4 pl-4 py-2 bg-gray-50 rounded ${
+                        item.type === 'doctor' ? 'border-red-400' : 'border-orange-400'
+                      }`}>
                         <div className="flex justify-between items-start mb-2">
                           <div>
                             <p className="font-semibold text-gray-800">
@@ -3316,6 +3432,733 @@ function SubscriptionManagementTab() {
         {filteredSubscriptions.length === 0 && (
           <div className="text-center py-8">
             <p className="text-gray-500">No subscriptions found matching your criteria.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Add Doctor Tab Component
+function AddDoctorTab({ onSuccess }) {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    phone: '',
+    specialization: '',
+    qualification: '',
+    experience: '',
+    description: '',
+    photo: '',
+    consultationFee: '500',
+    licenseNumber: ''
+  })
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+  const [generatedCredentials, setGeneratedCredentials] = useState(null)
+
+  const handleImageUpload = (data) => {
+    setFormData(prev => ({...prev, photo: data.url}))
+    setMessage('Profile picture uploaded successfully!')
+    setTimeout(() => setMessage(''), 3000)
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setMessage('')
+    setError('')
+
+    try {
+      const token = localStorage.getItem('token')
+      const res = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/admin/doctors`,
+        formData,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+
+      setMessage('Doctor created successfully!')
+      setGeneratedCredentials({
+        email: formData.email,
+        password: formData.password
+      })
+      
+      // Reset form
+      setFormData({
+        name: '',
+        email: '',
+        password: '',
+        phone: '',
+        specialization: '',
+        qualification: '',
+        experience: '',
+        description: '',
+        photo: '',
+        consultationFee: '500',
+        licenseNumber: ''
+      })
+      
+      onSuccess()
+    } catch (err) {
+      console.error('Error creating doctor:', err)
+      setError(err.response?.data?.message || 'Failed to create doctor')
+    }
+  }
+
+  return (
+    <div>
+      <h2 className="text-xl font-bold mb-4">Add New Doctor</h2>
+      
+      {message && (
+        <div className="bg-green-100 text-green-700 p-4 rounded mb-4">
+          {message}
+          {generatedCredentials && (
+            <div className="mt-2 p-3 bg-white rounded">
+              <p className="font-semibold">Login Credentials:</p>
+              <p>Email: <code className="bg-gray-100 px-2 py-1 rounded">{generatedCredentials.email}</code></p>
+              <p>Password: <code className="bg-gray-100 px-2 py-1 rounded">{generatedCredentials.password}</code></p>
+              <p className="text-sm text-gray-600 mt-2">⚠️ Save these credentials! They won't be shown again.</p>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {error && <div className="bg-red-100 text-red-700 p-4 rounded mb-4">{error}</div>}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Profile Picture Upload */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <ImageUploader 
+            onUploadSuccess={handleImageUpload}
+            uploadType="prescription"
+            currentImage={formData.photo}
+            label="Profile Picture (Optional)"
+          />
+          {formData.photo && (
+            <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-sm">
+              <p className="text-green-700 font-medium">✓ Profile picture ready</p>
+              <p className="text-xs text-gray-600 truncate">{formData.photo}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-gray-700 mb-2">Name *</label>
+            <input
+              type="text"
+              className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600"
+              value={formData.name}
+              onChange={(e) => setFormData({...formData, name: e.target.value})}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-gray-700 mb-2">Email/Username *</label>
+            <input
+              type="text"
+              className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600"
+              value={formData.email}
+              onChange={(e) => setFormData({...formData, email: e.target.value})}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-gray-700 mb-2">Password *</label>
+            <input
+              type="password"
+              className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600"
+              value={formData.password}
+              onChange={(e) => setFormData({...formData, password: e.target.value})}
+              required
+              minLength={6}
+            />
+          </div>
+
+          <div>
+            <label className="block text-gray-700 mb-2">Phone</label>
+            <input
+              type="tel"
+              className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600"
+              value={formData.phone}
+              onChange={(e) => setFormData({...formData, phone: e.target.value})}
+            />
+          </div>
+
+          <div>
+            <label className="block text-gray-700 mb-2">Specialization *</label>
+            <input
+              type="text"
+              className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600"
+              placeholder="e.g., Cardiology, Dermatology"
+              value={formData.specialization}
+              onChange={(e) => setFormData({...formData, specialization: e.target.value})}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-gray-700 mb-2">Qualification *</label>
+            <input
+              type="text"
+              className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600"
+              placeholder="e.g., MBBS, MD"
+              value={formData.qualification}
+              onChange={(e) => setFormData({...formData, qualification: e.target.value})}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-gray-700 mb-2">Experience (Years) *</label>
+            <input
+              type="number"
+              className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600"
+              value={formData.experience}
+              onChange={(e) => setFormData({...formData, experience: e.target.value})}
+              required
+              min="0"
+            />
+          </div>
+
+          <div>
+            <label className="block text-gray-700 mb-2">License Number *</label>
+            <input
+              type="text"
+              className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600"
+              placeholder="Medical License Number"
+              value={formData.licenseNumber}
+              onChange={(e) => setFormData({...formData, licenseNumber: e.target.value})}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-gray-700 mb-2">Consultation Fee (₹)</label>
+            <input
+              type="number"
+              className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600"
+              value={formData.consultationFee}
+              onChange={(e) => setFormData({...formData, consultationFee: e.target.value})}
+              min="0"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-gray-700 mb-2">Description</label>
+          <textarea
+            className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600"
+            placeholder="Brief description about the doctor..."
+            rows="3"
+            value={formData.description}
+            onChange={(e) => setFormData({...formData, description: e.target.value})}
+          />
+        </div>
+
+        <button
+          type="submit"
+          className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
+        >
+          Create Doctor
+        </button>
+      </form>
+    </div>
+  )
+}
+
+// Manage Doctors Tab Component
+function ManageDoctorsTab({ onUpdate }) {
+  const [doctors, setDoctors] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [editingDoctor, setEditingDoctor] = useState(null)
+  const [editForm, setEditForm] = useState({})
+
+  useEffect(() => {
+    fetchDoctors()
+  }, [])
+
+  const fetchDoctors = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/doctors`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setDoctors(res.data)
+      setLoading(false)
+    } catch (err) {
+      console.error('Error fetching doctors:', err)
+      setLoading(false)
+    }
+  }
+
+  const handleToggleStatus = async (doctorId, currentStatus) => {
+    try {
+      const token = localStorage.getItem('token')
+      const newStatus = currentStatus === 'online' ? 'offline' : 'online'
+      
+      await axios.patch(
+        `${process.env.NEXT_PUBLIC_API_URL}/admin/doctors/${doctorId}/status`,
+        { status: newStatus },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      
+      fetchDoctors()
+      toast.success('Status updated successfully')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to update status')
+    }
+  }
+
+  const handleEdit = (doctor) => {
+    setEditingDoctor(doctor._id)
+    setEditForm({
+      specialization: doctor.specialization,
+      qualification: doctor.qualification,
+      experience: doctor.experience,
+      description: doctor.description || '',
+      status: doctor.status,
+      photo: doctor.photo || '',
+      consultationFee: doctor.consultationFee,
+      licenseNumber: doctor.licenseNumber
+    })
+  }
+
+  const handlePhotoUpload = (data) => {
+    setEditForm(prev => ({...prev, photo: data.url}))
+  }
+
+  const handleSaveEdit = async (doctorId) => {
+    try {
+      const token = localStorage.getItem('token')
+      await axios.put(
+        `${process.env.NEXT_PUBLIC_API_URL}/admin/doctors/${doctorId}`,
+        editForm,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      
+      setEditingDoctor(null)
+      fetchDoctors()
+      toast.success('Doctor updated successfully')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to update doctor')
+    }
+  }
+
+  const handleDelete = async (doctorId, name) => {
+    if (!window.confirm(`Are you sure you want to delete Dr. ${name}?`)) return
+    
+    try {
+      const token = localStorage.getItem('token')
+      await axios.delete(
+        `${process.env.NEXT_PUBLIC_API_URL}/admin/doctors/${doctorId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      
+      fetchDoctors()
+      toast.success('Doctor deleted successfully')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to delete doctor')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <p className="mt-2 text-gray-600">Loading doctors...</p>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <h2 className="text-xl font-bold mb-4">Manage Doctors</h2>
+      
+      <div className="space-y-6">
+        {doctors.map(doctor => (
+          <div key={doctor._id} className="bg-white border rounded-lg p-4">
+            {editingDoctor === doctor._id ? (
+              <div className="space-y-3">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <ImageUploader 
+                    onUploadSuccess={handlePhotoUpload}
+                    uploadType="prescription"
+                    currentImage={editForm.photo}
+                    label="Update Profile Picture"
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border rounded"
+                    placeholder="Specialization"
+                    value={editForm.specialization}
+                    onChange={(e) => setEditForm({...editForm, specialization: e.target.value})}
+                  />
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border rounded"
+                    placeholder="Qualification"
+                    value={editForm.qualification}
+                    onChange={(e) => setEditForm({...editForm, qualification: e.target.value})}
+                  />
+                  <input
+                    type="number"
+                    className="w-full px-3 py-2 border rounded"
+                    placeholder="Experience (Years)"
+                    value={editForm.experience}
+                    onChange={(e) => setEditForm({...editForm, experience: e.target.value})}
+                  />
+                  <input
+                    type="number"
+                    className="w-full px-3 py-2 border rounded"
+                    placeholder="Consultation Fee"
+                    value={editForm.consultationFee}
+                    onChange={(e) => setEditForm({...editForm, consultationFee: e.target.value})}
+                  />
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border rounded"
+                    placeholder="License Number"
+                    value={editForm.licenseNumber}
+                    onChange={(e) => setEditForm({...editForm, licenseNumber: e.target.value})}
+                  />
+                </div>
+                <textarea
+                  className="w-full px-3 py-2 border rounded"
+                  placeholder="Description"
+                  rows="2"
+                  value={editForm.description}
+                  onChange={(e) => setEditForm({...editForm, description: e.target.value})}
+                />
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleSaveEdit(doctor._id)}
+                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setEditingDoctor(null)}
+                    className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex items-start space-x-3">
+                    <img 
+                      src={doctor.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.userId?.name || 'Doctor')}&size=80`}
+                      alt={doctor.userId?.name}
+                      className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
+                      onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.userId?.name || 'Doctor')}&size=80` }}
+                    />
+                    <div>
+                      <h3 className="font-semibold text-lg">Dr. {doctor.userId?.name}</h3>
+                      <p className="text-sm text-gray-600">{doctor.userId?.email}</p>
+                      <p className="text-sm text-blue-600">{doctor.specialization}</p>
+                      <p className="text-sm text-gray-500">{doctor.qualification} • {doctor.experience} years exp</p>
+                      <p className="text-sm text-green-600">₹{doctor.consultationFee} consultation fee</p>
+                      {doctor.description && (
+                        <p className="text-sm text-gray-500 mt-1">{doctor.description}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleToggleStatus(doctor._id, doctor.status)}
+                      className={`px-3 py-1 rounded text-sm font-medium ${
+                        doctor.status === 'online'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      {doctor.status === 'online' ? '🟢 Online' : '⚫ Offline'}
+                    </button>
+                  </div>
+                </div>
+                <div className="flex space-x-2 mt-3">
+                  <button
+                    onClick={() => handleEdit(doctor)}
+                    className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(doctor._id, doctor.userId?.name)}
+                    className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+        
+        {doctors.length === 0 && (
+          <div className="text-center py-8">
+            <p className="text-gray-500">No doctors found. Add some doctors to get started.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Doctor Payments Tab Component
+function DoctorPaymentsTab() {
+  const [payments, setPayments] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [selectedBookings, setSelectedBookings] = useState([])
+  const [message, setMessage] = useState('')
+  const [adminRevenue, setAdminRevenue] = useState({
+    totalRevenue: 0,
+    platformShare: 0,
+    doctorShare: 0,
+    totalBookings: 0
+  })
+
+  useEffect(() => {
+    fetchDoctorPayments()
+  }, [])
+
+  const fetchDoctorPayments = async () => {
+    try {
+      const token = localStorage.getItem('token')
+
+      const res = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/admin/doctor-payments`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+
+      setPayments(res.data)
+      
+      // Calculate admin revenue (100% of patient payments)
+      const totalRevenue = res.data.reduce((sum, p) => sum + (p.totalEarned * 2), 0) // totalEarned is 50%, so *2 for 100%
+      const doctorShare = res.data.reduce((sum, p) => sum + p.totalEarned, 0)
+      const platformShare = totalRevenue - doctorShare
+      const totalBookings = res.data.reduce((sum, p) => sum + p.completedBookings, 0)
+
+      setAdminRevenue({
+        totalRevenue,
+        platformShare,
+        doctorShare,
+        totalBookings
+      })
+      
+      setLoading(false)
+    } catch (err) {
+      console.error('Error fetching doctor payments:', err)
+      console.error('Error details:', err.response?.data || err.message)
+      setError(err.response?.data?.message || err.message || 'Failed to load doctor payment data')
+      setLoading(false)
+    }
+  }
+
+  const handleMarkAsPaid = async (doctorId, bookingIds) => {
+    try {
+      const token = localStorage.getItem('token')
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/admin/mark-doctor-payment-done`,
+        { bookingIds },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      setMessage('Doctor payment marked as done successfully!')
+      toast.success('Doctor payment marked as done successfully!')
+      setSelectedBookings([])
+      fetchDoctorPayments()
+      setTimeout(() => setMessage(''), 3000)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to mark doctor payment as done')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600"></div>
+        <p className="mt-2 text-gray-600">Loading doctor payment data...</p>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <h2 className="text-2xl font-bold mb-6">💰 Doctor Payment Management</h2>
+      
+      {error && (
+        <div className="bg-red-100 text-red-700 p-4 rounded mb-4">
+          <p className="font-semibold">Error loading doctor payment data:</p>
+          <p>{error}</p>
+          <button 
+            onClick={fetchDoctorPayments}
+            className="mt-2 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+      
+      {message && (
+        <div className="bg-green-100 text-green-700 p-4 rounded mb-4">
+          {message}
+        </div>
+      )}
+
+      {/* Admin Revenue Overview - Shows 100% of payments */}
+      <div className="bg-gradient-to-r from-green-50 to-blue-50 p-6 rounded-lg shadow-lg mb-8">
+        <h3 className="text-xl font-bold text-gray-800 mb-4">Platform Revenue Overview (Doctors)</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white p-4 rounded-lg shadow">
+            <p className="text-gray-600 text-sm font-medium">Total Revenue (100%)</p>
+            <p className="text-3xl font-bold text-blue-600">₹{adminRevenue.totalRevenue}</p>
+            <p className="text-xs text-gray-500 mt-1">{adminRevenue.totalBookings} consultations</p>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow">
+            <p className="text-gray-600 text-sm font-medium">Platform Share (50%)</p>
+            <p className="text-3xl font-bold text-green-600">₹{adminRevenue.platformShare}</p>
+            <p className="text-xs text-gray-500 mt-1">Your earnings</p>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow">
+            <p className="text-gray-600 text-sm font-medium">Doctor Share (50%)</p>
+            <p className="text-3xl font-bold text-orange-600">₹{adminRevenue.doctorShare}</p>
+            <p className="text-xs text-gray-500 mt-1">To be paid out</p>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow">
+            <p className="text-gray-600 text-sm font-medium">Per Consultation</p>
+            <p className="text-3xl font-bold text-purple-600">₹500</p>
+            <p className="text-xs text-gray-500 mt-1">Standard rate</p>
+          </div>
+        </div>
+
+        {/* Revenue Progress Bar - Shows 100% */}
+        <div className="bg-white p-4 rounded-lg shadow">
+          <div className="flex justify-between items-center mb-2">
+            <p className="text-sm font-medium text-gray-700">Revenue Distribution</p>
+            <p className="text-sm text-gray-600">100% Collected</p>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-8 overflow-hidden flex">
+            <div 
+              className="bg-gradient-to-r from-green-500 to-green-600 h-8 flex items-center justify-center text-white text-sm font-bold"
+              style={{ width: '50%' }}
+            >
+              Platform: ₹{adminRevenue.platformShare}
+            </div>
+            <div 
+              className="bg-gradient-to-r from-orange-400 to-orange-500 h-8 flex items-center justify-center text-white text-sm font-bold"
+              style={{ width: '50%' }}
+            >
+              Doctors: ₹{adminRevenue.doctorShare}
+            </div>
+          </div>
+          <div className="flex justify-between mt-2 text-xs text-gray-600">
+            <span>Platform Revenue: 50%</span>
+            <span>Doctor Payouts: 50%</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Doctor Payment Management */}
+      <h3 className="text-xl font-bold mb-4">Doctor Payment Management</h3>
+      <div className="space-y-6">
+        {payments.map((payment) => (
+          <div key={payment.doctorId} className="bg-white border rounded-lg p-6">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-lg font-bold">Dr. {payment.name}</h3>
+                <p className="text-sm text-gray-600">{payment.email}</p>
+                <p className="text-sm text-gray-600">{payment.completedBookings} completed consultations</p>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-bold text-green-600">₹{payment.totalEarned}</p>
+                <p className="text-xs text-gray-500">Total Earned</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="bg-green-50 p-3 rounded">
+                <p className="text-xs text-green-600 font-medium">Paid</p>
+                <p className="text-xl font-bold text-green-700">₹{payment.totalPaid}</p>
+              </div>
+              <div className="bg-yellow-50 p-3 rounded">
+                <p className="text-xs text-yellow-600 font-medium">Outstanding</p>
+                <p className="text-xl font-bold text-yellow-700">₹{payment.outstanding}</p>
+              </div>
+              <div className="bg-blue-50 p-3 rounded">
+                <p className="text-xs text-blue-600 font-medium">Unpaid Consultations</p>
+                <p className="text-xl font-bold text-blue-700">{payment.unpaidBookings.length}</p>
+              </div>
+            </div>
+
+            {payment.unpaidBookings.length > 0 && (
+              <div className="border-t pt-4">
+                <p className="font-medium mb-2">Unpaid Consultations:</p>
+                <div className="space-y-2 mb-3">
+                  {payment.unpaidBookings.map((booking) => (
+                    <div key={booking.bookingId} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedBookings.includes(booking.bookingId)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedBookings([...selectedBookings, booking.bookingId])
+                            } else {
+                              setSelectedBookings(selectedBookings.filter(id => id !== booking.bookingId))
+                            }
+                          }}
+                          className="w-4 h-4"
+                        />
+                        <div>
+                          <p className="text-sm font-medium">{booking.patientName}</p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(booking.date).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-sm font-bold text-green-600">₹{booking.amount}</p>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => {
+                    const bookingIds = payment.unpaidBookings
+                      .filter(b => selectedBookings.includes(b.bookingId))
+                      .map(b => b.bookingId)
+                    if (bookingIds.length > 0) {
+                      handleMarkAsPaid(payment.doctorId, bookingIds)
+                    } else {
+                      toast.warning('Please select consultations to mark as paid')
+                    }
+                  }}
+                  disabled={selectedBookings.length === 0}
+                  className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-400"
+                >
+                  Mark Selected as Paid ({selectedBookings.filter(id => 
+                    payment.unpaidBookings.some(b => b.bookingId === id)
+                  ).length})
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+        
+        {payments.length === 0 && !loading && (
+          <div className="text-center py-8">
+            <p className="text-gray-500">No doctor payment data found.</p>
           </div>
         )}
       </div>
