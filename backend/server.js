@@ -15,14 +15,12 @@ app.use(express.urlencoded({ extended: true }));
 
 // Database connection with optimized settings for Vercel
 const mongooseOptions = {
-  serverSelectionTimeoutMS: 5000, // Reduced from 8000 for faster failure
+  serverSelectionTimeoutMS: 8000, // Keep trying to send operations for 8 seconds
   socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
-  maxPoolSize: 5, // Reduced from 10 for serverless
-  minPoolSize: 1, // Reduced from 2 for serverless
+  maxPoolSize: 10, // Maintain up to 10 socket connections
+  minPoolSize: 2, // Maintain a minimum of 2 socket connections
   maxIdleTimeMS: 30000, // Close connections after 30 seconds of inactivity
-  family: 4, // Use IPv4, skip trying IPv6
-  bufferCommands: false, // Disable mongoose buffering
-  bufferMaxEntries: 0 // Disable mongoose buffering
+  family: 4 // Use IPv4, skip trying IPv6
 };
 
 mongoose.connect(process.env.MONGODB_URI, mongooseOptions)
