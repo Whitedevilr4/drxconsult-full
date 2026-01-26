@@ -9,33 +9,21 @@ const { withSlotCleanup } = require('../utils/slotCleanup');
 // Get all doctors
 router.get('/', async (req, res) => {
   try {
-    // Add timeout protection to the main query
-    const doctors = await Promise.race([
-      Doctor.find()
-        .populate('userId', 'name email phone profilePicture')
-        .sort({ createdAt: -1 })
-        .maxTimeMS(5000), // 5 second timeout
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Database query timeout')), 5000)
-      )
-    ]);
+    const doctors = await Doctor.find()
+      .populate('userId', 'name email phone profilePicture')
+      .sort({ createdAt: -1 });
     
-    // RELIABLE cleanup - ALWAYS filters expired slots
+    // Simple cleanup - just filter expired slots in memory
     const cleanedDoctors = await withSlotCleanup(doctors, 'doctor');
     
-    // Calculate rating and session statistics for each doctor with timeout protection
+    // Calculate rating and session statistics for each doctor
     const doctorsWithStats = await Promise.all(cleanedDoctors.map(async (doctor) => {
       try {
-        // Get all completed bookings for this doctor with timeout
-        const completedBookings = await Promise.race([
-          Booking.find({ 
-            doctorId: doctor._id, 
-            status: 'completed' 
-          }).maxTimeMS(3000), // 3 second timeout for individual queries
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Booking query timeout')), 3000)
-          )
-        ]);
+        // Get all completed bookings for this doctor
+        const completedBookings = await Booking.find({ 
+          doctorId: doctor._id, 
+          status: 'completed' 
+        });
         
         // Calculate rating statistics
         const reviewedBookings = completedBookings.filter(booking => 
@@ -73,15 +61,6 @@ router.get('/', async (req, res) => {
     res.json(doctorsWithStats);
   } catch (error) {
     console.error('Error fetching doctors:', error);
-    
-    // Handle specific timeout errors
-    if (error.message === 'Database query timeout' || error.name === 'MongooseError') {
-      return res.status(503).json({ 
-        message: 'Database connection timeout. Please try again.',
-        retryable: true 
-      });
-    }
-    
     res.status(500).json({ message: 'Server error' });
   }
 });
