@@ -13,8 +13,17 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Database connection
-mongoose.connect(process.env.MONGODB_URI)
+// Database connection with optimized settings for Vercel
+const mongooseOptions = {
+  serverSelectionTimeoutMS: 8000, // Keep trying to send operations for 8 seconds
+  socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
+  maxPoolSize: 10, // Maintain up to 10 socket connections
+  minPoolSize: 2, // Maintain a minimum of 2 socket connections
+  maxIdleTimeMS: 30000, // Close connections after 30 seconds of inactivity
+  family: 4 // Use IPv4, skip trying IPv6
+};
+
+mongoose.connect(process.env.MONGODB_URI, mongooseOptions)
   .then(() => {
     console.log('✅ MongoDB connected successfully');
   })
@@ -25,6 +34,19 @@ mongoose.connect(process.env.MONGODB_URI)
       process.exit(1);
     }
   });
+
+// Handle MongoDB connection events
+mongoose.connection.on('error', (err) => {
+  console.error('❌ MongoDB connection error:', err);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.warn('⚠️  MongoDB disconnected');
+});
+
+mongoose.connection.on('reconnected', () => {
+  console.log('✅ MongoDB reconnected');
+});
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
