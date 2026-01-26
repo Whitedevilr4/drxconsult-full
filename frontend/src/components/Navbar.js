@@ -25,7 +25,9 @@ export default function Navbar() {
   const getDashboardLink = () => {
     if (!user) return null
     if (user.role === 'admin') return '/admin/dashboard'
-    return user.role === 'pharmacist' ? '/pharmacist/dashboard' : '/patient/dashboard'
+    if (user.role === 'pharmacist') return '/pharmacist/dashboard'
+    if (user.role === 'doctor') return '/doctor/dashboard'
+    return '/patient/dashboard'
   }
 
   return (
