@@ -23,4 +23,7 @@ const userSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
+// Add indexes for better query performance (compound index only)
+userSchema.index({ email: 1, firebaseUid: 1 }); // Compound index for Firebase login query
+
 module.exports = mongoose.model('User', userSchema);
