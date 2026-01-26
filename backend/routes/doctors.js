@@ -8,45 +8,76 @@ const { auth } = require('../middleware/auth');
 // Get all doctors
 router.get('/', async (req, res) => {
   try {
-    const doctors = await Doctor.find()
-      .populate('userId', 'name email phone profilePicture')
-      .sort({ createdAt: -1 });
+    // Add timeout protection to the main query
+    const doctors = await Promise.race([
+      Doctor.find()
+        .populate('userId', 'name email phone profilePicture')
+        .sort({ createdAt: -1 })
+        .maxTimeMS(5000), // 5 second timeout
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database query timeout')), 5000)
+      )
+    ]);
     
-    // Calculate rating and session statistics for each doctor
+    // Calculate rating and session statistics for each doctor with timeout protection
     const doctorsWithStats = await Promise.all(doctors.map(async (doctor) => {
-      // Get all completed bookings for this doctor
-      const completedBookings = await Booking.find({ 
-        doctorId: doctor._id, 
-        status: 'completed' 
-      });
-      
-      // Calculate rating statistics
-      const reviewedBookings = completedBookings.filter(booking => 
-        booking.review && booking.review.rating
-      );
-      
-      let averageRating = 0;
-      let totalReviews = reviewedBookings.length;
-      
-      if (totalReviews > 0) {
-        const totalRating = reviewedBookings.reduce((sum, booking) => 
-          sum + booking.review.rating, 0
+      try {
+        // Get all completed bookings for this doctor with timeout
+        const completedBookings = await Promise.race([
+          Booking.find({ 
+            doctorId: doctor._id, 
+            status: 'completed' 
+          }).maxTimeMS(3000), // 3 second timeout for individual queries
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Booking query timeout')), 3000)
+          )
+        ]);
+        
+        // Calculate rating statistics
+        const reviewedBookings = completedBookings.filter(booking => 
+          booking.review && booking.review.rating
         );
-        averageRating = totalRating / totalReviews;
+        
+        let averageRating = 0;
+        let totalReviews = reviewedBookings.length;
+        
+        if (totalReviews > 0) {
+          const totalRating = reviewedBookings.reduce((sum, booking) => 
+            sum + booking.review.rating, 0
+          );
+          averageRating = totalRating / totalReviews;
+        }
+        
+        // Convert to plain object and add statistics
+        const doctorObj = doctor.toObject();
+        doctorObj.averageRating = Math.round(averageRating * 10) / 10; // Round to 1 decimal
+        doctorObj.totalReviews = totalReviews;
+        doctorObj.completedSessions = completedBookings.length;
+        
+        return doctorObj;
+      } catch (statsError) {
+        console.error(`Error fetching stats for doctor ${doctor._id}:`, statsError);
+        // Return doctor without stats if stats query fails
+        const doctorObj = doctor.toObject();
+        doctorObj.averageRating = 0;
+        doctorObj.totalReviews = 0;
+        doctorObj.completedSessions = 0;
+        return doctorObj;
       }
-      
-      // Convert to plain object and add statistics
-      const doctorObj = doctor.toObject();
-      doctorObj.averageRating = Math.round(averageRating * 10) / 10; // Round to 1 decimal
-      doctorObj.totalReviews = totalReviews;
-      doctorObj.completedSessions = completedBookings.length;
-      
-      return doctorObj;
     }));
     
     res.json(doctorsWithStats);
   } catch (error) {
     console.error('Error fetching doctors:', error);
+    
+    // Handle specific timeout errors
+    if (error.message === 'Database query timeout' || error.name === 'MongooseError') {
+      return res.status(503).json({ 
+        message: 'Database connection timeout. Please try again.',
+        retryable: true 
+      });
+    }
+    
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -54,21 +85,38 @@ router.get('/', async (req, res) => {
 // Get doctor's bookings (for doctor dashboard) - MUST come before /:id route
 router.get('/my-bookings', auth, async (req, res) => {
   try {
-    const doctor = await Doctor.findOne({ userId: req.user.userId });
+    const doctor = await Promise.race([
+      Doctor.findOne({ userId: req.user.userId }).maxTimeMS(3000),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database query timeout')), 3000)
+      )
+    ]);
     
     if (!doctor) {
       return res.status(404).json({ message: 'Doctor profile not found' });
     }
 
-    const bookings = await Booking.find({ 
-      doctorId: doctor._id 
-    })
-    .populate('patientId', 'name email phone')
-    .sort({ slotDate: -1 });
+    const bookings = await Promise.race([
+      Booking.find({ doctorId: doctor._id })
+        .populate('patientId', 'name email phone')
+        .sort({ slotDate: -1 })
+        .maxTimeMS(5000),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database query timeout')), 5000)
+      )
+    ]);
 
     res.json(bookings);
   } catch (error) {
     console.error('Error fetching doctor bookings:', error);
+    
+    if (error.message === 'Database query timeout' || error.name === 'MongooseError') {
+      return res.status(503).json({ 
+        message: 'Database connection timeout. Please try again.',
+        retryable: true 
+      });
+    }
+    
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -76,16 +124,26 @@ router.get('/my-bookings', auth, async (req, res) => {
 // Get doctor's payment stats - MUST come before /:id route
 router.get('/payment-stats', auth, async (req, res) => {
   try {
-    const doctor = await Doctor.findOne({ userId: req.user.userId });
+    const doctor = await Promise.race([
+      Doctor.findOne({ userId: req.user.userId }).maxTimeMS(3000),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database query timeout')), 3000)
+      )
+    ]);
     
     if (!doctor) {
       return res.status(404).json({ message: 'Doctor profile not found' });
     }
 
-    const completedBookings = await Booking.find({ 
-      doctorId: doctor._id,
-      status: 'completed'
-    });
+    const completedBookings = await Promise.race([
+      Booking.find({ 
+        doctorId: doctor._id,
+        status: 'completed'
+      }).maxTimeMS(5000),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database query timeout')), 5000)
+      )
+    ]);
 
     const totalEarned = completedBookings.reduce((sum, booking) => {
       return sum + (booking.doctorShare || 250);
@@ -110,6 +168,14 @@ router.get('/payment-stats', auth, async (req, res) => {
     res.json(stats);
   } catch (error) {
     console.error('Error fetching payment stats:', error);
+    
+    if (error.message === 'Database query timeout' || error.name === 'MongooseError') {
+      return res.status(503).json({ 
+        message: 'Database connection timeout. Please try again.',
+        retryable: true 
+      });
+    }
+    
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -119,20 +185,38 @@ router.put('/slots', auth, async (req, res) => {
   try {
     const { slots } = req.body;
     
-    // Find doctor by user ID
-    const doctor = await Doctor.findOne({ userId: req.user.userId });
+    // Find doctor by user ID with timeout
+    const doctor = await Promise.race([
+      Doctor.findOne({ userId: req.user.userId }).maxTimeMS(3000),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database query timeout')), 3000)
+      )
+    ]);
     
     if (!doctor) {
       return res.status(404).json({ message: 'Doctor profile not found' });
     }
 
-    // Update slots
+    // Update slots with timeout
     doctor.availableSlots = slots;
-    await doctor.save();
+    await Promise.race([
+      doctor.save(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database save timeout')), 3000)
+      )
+    ]);
 
     res.json({ message: 'Slots updated successfully', slots: doctor.availableSlots });
   } catch (error) {
     console.error('Error updating doctor slots:', error);
+    
+    if (error.message.includes('timeout') || error.name === 'MongooseError') {
+      return res.status(503).json({ 
+        message: 'Database connection timeout. Please try again.',
+        retryable: true 
+      });
+    }
+    
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
@@ -140,8 +224,14 @@ router.put('/slots', auth, async (req, res) => {
 // Get doctor by ID - MUST come after specific routes
 router.get('/:id', async (req, res) => {
   try {
-    const doctor = await Doctor.findById(req.params.id)
-      .populate('userId', 'name email phone profilePicture');
+    const doctor = await Promise.race([
+      Doctor.findById(req.params.id)
+        .populate('userId', 'name email phone profilePicture')
+        .maxTimeMS(3000),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database query timeout')), 3000)
+      )
+    ]);
     
     if (!doctor) {
       return res.status(404).json({ message: 'Doctor not found' });
@@ -150,6 +240,14 @@ router.get('/:id', async (req, res) => {
     res.json(doctor);
   } catch (error) {
     console.error('Error fetching doctor:', error);
+    
+    if (error.message === 'Database query timeout' || error.name === 'MongooseError') {
+      return res.status(503).json({ 
+        message: 'Database connection timeout. Please try again.',
+        retryable: true 
+      });
+    }
+    
     res.status(500).json({ message: 'Server error' });
   }
 });
