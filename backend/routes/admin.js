@@ -5,7 +5,8 @@ const User = require('../models/User');
 const Pharmacist = require('../models/Pharmacist');
 const MedicalHistory = require('../models/MedicalHistory');
 const { auth, isAdmin } = require('../middleware/auth');
-const { sendUserSuspensionEmail, sendUserUnsuspensionEmail } = require('../utils/emailService');
+const { sendUserSuspensionEmail, sendUserUnsuspensionEmail, sendPaymentReceivedEmail } = require('../utils/emailService');
+const { notifyPaymentApproved } = require('../utils/notificationHelper');
 
 const router = express.Router();
 
@@ -208,6 +209,21 @@ router.get('/users/:id/activity', auth, isAdmin, async (req, res) => {
           totalConsultations: bookings.length,
           completedConsultations: bookings.filter(b => b.status === 'completed').length,
           totalEarned: bookings.reduce((sum, b) => sum + (b.pharmacistShare || 0), 0),
+          recentConsultations: bookings.slice(-5).reverse()
+        };
+      }
+    } else if (user.role === 'doctor') {
+      const Booking = require('../models/Booking');
+      const Doctor = require('../models/Doctor');
+      const doctor = await Doctor.findOne({ userId: userId });
+      
+      if (doctor) {
+        const bookings = await Booking.find({ doctorId: doctor._id });
+        
+        activity.stats = {
+          totalConsultations: bookings.length,
+          completedConsultations: bookings.filter(b => b.status === 'completed').length,
+          totalEarned: bookings.reduce((sum, b) => sum + (b.doctorShare || 0), 0),
           recentConsultations: bookings.slice(-5).reverse()
         };
       }
@@ -521,16 +537,19 @@ router.post('/mark-payment-done', auth, isAdmin, async (req, res) => {
   try {
     const { bookingIds } = req.body;
     const Booking = require('../models/Booking');
-    const { notifyPaymentApproved } = require('../utils/notificationHelper');
     
     if (!bookingIds || !Array.isArray(bookingIds)) {
       return res.status(400).json({ message: 'Booking IDs array required' });
     }
     
-    // Get bookings before updating to calculate total amount and get pharmacist info
+    // Get bookings before updating to calculate total amount and get professional info
     const bookings = await Booking.find({ _id: { $in: bookingIds } })
       .populate({
         path: 'pharmacistId',
+        populate: { path: 'userId', select: 'name' }
+      })
+      .populate({
+        path: 'doctorId',
         populate: { path: 'userId', select: 'name' }
       });
     
@@ -570,11 +589,28 @@ router.post('/mark-payment-done', auth, isAdmin, async (req, res) => {
     for (const payment of Object.values(pharmacistPayments)) {
       if (payment.pharmacistUserId) {
         await notifyPaymentApproved({
-          pharmacistUserId: payment.pharmacistUserId,
-          pharmacistName: payment.pharmacistName,
+          professionalUserId: payment.pharmacistUserId,
+          professionalName: payment.pharmacistName,
           amount: payment.totalAmount,
-          bookingCount: payment.bookingCount
+          bookingCount: payment.bookingCount,
+          professionalType: 'pharmacist'
         });
+        
+        // Send payment email
+        try {
+          const pharmacist = await Pharmacist.findById(Object.keys(pharmacistPayments)[0]).populate('userId', 'email');
+          if (pharmacist?.userId?.email) {
+            await sendPaymentReceivedEmail(
+              pharmacist.userId.email,
+              payment.pharmacistName,
+              payment.totalAmount,
+              payment.bookingCount,
+              'pharmacist'
+            );
+          }
+        } catch (emailError) {
+          console.error('Failed to send payment email:', emailError);
+        }
       }
     }
     
@@ -593,11 +629,15 @@ router.get('/analytics', auth, isAdmin, async (req, res) => {
   try {
     const Booking = require('../models/Booking');
     
-    // Get all bookings with pharmacist and patient info
+    // Get all bookings with pharmacist, doctor, and patient info
     const bookings = await Booking.find()
       .populate('patientId', 'name email')
       .populate({
         path: 'pharmacistId',
+        populate: { path: 'userId', select: 'name email' }
+      })
+      .populate({
+        path: 'doctorId',
         populate: { path: 'userId', select: 'name email' }
       });
     
@@ -643,6 +683,329 @@ router.get('/analytics', auth, isAdmin, async (req, res) => {
     });
   } catch (err) {
     console.error('Error fetching analytics:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Doctor Management Routes
+
+// Get all doctors (admin only)
+router.get('/doctors', auth, isAdmin, async (req, res) => {
+  try {
+    const Doctor = require('../models/Doctor');
+    const doctors = await Doctor.find()
+      .populate('userId', 'name email phone profilePicture createdAt')
+      .sort({ createdAt: -1 });
+    res.json(doctors);
+  } catch (err) {
+    console.error('Error fetching doctors:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Create new doctor (admin only)
+router.post('/doctors', [
+  auth,
+  isAdmin,
+  body('name').notEmpty().withMessage('Name is required'),
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('specialization').notEmpty().withMessage('Specialization is required'),
+  body('qualification').notEmpty().withMessage('Qualification is required'),
+  body('experience').isNumeric().withMessage('Experience must be a number'),
+  body('licenseNumber').notEmpty().withMessage('License number is required')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { 
+      name, 
+      email, 
+      password, 
+      phone, 
+      specialization, 
+      qualification, 
+      experience, 
+      description, 
+      photo, 
+      consultationFee,
+      licenseNumber 
+    } = req.body;
+
+    // Check if user already exists
+    let user = await User.findOne({ email });
+    if (user) {
+      return res.status(400).json({ message: 'User already exists with this email' });
+    }
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create user
+    user = new User({
+      name,
+      email,
+      password: hashedPassword,
+      phone: phone || '',
+      role: 'doctor',
+      profilePicture: photo || ''
+    });
+
+    await user.save();
+
+    // Create doctor profile
+    const Doctor = require('../models/Doctor');
+    const doctor = new Doctor({
+      userId: user._id,
+      specialization,
+      qualification,
+      experience: parseInt(experience),
+      description: description || '',
+      photo: photo || '',
+      consultationFee: consultationFee || 500,
+      licenseNumber
+    });
+
+    await doctor.save();
+
+    // Populate user data for response
+    await doctor.populate('userId', 'name email phone profilePicture');
+
+    res.status(201).json({
+      message: 'Doctor created successfully',
+      doctor,
+      credentials: {
+        email,
+        password
+      }
+    });
+
+  } catch (err) {
+    console.error('Error creating doctor:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Update doctor (admin only)
+router.put('/doctors/:id', auth, isAdmin, async (req, res) => {
+  try {
+    const Doctor = require('../models/Doctor');
+    const { specialization, qualification, experience, description, photo, status, consultationFee, licenseNumber } = req.body;
+    
+    const doctor = await Doctor.findByIdAndUpdate(
+      req.params.id,
+      {
+        specialization,
+        qualification,
+        experience,
+        description,
+        photo,
+        status,
+        consultationFee,
+        licenseNumber,
+        updatedAt: Date.now()
+      },
+      { new: true }
+    ).populate('userId', 'name email phone');
+
+    if (!doctor) {
+      return res.status(404).json({ message: 'Doctor not found' });
+    }
+
+    res.json(doctor);
+  } catch (err) {
+    console.error('Error updating doctor:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Update doctor status (admin only)
+router.patch('/doctors/:id/status', auth, isAdmin, async (req, res) => {
+  try {
+    const Doctor = require('../models/Doctor');
+    const { status } = req.body;
+    
+    const doctor = await Doctor.findByIdAndUpdate(
+      req.params.id,
+      { status, updatedAt: Date.now() },
+      { new: true }
+    );
+
+    if (!doctor) {
+      return res.status(404).json({ message: 'Doctor not found' });
+    }
+
+    res.json({ message: 'Doctor status updated successfully' });
+  } catch (err) {
+    console.error('Error updating doctor status:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Delete doctor (admin only)
+router.delete('/doctors/:id', auth, isAdmin, async (req, res) => {
+  try {
+    const Doctor = require('../models/Doctor');
+    const doctor = await Doctor.findById(req.params.id);
+    
+    if (!doctor) {
+      return res.status(404).json({ message: 'Doctor not found' });
+    }
+
+    // Update user role back to patient
+    await User.findByIdAndUpdate(doctor.userId, { role: 'patient' });
+    
+    // Delete doctor profile
+    await Doctor.findByIdAndDelete(req.params.id);
+
+    res.json({ message: 'Doctor deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting doctor:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Get doctor payment stats (admin only)
+router.get('/doctor-payments', auth, isAdmin, async (req, res) => {
+  try {
+    const Doctor = require('../models/Doctor');
+    const Booking = require('../models/Booking');
+    
+    const doctors = await Doctor.find().populate('userId', 'name email');
+    
+    const paymentStats = await Promise.all(doctors.map(async (doctor) => {
+      const completedBookings = await Booking.find({ 
+        doctorId: doctor._id,
+        status: 'completed'
+      }).populate('patientId', 'name');
+
+      const totalEarned = completedBookings.reduce((sum, booking) => {
+        return sum + (booking.doctorShare || 250);
+      }, 0);
+
+      const paidBookings = completedBookings.filter(booking => booking.doctorPaid);
+      const totalPaid = paidBookings.reduce((sum, booking) => {
+        return sum + (booking.doctorShare || 250);
+      }, 0);
+
+      const unpaidBookings = completedBookings.filter(booking => !booking.doctorPaid);
+
+      return {
+        doctorId: doctor._id,
+        name: doctor.userId.name,
+        email: doctor.userId.email,
+        totalEarned,
+        totalPaid,
+        outstanding: totalEarned - totalPaid,
+        completedBookings: completedBookings.length,
+        paidBookings: paidBookings.length,
+        unpaidBookings: unpaidBookings.map(booking => ({
+          bookingId: booking._id,
+          patientName: booking.patientId.name,
+          date: booking.slotDate,
+          amount: booking.doctorShare || 250
+        }))
+      };
+    }));
+
+    res.json(paymentStats);
+  } catch (err) {
+    console.error('Error fetching doctor payments:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Mark doctor payment as done (admin only)
+router.post('/mark-doctor-payment-done', auth, isAdmin, async (req, res) => {
+  try {
+    const { bookingIds } = req.body;
+    
+    if (!bookingIds || !Array.isArray(bookingIds)) {
+      return res.status(400).json({ message: 'Booking IDs array is required' });
+    }
+
+    const Booking = require('../models/Booking');
+    const Doctor = require('../models/Doctor');
+    
+    // Get booking details for notifications
+    const bookings = await Booking.find({ _id: { $in: bookingIds } })
+      .populate({
+        path: 'doctorId',
+        populate: { path: 'userId', select: 'name email' }
+      });
+    
+    // Group bookings by doctor
+    const doctorPayments = {};
+    
+    for (const booking of bookings) {
+      if (booking.doctorId && booking.doctorId.userId) {
+        const doctorId = booking.doctorId._id.toString();
+        const doctorUserId = booking.doctorId.userId._id.toString();
+        const doctorName = booking.doctorId.userId.name;
+        const doctorEmail = booking.doctorId.userId.email;
+        
+        if (!doctorPayments[doctorId]) {
+          doctorPayments[doctorId] = {
+            doctorUserId,
+            doctorName,
+            doctorEmail,
+            totalAmount: 0,
+            bookingCount: 0
+          };
+        }
+        
+        doctorPayments[doctorId].totalAmount += booking.doctorShare || 250;
+        doctorPayments[doctorId].bookingCount += 1;
+      }
+    }
+    
+    // Update payment status
+    const result = await Booking.updateMany(
+      { _id: { $in: bookingIds } },
+      { 
+        doctorPaid: true,
+        paidAt: new Date()
+      }
+    );
+    
+    // Send notifications and emails for each doctor
+    for (const payment of Object.values(doctorPayments)) {
+      if (payment.doctorUserId) {
+        // Send notification
+        await notifyPaymentApproved({
+          professionalUserId: payment.doctorUserId,
+          professionalName: payment.doctorName,
+          amount: payment.totalAmount,
+          bookingCount: payment.bookingCount,
+          professionalType: 'doctor'
+        });
+        
+        // Send payment email
+        try {
+          await sendPaymentReceivedEmail(
+            payment.doctorEmail,
+            payment.doctorName,
+            payment.totalAmount,
+            payment.bookingCount,
+            'doctor'
+          );
+          console.log(`✅ Payment email sent to doctor ${payment.doctorName} (${payment.doctorEmail})`);
+        } catch (emailError) {
+          console.error('Failed to send payment email to doctor:', emailError);
+        }
+      }
+    }
+
+    res.json({ 
+      message: `${result.modifiedCount} doctor payment(s) marked as done`,
+      modifiedCount: result.modifiedCount
+    });
+  } catch (err) {
+    console.error('Error marking doctor payments as done:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
