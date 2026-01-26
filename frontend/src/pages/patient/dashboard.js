@@ -281,17 +281,17 @@ export default function PatientDashboard() {
                       <div>
                         <div className="flex items-center mb-1">
                           <p className="font-semibold text-lg text-gray-800">
-                            👨‍⚕️ {booking.pharmacistId?.userId?.name || 'Pharmacist'}
+                            {booking.doctorId ? '👨‍⚕️' : '💊'} {booking.doctorId?.userId?.name || booking.pharmacistId?.userId?.name || (booking.doctorId ? 'Doctor' : 'Pharmacist')}
                           </p>
                           <span className={`ml-3 px-2 py-1 text-xs rounded-full font-medium ${
                             booking.serviceType === 'prescription_review' 
                               ? 'bg-blue-100 text-blue-700' 
                               : 'bg-purple-100 text-purple-700'
                           }`}>
-                            {booking.serviceType === 'prescription_review' ? '📋 Prescription Review' : '👨‍⚕️ Full Consultation'}
+                            {booking.serviceType === 'prescription_review' ? '📋 Prescription Review' : (booking.doctorId ? '👨‍⚕️ Doctor Consultation' : '💊 Pharmacist Consultation')}
                           </span>
                         </div>
-                        <p className="text-sm text-gray-600">{booking.pharmacistId?.designation || ''}</p>
+                        <p className="text-sm text-gray-600">{booking.doctorId?.specialization || booking.pharmacistId?.designation || ''}</p>
                         <p className="font-medium mt-2">Date: {new Date(booking.slotDate).toLocaleDateString()}</p>
                         <p>Time: {booking.slotTime}</p>
                         <p className="text-sm text-gray-600 mt-1">
@@ -450,7 +450,7 @@ export default function PatientDashboard() {
                         ) : (
                           <div className="mb-3 bg-yellow-50 p-3 rounded border border-yellow-200">
                             <p className="text-sm text-yellow-800">
-                              ⏳ Waiting for pharmacist to add meeting link. You'll be able to join once the link is provided.
+                              ⏳ Waiting for {booking.doctorId ? 'doctor' : 'pharmacist'} to add meeting link. You'll be able to join once the link is provided.
                             </p>
                           </div>
                         )}
