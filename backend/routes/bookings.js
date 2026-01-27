@@ -5,7 +5,7 @@ const Doctor = require('../models/Doctor');
 const User = require('../models/User');
 const { auth, isPharmacist } = require('../middleware/auth');
 const { createMeetLink } = require('../utils/googleMeet');
-const { cleanupExpiredSlotsForPharmacist } = require('../utils/slotCleanup');
+const { cleanupExpiredSlotsForPharmacist, cleanupExpiredSlotsForDoctor } = require('../utils/slotCleanup');
 const { notifyBookingConfirmed, notifyMeetingLinkAdded, notifyTestResultUploaded, notifyReviewSubmitted } = require('../utils/notificationHelper');
 const { 
   sendBookingConfirmationEmail, 
@@ -27,6 +27,9 @@ router.get('/available-slots/:professionalId', async (req, res) => {
     let activeBookings;
     
     if (type === 'doctor') {
+      // Clean up expired slots for doctor
+      await cleanupExpiredSlotsForDoctor(professionalId);
+      
       professional = await Doctor.findById(professionalId);
       if (!professional) {
         return res.status(404).json({ message: 'Doctor not found' });
@@ -165,8 +168,52 @@ router.post('/', auth, async (req, res) => {
     const slot = professional.availableSlots.find(s => 
       s.date.toISOString() === new Date(slotDate).toISOString() && s.startTime === slotTime
     );
-    if (slot && slot.isBooked) {
+    
+    if (!slot) {
+      return res.status(400).json({ message: 'This slot is not available. Please select another slot.' });
+    }
+    
+    if (slot.isBooked) {
       return res.status(400).json({ message: 'This slot is already booked. Please select another slot.' });
+    }
+    
+    // Check if slot has expired
+    const now = new Date();
+    const slotDateTime = new Date(slot.date);
+    const endTime = slot.endTime;
+    
+    // Parse end time to check if slot has expired
+    let timeMatch = endTime.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    let hours, minutes;
+    
+    if (timeMatch) {
+      // 12-hour format with AM/PM
+      hours = parseInt(timeMatch[1]);
+      minutes = parseInt(timeMatch[2]);
+      const period = timeMatch[3].toUpperCase();
+      
+      // Convert to 24-hour format
+      if (period === 'PM' && hours !== 12) hours += 12;
+      if (period === 'AM' && hours === 12) hours = 0;
+    } else {
+      // Try 24-hour format
+      timeMatch = endTime.match(/(\d+):(\d+)/);
+      if (timeMatch) {
+        hours = parseInt(timeMatch[1]);
+        minutes = parseInt(timeMatch[2]);
+      } else {
+        // Invalid time format, allow booking
+        hours = 23;
+        minutes = 59;
+      }
+    }
+    
+    // Set the end time on the slot date
+    slotDateTime.setHours(hours, minutes, 0, 0);
+    
+    // Check if slot has expired
+    if (slotDateTime <= now) {
+      return res.status(400).json({ message: 'This slot has expired. Please select another available slot.' });
     }
     
     // Calculate payment amounts based on service type
