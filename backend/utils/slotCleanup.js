@@ -1,132 +1,148 @@
 const Pharmacist = require('../models/Pharmacist');
+const Doctor = require('../models/Doctor');
 
 /**
- * Clean up expired time slots for all pharmacists
- * Removes slots where the date + end time has passed
+ * Helper: check if a slot is still valid (future)
  */
-async function cleanupExpiredSlots() {
+function isFutureSlot(slot, now) {
+  if (!slot?.date || !slot?.endTime) return false;
+
+  const slotDate = new Date(slot.date);
+
+  // Normalize endTime (remove spaces, uppercase)
+  const endTime = slot.endTime.replace(/\s+/g, '').toUpperCase();
+
+  let hours, minutes;
+  let match = endTime.match(/(\d{1,2}):(\d{2})(AM|PM)/);
+
+  if (match) {
+    hours = parseInt(match[1], 10);
+    minutes = parseInt(match[2], 10);
+    const period = match[3];
+
+    if (period === 'PM' && hours !== 12) hours += 12;
+    if (period === 'AM' && hours === 12) hours = 0;
+  } else {
+    match = endTime.match(/(\d{1,2}):(\d{2})/);
+    if (!match) return false;
+
+    hours = parseInt(match[1], 10);
+    minutes = parseInt(match[2], 10);
+  }
+
+  slotDate.setHours(hours, minutes, 0, 0);
+
+  return slotDate.getTime() > now.getTime();
+}
+
+/**
+ * Generic cleanup for any model with availableSlots
+ */
+async function cleanupExpiredSlotsForModel(Model, label = 'Unknown') {
   try {
     const now = new Date();
-    const pharmacists = await Pharmacist.find();
-    
+
+    const docs = await Model.find({
+      availableSlots: { $exists: true, $ne: [] }
+    });
+
     let totalCleaned = 0;
-    
-    for (const pharmacist of pharmacists) {
-      if (!pharmacist.availableSlots || pharmacist.availableSlots.length === 0) {
-        continue;
-      }
-      
-      const originalCount = pharmacist.availableSlots.length;
-      
-      // Filter out expired slots
-      pharmacist.availableSlots = pharmacist.availableSlots.filter(slot => {
-        // Parse the end time to determine if slot has expired
-        const slotDate = new Date(slot.date);
-        const endTime = slot.endTime;
-        
-        // Extract hours and minutes from endTime (supports multiple formats)
-        // Formats: "10:00 AM", "02:30 PM", "23:55" (24-hour)
-        let timeMatch = endTime.match(/(\d+):(\d+)\s*(AM|PM)/i);
-        let hours, minutes;
-        
-        if (timeMatch) {
-          // 12-hour format with AM/PM
-          hours = parseInt(timeMatch[1]);
-          minutes = parseInt(timeMatch[2]);
-          const period = timeMatch[3].toUpperCase();
-          
-          // Convert to 24-hour format
-          if (period === 'PM' && hours !== 12) hours += 12;
-          if (period === 'AM' && hours === 12) hours = 0;
-        } else {
-          // Try 24-hour format
-          timeMatch = endTime.match(/(\d+):(\d+)/);
-          if (!timeMatch) return true; // Keep slot if time format is invalid
-          
-          hours = parseInt(timeMatch[1]);
-          minutes = parseInt(timeMatch[2]);
-        }
-        
-        // Set the time on the slot date
-        slotDate.setHours(hours, minutes, 0, 0);
-        
-        // Keep slot if it's in the future
-        return slotDate > now;
-      });
-      
-      const cleanedCount = originalCount - pharmacist.availableSlots.length;
-      
+
+    for (const doc of docs) {
+      const originalCount = doc.availableSlots.length;
+
+      doc.availableSlots = doc.availableSlots.filter(slot =>
+        isFutureSlot(slot, now)
+      );
+
+      const cleanedCount = originalCount - doc.availableSlots.length;
+
       if (cleanedCount > 0) {
-        await pharmacist.save();
+        await doc.save();
         totalCleaned += cleanedCount;
       }
     }
-    
+
+    console.log(`🧹 ${label} slot cleanup removed ${totalCleaned} slots`);
     return totalCleaned;
+
   } catch (error) {
-    console.error('Error cleaning up expired slots:', error);
+    console.error(`❌ ${label} slot cleanup error:`, error);
     throw error;
   }
 }
 
 /**
- * Clean up expired slots for a specific pharmacist
+ * PUBLIC FUNCTIONS
  */
+
+// 🔹 Clean all pharmacists
+async function cleanupExpiredPharmacistSlots() {
+  return cleanupExpiredSlotsForModel(Pharmacist, 'Pharmacist');
+}
+
+// 🔹 Clean all doctors
+async function cleanupExpiredDoctorSlots() {
+  return cleanupExpiredSlotsForModel(Doctor, 'Doctor');
+}
+
+// 🔹 Clean slots for one pharmacist
 async function cleanupExpiredSlotsForPharmacist(pharmacistId) {
   try {
     const pharmacist = await Pharmacist.findById(pharmacistId);
-    if (!pharmacist) {
-      throw new Error('Pharmacist not found');
-    }
-    
-    if (!pharmacist.availableSlots || pharmacist.availableSlots.length === 0) {
-      return 0;
-    }
-    
+    if (!pharmacist || !pharmacist.availableSlots?.length) return 0;
+
     const now = new Date();
     const originalCount = pharmacist.availableSlots.length;
-    
-    pharmacist.availableSlots = pharmacist.availableSlots.filter(slot => {
-      const slotDate = new Date(slot.date);
-      const endTime = slot.endTime;
-      
-      let timeMatch = endTime.match(/(\d+):(\d+)\s*(AM|PM)/i);
-      let hours, minutes;
-      
-      if (timeMatch) {
-        hours = parseInt(timeMatch[1]);
-        minutes = parseInt(timeMatch[2]);
-        const period = timeMatch[3].toUpperCase();
-        
-        if (period === 'PM' && hours !== 12) hours += 12;
-        if (period === 'AM' && hours === 12) hours = 0;
-      } else {
-        timeMatch = endTime.match(/(\d+):(\d+)/);
-        if (!timeMatch) return true;
-        
-        hours = parseInt(timeMatch[1]);
-        minutes = parseInt(timeMatch[2]);
-      }
-      
-      slotDate.setHours(hours, minutes, 0, 0);
-      
-      return slotDate > now;
-    });
-    
+
+    pharmacist.availableSlots = pharmacist.availableSlots.filter(slot =>
+      isFutureSlot(slot, now)
+    );
+
     const cleanedCount = originalCount - pharmacist.availableSlots.length;
-    
+
     if (cleanedCount > 0) {
       await pharmacist.save();
     }
-    
+
     return cleanedCount;
+
   } catch (error) {
-    console.error('Error cleaning up expired slots for pharmacist:', error);
+    console.error('❌ Pharmacist slot cleanup error:', error);
+    throw error;
+  }
+}
+
+// 🔹 Clean slots for one doctor
+async function cleanupExpiredSlotsForDoctor(doctorId) {
+  try {
+    const doctor = await Doctor.findById(doctorId);
+    if (!doctor || !doctor.availableSlots?.length) return 0;
+
+    const now = new Date();
+    const originalCount = doctor.availableSlots.length;
+
+    doctor.availableSlots = doctor.availableSlots.filter(slot =>
+      isFutureSlot(slot, now)
+    );
+
+    const cleanedCount = originalCount - doctor.availableSlots.length;
+
+    if (cleanedCount > 0) {
+      await doctor.save();
+    }
+
+    return cleanedCount;
+
+  } catch (error) {
+    console.error('❌ Doctor slot cleanup error:', error);
     throw error;
   }
 }
 
 module.exports = {
-  cleanupExpiredSlots,
-  cleanupExpiredSlotsForPharmacist
+  cleanupExpiredPharmacistSlots,
+  cleanupExpiredDoctorSlots,
+  cleanupExpiredSlotsForPharmacist,
+  cleanupExpiredSlotsForDoctor
 };
