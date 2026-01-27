@@ -121,7 +121,7 @@ const emailTemplates = {
         
         <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0;">
           <h4 style="margin-top: 0; color: #856404;">Your Earnings:</h4>
-          <p><strong>Your Share:</strong> ₹${booking.pharmacistShare || (booking.serviceType === 'prescription_review' ? 100 : 250)}</p>
+          <p><strong>Your Share:</strong> ₹${booking.pharmacistShare || booking.doctorShare || (booking.serviceType === 'prescription_review' ? 100 : 250)}</p>
           <p><em>50% of the total booking amount</em></p>
         </div>
         
@@ -134,7 +134,7 @@ const emailTemplates = {
         </ul>
         
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${process.env.FRONTEND_URL}/pharmacist/dashboard" 
+          <a href="${process.env.FRONTEND_URL}/${booking.providerType || 'pharmacist'}/dashboard" 
              style="background-color: #3498db; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
             Go to Dashboard
           </a>
@@ -693,7 +693,7 @@ const sendBookingConfirmationEmail = async (patientEmail, booking, patientName, 
 };
 
 const sendPharmacistBookingNotification = async (pharmacistEmail, booking, patientName, patientEmail, patientPhone) => {
-  return await sendEmail(pharmacistEmail, emailTemplates.pharmacistBookingNotification, booking, patientName, patientEmail, patientPhone);
+  return await sendEmail(pharmacistEmail, emailTemplates.professionalBookingNotification, booking, patientName, patientEmail, patientPhone);
 };
 
 const sendMeetingLinkEmail = async (patientEmail, booking, patientName, pharmacistName) => {
