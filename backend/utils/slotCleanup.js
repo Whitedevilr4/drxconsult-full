@@ -140,7 +140,23 @@ async function cleanupExpiredSlotsForDoctor(doctorId) {
   }
 }
 
+// 🔹 Clean all expired slots (both pharmacists and doctors)
+async function cleanupExpiredSlots() {
+  try {
+    const pharmacistCleaned = await cleanupExpiredPharmacistSlots();
+    const doctorCleaned = await cleanupExpiredDoctorSlots();
+    const totalCleaned = pharmacistCleaned + doctorCleaned;
+    
+    console.log(`🧹 Total slot cleanup removed ${totalCleaned} slots (${pharmacistCleaned} pharmacist, ${doctorCleaned} doctor)`);
+    return totalCleaned;
+  } catch (error) {
+    console.error('❌ General slot cleanup error:', error);
+    throw error;
+  }
+}
+
 module.exports = {
+  cleanupExpiredSlots,
   cleanupExpiredPharmacistSlots,
   cleanupExpiredDoctorSlots,
   cleanupExpiredSlotsForPharmacist,
