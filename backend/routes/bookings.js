@@ -177,43 +177,52 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ message: 'This slot is already booked. Please select another slot.' });
     }
     
-    // Check if slot has expired
+    // Check if slot has expired by comparing both start and end times
     const now = new Date();
-    const slotDateTime = new Date(slot.date);
-    const endTime = slot.endTime;
+    const slotBaseDate = new Date(slot.date);
     
-    // Parse end time to check if slot has expired
-    let timeMatch = endTime.match(/(\d+):(\d+)\s*(AM|PM)/i);
-    let hours, minutes;
-    
-    if (timeMatch) {
-      // 12-hour format with AM/PM
-      hours = parseInt(timeMatch[1]);
-      minutes = parseInt(timeMatch[2]);
-      const period = timeMatch[3].toUpperCase();
+    // Helper function to parse time and return date object
+    const parseTimeToDate = (timeString, baseDate) => {
+      const dateObj = new Date(baseDate);
+      let timeMatch = timeString.match(/(\d+):(\d+)\s*(AM|PM)/i);
+      let hours, minutes;
       
-      // Convert to 24-hour format
-      if (period === 'PM' && hours !== 12) hours += 12;
-      if (period === 'AM' && hours === 12) hours = 0;
-    } else {
-      // Try 24-hour format
-      timeMatch = endTime.match(/(\d+):(\d+)/);
       if (timeMatch) {
+        // 12-hour format with AM/PM
         hours = parseInt(timeMatch[1]);
         minutes = parseInt(timeMatch[2]);
+        const period = timeMatch[3].toUpperCase();
+        
+        // Convert to 24-hour format
+        if (period === 'PM' && hours !== 12) hours += 12;
+        if (period === 'AM' && hours === 12) hours = 0;
       } else {
-        // Invalid time format, allow booking
-        hours = 23;
-        minutes = 59;
+        // Try 24-hour format
+        timeMatch = timeString.match(/(\d+):(\d+)/);
+        if (timeMatch) {
+          hours = parseInt(timeMatch[1]);
+          minutes = parseInt(timeMatch[2]);
+        } else {
+          // Invalid time format, return null
+          return null;
+        }
       }
+      
+      dateObj.setHours(hours, minutes, 0, 0);
+      return dateObj;
+    };
+    
+    // Parse start and end times
+    const startDateTime = parseTimeToDate(slot.startTime, slotBaseDate);
+    const endDateTime = parseTimeToDate(slot.endTime, slotBaseDate);
+    
+    // Check if either start time or end time has passed
+    if (startDateTime && startDateTime <= now) {
+      return res.status(400).json({ message: 'This slot has expired (start time passed). Please select another available slot.' });
     }
     
-    // Set the end time on the slot date
-    slotDateTime.setHours(hours, minutes, 0, 0);
-    
-    // Check if slot has expired
-    if (slotDateTime <= now) {
-      return res.status(400).json({ message: 'This slot has expired. Please select another available slot.' });
+    if (endDateTime && endDateTime <= now) {
+      return res.status(400).json({ message: 'This slot has expired (end time passed). Please select another available slot.' });
     }
     
     // Calculate payment amounts based on service type
