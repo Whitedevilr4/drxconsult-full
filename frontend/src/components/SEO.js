@@ -58,7 +58,7 @@ const SEO = ({
     "name": "DrX Consult",
     "description": "Professional online pharmacy consultation and medication counseling services",
     "url": siteUrl,
-    "priceRange": "₹200-₹500",
+    "priceRange": "₹149-₹449",
     "paymentAccepted": ["Cash", "Credit Card", "UPI", "Net Banking"],
     "currenciesAccepted": "INR",
     "openingHours": "Mo-Su 00:00-23:59",
@@ -110,7 +110,7 @@ const SEO = ({
         "name": "How much does a consultation cost?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "We offer prescription review for ₹200 and comprehensive consultation for ₹500. All consultations are conducted by certified pharmacists."
+          "text": "We offer prescription review for ₹149 and comprehensive consultation for ₹449. All consultations are conducted by certified pharmacists."
         }
       },
       {
