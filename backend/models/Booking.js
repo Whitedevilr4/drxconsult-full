@@ -48,19 +48,19 @@ const bookingSchema = new mongoose.Schema({
   paymentAmount: { 
     type: Number, 
     default: function() {
-      return this.serviceType === 'prescription_review' ? 200 : 500;
+      return this.serviceType === 'prescription_review' ? 149 : 449;
     }
   },
   pharmacistShare: { 
     type: Number, 
     default: function() {
-      return this.serviceType === 'prescription_review' ? 100 : 250; // 50% share
+      return this.serviceType === 'prescription_review' ? 75 : 225; // 50% share
     }
   },
   doctorShare: { 
     type: Number, 
     default: function() {
-      return this.serviceType === 'prescription_review' ? 100 : 250; // 50% share
+      return this.serviceType === 'prescription_review' ? 75 : 225; // 50% share
     }
   },
   pharmacistPaid: { type: Boolean, default: false },
