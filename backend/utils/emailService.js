@@ -61,7 +61,7 @@ const emailTemplates = {
         
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <h3 style="margin-top: 0; color: #2c3e50;">Booking Details:</h3>
-          <p><strong>Service:</strong> ${booking.serviceType === 'prescription_review' ? 'Know Your Prescription (₹200)' : 'Full Consultation (₹500)'}</p>
+          <p><strong>Service:</strong> ${booking.serviceType === 'prescription_review' ? 'Know Your Prescription (₹149)' : 'Full Consultation (₹449)'}</p>
           <p><strong>Professional:</strong> ${professionalName}</p>
           <p><strong>Date:</strong> ${new Date(booking.slotDate).toLocaleDateString()}</p>
           <p><strong>Time:</strong> ${booking.slotTime}</p>
@@ -102,7 +102,7 @@ const emailTemplates = {
         
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <h3 style="margin-top: 0; color: #2c3e50;">Booking Details:</h3>
-          <p><strong>Service Type:</strong> ${booking.serviceType === 'prescription_review' ? 'Know Your Prescription (₹200)' : 'Full Consultation (₹500)'}</p>
+          <p><strong>Service Type:</strong> ${booking.serviceType === 'prescription_review' ? 'Know Your Prescription (₹149)' : 'Full Consultation (₹449)'}</p>
           <p><strong>Patient:</strong> ${patientName}</p>
           <p><strong>Email:</strong> ${patientEmail}</p>
           ${patientPhone ? `<p><strong>Phone:</strong> ${patientPhone}</p>` : ''}
@@ -121,7 +121,7 @@ const emailTemplates = {
         
         <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0;">
           <h4 style="margin-top: 0; color: #856404;">Your Earnings:</h4>
-          <p><strong>Your Share:</strong> ₹${booking.pharmacistShare || booking.doctorShare || (booking.serviceType === 'prescription_review' ? 100 : 250)}</p>
+          <p><strong>Your Share:</strong> ₹${booking.pharmacistShare || booking.doctorShare || (booking.serviceType === 'prescription_review' ? 75 : 225)}</p>
           <p><em>50% of the total booking amount</em></p>
         </div>
         
@@ -330,8 +330,8 @@ const emailTemplates = {
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <h3 style="margin-top: 0; color: #2c3e50;">🚀 What You Can Do Now:</h3>
           <ul style="color: #555; line-height: 1.8;">
-            <li><strong>📋 Prescription Reviews:</strong> Get expert guidance on your medications (₹200)</li>
-            <li><strong>👨‍⚕️ Full Consultations:</strong> Comprehensive health consultations with doctors (₹500)</li>
+            <li><strong>📋 Prescription Reviews:</strong> Get expert guidance on your medications (₹149)</li>
+            <li><strong>👨‍⚕️ Full Consultations:</strong> Comprehensive health consultations with doctors (₹449)</li>
             <li><strong>💊 Pharmacist Sessions:</strong> Medication counseling with certified pharmacists</li>
             <li><strong>📱 Easy Booking:</strong> Schedule sessions at your convenience</li>
             <li><strong>📄 Digital Reports:</strong> Access your consultation reports anytime</li>
@@ -558,7 +558,7 @@ const emailTemplates = {
           <p><strong>Total Sessions Used:</strong> ${subscription.sessionsUsed}/${subscription.sessionsLimit}</p>
           ${subscription.doctorConsultationsLimit > 0 ? `<p><strong>Doctor Consultations Used:</strong> ${subscription.doctorConsultationsUsed}/${subscription.doctorConsultationsLimit}</p>` : ''}
           <p><strong>Subscription Period:</strong> ${new Date(subscription.startDate).toLocaleDateString()} - ${new Date(subscription.endDate).toLocaleDateString()}</p>
-          <p><strong>Total Savings:</strong> Approximately ₹${Math.round((subscription.sessionsUsed * 100) + (subscription.doctorConsultationsUsed * 250))}</p>
+          <p><strong>Total Savings:</strong> Approximately ₹${Math.round((subscription.sessionsUsed * 75) + (subscription.doctorConsultationsUsed * 225))}</p>
         </div>
         
         <div style="background-color: #fff3cd; padding: 20px; border-radius: 8px; margin: 20px 0;">
@@ -602,6 +602,216 @@ const emailTemplates = {
     `
   }),
 
+  // Medical Form Email Templates
+  medicalFormSubmitted: (patientName, patientEmail, formId) => ({
+    subject: 'Medical Form Submitted Successfully - Drx Consult',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background-color: #e8f5e9; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+          <h2 style="color: #2e7d32; margin: 0;">📋 Medical Form Submitted</h2>
+        </div>
+        
+        <p>Dear ${patientName},</p>
+        
+        <p>Your medical form has been successfully submitted and is now under review by our admin team.</p>
+        
+        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #333; margin-top: 0;">What happens next?</h3>
+          <ul style="color: #666; line-height: 1.6;">
+            <li>Our admin team will review your form within 24 hours</li>
+            <li>A qualified professional (pharmacist or doctor) will be assigned</li>
+            <li>You'll receive an email notification once the analysis is complete</li>
+            <li>Results will be available for download after payment of ₹29</li>
+          </ul>
+        </div>
+        
+        <p>You can track the status of your medical form in your patient dashboard.</p>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${process.env.FRONTEND_URL}/patient/dashboard" 
+             style="background-color: #4caf50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+            View Dashboard
+          </a>
+        </div>
+        
+        <p>Thank you for choosing Drx Consult for your healthcare needs.</p>
+        
+        <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+        <p style="color: #666; font-size: 12px;">
+          Form ID: ${formId}<br>
+          If you have any questions, please contact our support team.
+        </p>
+      </div>
+    `
+  }),
+
+  medicalFormAssigned: (patientName, patientEmail, professionalName, professionalType, formId) => ({
+    subject: 'Medical Form Assigned for Review - Drx Consult',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background-color: #e3f2fd; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+          <h2 style="color: #1976d2; margin: 0;">👨‍⚕️ Medical Form Under Review</h2>
+        </div>
+        
+        <p>Dear ${patientName},</p>
+        
+        <p>Great news! Your medical form has been assigned to a qualified professional for review.</p>
+        
+        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #333; margin-top: 0;">Assignment Details</h3>
+          <p style="margin: 5px 0;"><strong>Assigned to:</strong> ${professionalName}</p>
+          <p style="margin: 5px 0;"><strong>Professional Type:</strong> ${professionalType === 'doctor' ? 'Doctor' : 'Pharmacist'}</p>
+          <p style="margin: 5px 0;"><strong>Form ID:</strong> ${formId}</p>
+        </div>
+        
+        <p>The ${professionalType} will carefully review your prescription and medical details to provide you with a comprehensive analysis.</p>
+        
+        <p>You'll receive another email notification once the analysis is complete and ready for download.</p>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${process.env.FRONTEND_URL}/patient/dashboard" 
+             style="background-color: #2196f3; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+            Track Progress
+          </a>
+        </div>
+        
+        <p>Thank you for your patience.</p>
+        
+        <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+        <p style="color: #666; font-size: 12px;">
+          This is an automated notification. Please do not reply to this email.
+        </p>
+      </div>
+    `
+  }),
+
+  medicalFormCompleted: (patientName, patientEmail, professionalName, professionalType, formId, resultNotes) => ({
+    subject: 'Medical Form Analysis Complete - Payment Required - Drx Consult',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background-color: #e8f5e9; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+          <h2 style="color: #2e7d32; margin: 0;">✅ Analysis Complete!</h2>
+        </div>
+        
+        <p>Dear ${patientName},</p>
+        
+        <p>Excellent news! Your medical form analysis has been completed by ${professionalName} (${professionalType === 'doctor' ? 'Doctor' : 'Pharmacist'}).</p>
+        
+        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #333; margin-top: 0;">Analysis Summary</h3>
+          <p style="margin: 5px 0;"><strong>Reviewed by:</strong> ${professionalName}</p>
+          <p style="margin: 5px 0;"><strong>Form ID:</strong> ${formId}</p>
+          ${resultNotes ? `<p style="margin: 5px 0;"><strong>Notes:</strong> ${resultNotes}</p>` : ''}
+        </div>
+        
+        <div style="background-color: #fff3e0; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ff9800;">
+          <h3 style="color: #e65100; margin-top: 0;">💳 Payment Required</h3>
+          <p style="margin: 5px 0;">To download your detailed analysis report, please complete the payment of <strong>₹29</strong>.</p>
+          <p style="margin: 5px 0; color: #666; font-size: 14px;">Secure payment powered by Razorpay</p>
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${process.env.FRONTEND_URL}/patient/dashboard" 
+             style="background-color: #4caf50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+            Pay & Download Report
+          </a>
+        </div>
+        
+        <p>Your detailed analysis report is ready and waiting for you!</p>
+        
+        <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+        <p style="color: #666; font-size: 12px;">
+          This report contains professional medical analysis. Please consult with your healthcare provider for any medical decisions.
+        </p>
+      </div>
+    `
+  }),
+
+  medicalFormPaid: (patientName, patientEmail, professionalName, professionalType, formId, paymentId) => ({
+    subject: 'Payment Successful - Download Your Medical Report - Drx Consult',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background-color: #e8f5e9; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+          <h2 style="color: #2e7d32; margin: 0;">🎉 Payment Successful!</h2>
+        </div>
+        
+        <p>Dear ${patientName},</p>
+        
+        <p>Thank you! Your payment has been successfully processed. Your medical analysis report is now ready for download.</p>
+        
+        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #333; margin-top: 0;">Payment Details</h3>
+          <p style="margin: 5px 0;"><strong>Amount Paid:</strong> ₹29</p>
+          <p style="margin: 5px 0;"><strong>Payment ID:</strong> ${paymentId}</p>
+          <p style="margin: 5px 0;"><strong>Form ID:</strong> ${formId}</p>
+          <p style="margin: 5px 0;"><strong>Analyzed by:</strong> ${professionalName} (${professionalType === 'doctor' ? 'Doctor' : 'Pharmacist'})</p>
+        </div>
+        
+        <div style="background-color: #e8f5e9; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4caf50;">
+          <h3 style="color: #2e7d32; margin-top: 0;">📋 Your Report is Ready!</h3>
+          <p style="margin: 5px 0;">Your comprehensive medical analysis report is now available for download in your dashboard.</p>
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${process.env.FRONTEND_URL}/patient/dashboard" 
+             style="background-color: #4caf50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+            Download Report Now
+          </a>
+        </div>
+        
+        <p>Keep this report for your medical records and share it with your healthcare provider as needed.</p>
+        
+        <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+        <p style="color: #666; font-size: 12px;">
+          This is a professional medical analysis. Please consult with your healthcare provider for any medical decisions.<br>
+          Receipt and report will remain available in your dashboard for future reference.
+        </p>
+      </div>
+    `
+  }),
+
+  professionalMedicalFormAssigned: (professionalName, professionalEmail, patientName, formId, professionalType) => ({
+    subject: 'New Medical Form Assigned for Review - Drx Consult',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background-color: #e3f2fd; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+          <h2 style="color: #1976d2; margin: 0;">📋 New Medical Form Assignment</h2>
+        </div>
+        
+        <p>Dear Dr. ${professionalName},</p>
+        
+        <p>A new medical form has been assigned to you for professional review and analysis.</p>
+        
+        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #333; margin-top: 0;">Assignment Details</h3>
+          <p style="margin: 5px 0;"><strong>Patient:</strong> ${patientName}</p>
+          <p style="margin: 5px 0;"><strong>Form ID:</strong> ${formId}</p>
+          <p style="margin: 5px 0;"><strong>Your Role:</strong> ${professionalType === 'doctor' ? 'Doctor' : 'Pharmacist'}</p>
+        
+        </div>
+        
+        <div style="background-color: #fff3e0; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ff9800;">
+          <h3 style="color: #e65100; margin-top: 0;">📝 Action Required</h3>
+          <p style="margin: 5px 0;">Please review the patient's prescription and medical details, then upload your analysis report.</p>
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${process.env.FRONTEND_URL}/${professionalType}/dashboard" 
+             style="background-color: #2196f3; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+            Review Form Now
+          </a>
+        </div>
+        
+        <p>Thank you for your professional service in helping our patients.</p>
+        
+        <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+        <p style="color: #666; font-size: 12px;">
+          Please ensure timely completion of the analysis to maintain our service quality standards.
+        </p>
+      </div>
+    `
+  }),
+
   paymentReceived: (professionalName, amount, bookingCount, professionalType = 'pharmacist') => ({
     subject: `Payment Received - ₹${amount} - Drx Consult`,
     html: `
@@ -627,8 +837,8 @@ const emailTemplates = {
           <h3 style="margin-top: 0; color: #1565c0;">📊 Earnings Breakdown:</h3>
           <p>As a ${professionalType}, you receive 50% of each consultation fee:</p>
           <ul style="color: #1976d2; line-height: 1.6;">
-            <li>Prescription Reviews: ₹100 per session (from ₹200)</li>
-            <li>Full Consultations: ₹250 per session (from ₹500)</li>
+            <li>Prescription Reviews: ₹75 per session (from ₹149)</li>
+            <li>Full Consultations: ₹225 per session (from ₹449)</li>
           </ul>
         </div>
         
