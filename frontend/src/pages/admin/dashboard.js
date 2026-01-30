@@ -229,6 +229,7 @@ export default function AdminDashboard() {
                   <option value="website">🌐 Website</option>
                   <option value="users">👥 User Management</option>
                   <option value="subscriptions">💳 Subscriptions</option>
+                  <option value="medical-forms">📋 Medical Forms</option>
                 </select>
               </div>
 
@@ -384,6 +385,16 @@ export default function AdminDashboard() {
                 >
                   💳 Subscriptions
                 </button>
+                <button
+                  onClick={() => setActiveTab('medical-forms')}
+                  className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
+                    activeTab === 'medical-forms'
+                      ? 'border-b-2 border-teal-600 text-teal-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  📋 Medical Forms
+                </button>
               </nav>
             </div>
 
@@ -404,6 +415,7 @@ export default function AdminDashboard() {
               {activeTab === 'website' && <WebsiteTab />}
               {activeTab === 'users' && <UserManagementTab />}
               {activeTab === 'subscriptions' && <SubscriptionManagementTab />}
+              {activeTab === 'medical-forms' && <MedicalFormsTab />}
             </div>
           </div>
         </div>
@@ -1153,7 +1165,7 @@ function PaymentsTab() {
           </div>
           <div className="bg-white p-4 rounded-lg shadow">
             <p className="text-gray-600 text-sm font-medium">Per Booking</p>
-            <p className="text-3xl font-bold text-purple-600">₹500</p>
+            <p className="text-3xl font-bold text-purple-600">₹449</p>
             <p className="text-xs text-gray-500 mt-1">Standard rate</p>
           </div>
         </div>
@@ -4039,7 +4051,7 @@ function DoctorPaymentsTab() {
           </div>
           <div className="bg-white p-4 rounded-lg shadow">
             <p className="text-gray-600 text-sm font-medium">Per Consultation</p>
-            <p className="text-3xl font-bold text-purple-600">₹500</p>
+            <p className="text-3xl font-bold text-purple-600">₹449</p>
             <p className="text-xs text-gray-500 mt-1">Standard rate</p>
           </div>
         </div>
@@ -4162,6 +4174,491 @@ function DoctorPaymentsTab() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// Medical Forms Tab Component
+function MedicalFormsTab() {
+  const [medicalForms, setMedicalForms] = useState([])
+  const [pendingForms, setPendingForms] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [activeSubTab, setActiveSubTab] = useState('pending')
+  const [pharmacists, setPharmacists] = useState([])
+  const [doctors, setDoctors] = useState([])
+  const [assignmentLoading, setAssignmentLoading] = useState(null)
+
+  useEffect(() => {
+    fetchMedicalForms()
+    fetchProfessionals()
+  }, [])
+
+  const fetchMedicalForms = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      
+      // Fetch pending forms
+      const pendingRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/medical-forms/pending`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setPendingForms(pendingRes.data)
+
+      // Fetch all forms
+      const allRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/medical-forms/all`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setMedicalForms(allRes.data.medicalForms || [])
+      
+      setLoading(false)
+    } catch (error) {
+      console.error('Error fetching medical forms:', error)
+      setLoading(false)
+    }
+  }
+
+  const fetchProfessionals = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      
+      const [pharmacistsRes, doctorsRes] = await Promise.all([
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/pharmacists`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/doctors`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ])
+      
+      setPharmacists(pharmacistsRes.data)
+      setDoctors(doctorsRes.data)
+    } catch (error) {
+      console.error('Error fetching professionals:', error)
+    }
+  }
+
+  const handleAssignForm = async (formId, professionalId, professionalType) => {
+    setAssignmentLoading(formId)
+    try {
+      const token = localStorage.getItem('token')
+      await axios.patch(`${process.env.NEXT_PUBLIC_API_URL}/medical-forms/${formId}/assign`, {
+        professionalId,
+        professionalType
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      
+      toast.success(`Medical form assigned to ${professionalType} successfully!`)
+      fetchMedicalForms()
+    } catch (error) {
+      console.error('Error assigning form:', error)
+      toast.error(error.response?.data?.message || 'Failed to assign medical form')
+    } finally {
+      setAssignmentLoading(null)
+    }
+  }
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800'
+      case 'assigned':
+        return 'bg-blue-100 text-blue-800'
+      case 'completed':
+        return 'bg-green-100 text-green-800'
+      case 'paid':
+        return 'bg-purple-100 text-purple-800'
+      default:
+        return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'pending':
+        return 'Pending Assignment'
+      case 'assigned':
+        return 'Under Review'
+      case 'completed':
+        return 'Awaiting Payment'
+      case 'paid':
+        return 'Completed'
+      default:
+        return status
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+        <p className="mt-2 text-gray-600">Loading medical forms...</p>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <h2 className="text-2xl font-bold mb-6">📋 Medical Forms Management</h2>
+
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-gradient-to-r from-yellow-50 to-orange-50 p-6 rounded-lg shadow">
+          <p className="text-gray-600 text-sm font-medium">Pending Assignment</p>
+          <p className="text-3xl font-bold text-yellow-600">{pendingForms.length}</p>
+        </div>
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg shadow">
+          <p className="text-gray-600 text-sm font-medium">Under Review</p>
+          <p className="text-3xl font-bold text-blue-600">
+            {medicalForms.filter(f => f.status === 'assigned').length}
+          </p>
+        </div>
+        <div className="bg-gradient-to-r from-green-50 to-teal-50 p-6 rounded-lg shadow">
+          <p className="text-gray-600 text-sm font-medium">Completed</p>
+          <p className="text-3xl font-bold text-green-600">
+            {medicalForms.filter(f => f.status === 'completed').length}
+          </p>
+        </div>
+        <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-6 rounded-lg shadow">
+          <p className="text-gray-600 text-sm font-medium">Total Forms</p>
+          <p className="text-3xl font-bold text-purple-600">{medicalForms.length}</p>
+        </div>
+      </div>
+
+      {/* Sub-tabs */}
+      <div className="mb-6">
+        <nav className="flex space-x-8">
+          <button
+            onClick={() => setActiveSubTab('pending')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeSubTab === 'pending'
+                ? 'border-yellow-500 text-yellow-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Pending Assignment ({pendingForms.length})
+          </button>
+          <button
+            onClick={() => setActiveSubTab('all')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeSubTab === 'all'
+                ? 'border-teal-500 text-teal-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            All Forms ({medicalForms.length})
+          </button>
+        </nav>
+      </div>
+
+      {/* Pending Forms Tab */}
+      {activeSubTab === 'pending' && (
+        <div>
+          <h3 className="text-lg font-semibold mb-4">Forms Awaiting Assignment</h3>
+          {pendingForms.length === 0 ? (
+            <div className="bg-white p-8 rounded-lg shadow text-center">
+              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No pending forms</h3>
+              <p className="mt-1 text-sm text-gray-500">All medical forms have been assigned to professionals.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {pendingForms.map((form) => (
+                <div key={form._id} className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h4 className="text-lg font-semibold text-gray-900">{form.patientName}</h4>
+                      <p className="text-sm text-gray-600">
+                        Age: {form.age} | Sex: {form.sex}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Submitted: {new Date(form.createdAt).toLocaleDateString()}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Patient: {form.patientId?.name} ({form.patientId?.email})
+                      </p>
+                    </div>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(form.status)}`}>
+                      {getStatusText(form.status)}
+                    </span>
+                  </div>
+
+                  <div className="mb-4">
+                    <p className="text-sm text-gray-700 mb-2">
+                      <strong>Prescription Details:</strong>
+                    </p>
+                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
+                      {form.prescriptionDetails}
+                    </p>
+                    {form.additionalNotes && (
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-700 mb-1">
+                          <strong>Additional Notes:</strong>
+                        </p>
+                        <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
+                          {form.additionalNotes}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <div className="flex space-x-2">
+                      {form.prescriptionUrl && (
+                        <button
+                          onClick={() => window.open(form.prescriptionUrl, '_blank')}
+                          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                        >
+                          📄 View Prescription
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex space-x-2">
+                      {/* Assign to Pharmacist */}
+                      <div className="relative">
+                        <select
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              handleAssignForm(form._id, e.target.value, 'pharmacist')
+                              e.target.value = ''
+                            }
+                          }}
+                          disabled={assignmentLoading === form._id}
+                          className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                        >
+                          <option value="">Assign to Pharmacist</option>
+                          {pharmacists.map((pharmacist) => (
+                            <option key={pharmacist._id} value={pharmacist._id}>
+                              {pharmacist.userId?.name} - {pharmacist.designation}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Assign to Doctor */}
+                      <div className="relative">
+                        <select
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              handleAssignForm(form._id, e.target.value, 'doctor')
+                              e.target.value = ''
+                            }
+                          }}
+                          disabled={assignmentLoading === form._id}
+                          className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          <option value="">Assign to Doctor</option>
+                          {doctors.map((doctor) => (
+                            <option key={doctor._id} value={doctor._id}>
+                              {doctor.userId?.name} - {doctor.specialization}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {assignmentLoading === form._id && (
+                    <div className="mt-3 text-center">
+                      <div className="inline-flex items-center text-sm text-gray-600">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
+                        Assigning form...
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* All Forms Tab */}
+      {activeSubTab === 'all' && (
+        <div>
+          <h3 className="text-lg font-semibold mb-4">All Medical Forms</h3>
+          {medicalForms.length === 0 ? (
+            <div className="bg-white p-8 rounded-lg shadow text-center">
+              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No medical forms</h3>
+              <p className="mt-1 text-sm text-gray-500">No medical forms have been submitted yet.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {medicalForms.map((form) => (
+                <div key={form._id} className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h4 className="text-lg font-semibold text-gray-900">{form.patientName}</h4>
+                      <p className="text-sm text-gray-600">
+                        Age: {form.age} | Sex: {form.sex}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Submitted: {new Date(form.createdAt).toLocaleDateString()}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Patient: {form.patientId?.name} ({form.patientId?.email})
+                      </p>
+                    </div>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(form.status)}`}>
+                      {getStatusText(form.status)}
+                    </span>
+                  </div>
+
+                  <div className="mb-4">
+                    <p className="text-sm text-gray-700 mb-2">
+                      <strong>Prescription Details:</strong>
+                    </p>
+                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
+                      {form.prescriptionDetails}
+                    </p>
+                    {form.additionalNotes && (
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-700 mb-1">
+                          <strong>Additional Notes:</strong>
+                        </p>
+                        <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
+                          {form.additionalNotes}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {form.assignedTo && (
+                    <div className="mb-4 p-3 bg-blue-50 rounded-md">
+                      <p className="text-sm text-blue-800">
+                        <strong>Assigned to:</strong> {form.assignedTo.name} ({form.assignedType})
+                      </p>
+                      {form.assignedAt && (
+                        <p className="text-sm text-blue-600">
+                          Assigned on: {new Date(form.assignedAt).toLocaleDateString()}
+                        </p>
+                      )}
+                      {form.assignedBy && (
+                        <p className="text-sm text-blue-600">
+                          Assigned by: {form.assignedBy.name}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {form.status === 'completed' && (
+                    <div className="mb-4 p-3 bg-green-50 rounded-md">
+                      <p className="text-sm text-green-800">
+                        <strong>Result Completed!</strong> Awaiting patient payment.
+                      </p>
+                      {form.resultNotes && (
+                        <p className="text-sm text-green-700 mt-1">
+                          <strong>Result Notes:</strong> {form.resultNotes}
+                        </p>
+                      )}
+                      <p className="text-sm text-green-600 mt-1">
+                        Payment Required: ₹{form.paymentAmount}
+                      </p>
+                    </div>
+                  )}
+
+                  {form.status === 'paid' && (
+                    <div className="mb-4 p-3 bg-purple-50 rounded-md">
+                      <p className="text-sm text-purple-800">
+                        <strong>Payment Completed!</strong> Form processing complete.
+                      </p>
+                      {form.resultNotes && (
+                        <p className="text-sm text-purple-700 mt-1">
+                          <strong>Result Notes:</strong> {form.resultNotes}
+                        </p>
+                      )}
+                      <p className="text-sm text-purple-600 mt-1">
+                        Paid: ₹{form.paymentAmount} on {new Date(form.paidAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-center">
+                    <div className="flex space-x-2">
+                      {form.prescriptionUrl && (
+                        <button
+                          onClick={() => window.open(form.prescriptionUrl, '_blank')}
+                          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                        >
+                          📄 View Prescription
+                        </button>
+                      )}
+                      {form.resultPdfUrl && (
+                        <button
+                          onClick={() => window.open(form.resultPdfUrl, '_blank')}
+                          className="text-green-600 hover:text-green-800 text-sm font-medium"
+                        >
+                          📋 View Result
+                        </button>
+                      )}
+                    </div>
+
+                    {form.status === 'pending' && (
+                      <div className="flex space-x-2">
+                        {/* Assign to Pharmacist */}
+                        <div className="relative">
+                          <select
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                handleAssignForm(form._id, e.target.value, 'pharmacist')
+                                e.target.value = ''
+                              }
+                            }}
+                            disabled={assignmentLoading === form._id}
+                            className="bg-green-600 text-white px-3 py-1 rounded text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                          >
+                            <option value="">Assign to Pharmacist</option>
+                            {pharmacists.map((pharmacist) => (
+                              <option key={pharmacist._id} value={pharmacist._id}>
+                                {pharmacist.userId?.name} - {pharmacist.designation}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Assign to Doctor */}
+                        <div className="relative">
+                          <select
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                handleAssignForm(form._id, e.target.value, 'doctor')
+                                e.target.value = ''
+                              }
+                            }}
+                            disabled={assignmentLoading === form._id}
+                            className="bg-blue-600 text-white px-3 py-1 rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                          >
+                            <option value="">Assign to Doctor</option>
+                            {doctors.map((doctor) => (
+                              <option key={doctor._id} value={doctor._id}>
+                                {doctor.userId?.name} - {doctor.specialization}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {assignmentLoading === form._id && (
+                    <div className="mt-3 text-center">
+                      <div className="inline-flex items-center text-sm text-gray-600">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
+                        Assigning form...
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
