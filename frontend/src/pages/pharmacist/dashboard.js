@@ -89,9 +89,9 @@ export default function PharmacistDashboard() {
     const completedBookings = bookings.filter(b => b.status === 'completed')
     
     if (completedBookings.length > 0) {
-      const totalEarned = completedBookings.reduce((sum, b) => sum + (b.pharmacistShare || 250), 0)
+      const totalEarned = completedBookings.reduce((sum, b) => sum + (b.pharmacistShare || 225), 0)
       const paidBookingsArray = completedBookings.filter(b => b.pharmacistPaid)
-      const totalPaid = paidBookingsArray.reduce((sum, b) => sum + (b.pharmacistShare || 250), 0)
+      const totalPaid = paidBookingsArray.reduce((sum, b) => sum + (b.pharmacistShare || 225), 0)
       const outstanding = totalEarned - totalPaid
       
       const newStats = {
@@ -118,12 +118,12 @@ export default function PharmacistDashboard() {
       
       // Calculate payment stats from bookings
       const totalEarned = completedBookings.reduce((sum, b) => {
-        const share = b.pharmacistShare || 250
+        const share = b.pharmacistShare || 225
         return sum + share
       }, 0)
       
       const paidBookingsArray = completedBookings.filter(b => b.pharmacistPaid)
-      const totalPaid = paidBookingsArray.reduce((sum, b) => sum + (b.pharmacistShare || 250), 0)
+      const totalPaid = paidBookingsArray.reduce((sum, b) => sum + (b.pharmacistShare || 225), 0)
       const outstanding = totalEarned - totalPaid
       const paidBookings = paidBookingsArray.length
       const unpaidBookings = completedBookings.length - paidBookings
@@ -387,9 +387,9 @@ export default function PharmacistDashboard() {
 
     const completedBookings = bookings.filter(b => b.status === 'completed')
 
-    const totalEarned = completedBookings.reduce((sum, b) => sum + (b.pharmacistShare || 250), 0)
+    const totalEarned = completedBookings.reduce((sum, b) => sum + (b.pharmacistShare || 225), 0)
     const paidBookingsArray = completedBookings.filter(b => b.pharmacistPaid)
-    const totalPaid = paidBookingsArray.reduce((sum, b) => sum + (b.pharmacistShare || 250), 0)
+    const totalPaid = paidBookingsArray.reduce((sum, b) => sum + (b.pharmacistShare || 225), 0)
     const outstanding = totalEarned - totalPaid
     
     const result = {
@@ -681,6 +681,16 @@ export default function PharmacistDashboard() {
                 >
                   ⭐ Reviews
                 </button>
+                <button
+                  onClick={() => setActiveTab('medical-forms')}
+                  className={`py-4 px-6 font-medium text-sm ${
+                    activeTab === 'medical-forms'
+                      ? 'border-b-2 border-teal-600 text-teal-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  📋 Medical Forms
+                </button>
               </nav>
             </div>
           </div>
@@ -854,7 +864,7 @@ export default function PharmacistDashboard() {
                   </div>
                   <div className="ml-3">
                     <p className="text-sm text-blue-700">
-                      <strong>Payment Information:</strong> You receive 50% (₹250) from each ₹500 consultation. 
+                      <strong>Payment Information:</strong> You receive 50% (₹225) from each ₹449 consultation. 
                       Outstanding payments are processed by the admin and will be credited to your account soon.
                     </p>
                   </div>
@@ -952,6 +962,12 @@ export default function PharmacistDashboard() {
               )}
             </div>
           )}
+
+          {/* Medical Forms Tab */}
+          {activeTab === 'medical-forms' && (
+            <MedicalFormsTabContent />
+          )}
+
           {/* Bookings List */}
           {activeTab !== 'slots' && <h2 className="text-2xl font-bold mb-4">Sessions</h2>}
           {activeTab !== 'slots' && loading ? (
@@ -1041,9 +1057,9 @@ export default function PharmacistDashboard() {
                       {/* Payment Amount Display */}
                       {booking.status === 'completed' && (
                         <p className="text-sm text-gray-600 mt-1">
-                          Your share: <span className="font-semibold text-gray-800">₹{booking.pharmacistShare || (booking.serviceType === 'prescription_review' ? 100 : 250)}</span>
+                          Your share: <span className="font-semibold text-gray-800">₹{booking.pharmacistShare || (booking.serviceType === 'prescription_review' ? 75 : 225)}</span>
                           <span className="text-xs text-gray-500 ml-1">
-                            (from ₹{booking.paymentAmount || (booking.serviceType === 'prescription_review' ? 200 : 500)} {booking.serviceType === 'prescription_review' ? 'prescription review' : 'consultation'})
+                            (from ₹{booking.paymentAmount || (booking.serviceType === 'prescription_review' ? 149 : 449)} {booking.serviceType === 'prescription_review' ? 'prescription review' : 'consultation'})
                           </span>
                           {booking.pharmacistPaid && booking.paidAt && (
                             <span className="text-xs text-green-600 ml-2">
@@ -1348,5 +1364,240 @@ export default function PharmacistDashboard() {
         </div>
       </div>
     </Layout>
+  )
+}
+
+// Medical Forms Tab Component for Pharmacist
+function MedicalFormsTabContent() {
+  const [assignedForms, setAssignedForms] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [uploadingResult, setUploadingResult] = useState(null)
+  const [resultNotes, setResultNotes] = useState({})
+
+  useEffect(() => {
+    fetchAssignedForms()
+  }, [])
+
+  const fetchAssignedForms = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/medical-forms/assigned-to-me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setAssignedForms(response.data)
+    } catch (error) {
+      console.error('Error fetching assigned forms:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResultUpload = async (formId, resultUrl) => {
+    setUploadingResult(formId)
+    try {
+      const token = localStorage.getItem('token')
+      await axios.patch(`${process.env.NEXT_PUBLIC_API_URL}/medical-forms/${formId}/result`, {
+        resultPdfUrl: resultUrl,
+        resultNotes: resultNotes[formId] || ''
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      
+      toast.success('Result uploaded successfully!')
+      fetchAssignedForms()
+      setResultNotes(prev => ({ ...prev, [formId]: '' }))
+    } catch (error) {
+      console.error('Error uploading result:', error)
+      toast.error(error.response?.data?.message || 'Failed to upload result')
+    } finally {
+      setUploadingResult(null)
+    }
+  }
+
+  const handlePdfUploadSuccess = (data, formId) => {
+    handleResultUpload(formId, data.url)
+  }
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'assigned':
+        return 'bg-blue-100 text-blue-800'
+      case 'completed':
+        return 'bg-green-100 text-green-800'
+      default:
+        return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+        <p className="mt-2 text-gray-600">Loading assigned medical forms...</p>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <h2 className="text-2xl font-bold mb-6">📋 Assigned Medical Forms</h2>
+
+      {/* Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg shadow">
+          <p className="text-gray-600 text-sm font-medium">Assigned to Me</p>
+          <p className="text-3xl font-bold text-blue-600">
+            {assignedForms.filter(f => f.status === 'assigned').length}
+          </p>
+        </div>
+        <div className="bg-gradient-to-r from-green-50 to-teal-50 p-6 rounded-lg shadow">
+          <p className="text-gray-600 text-sm font-medium">Completed</p>
+          <p className="text-3xl font-bold text-green-600">
+            {assignedForms.filter(f => f.status === 'completed').length}
+          </p>
+        </div>
+        <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-6 rounded-lg shadow">
+          <p className="text-gray-600 text-sm font-medium">Total Forms</p>
+          <p className="text-3xl font-bold text-purple-600">{assignedForms.length}</p>
+        </div>
+      </div>
+
+      {assignedForms.length === 0 ? (
+        <div className="bg-white p-8 rounded-lg shadow text-center">
+          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <h3 className="mt-2 text-sm font-medium text-gray-900">No assigned forms</h3>
+          <p className="mt-1 text-sm text-gray-500">No medical forms have been assigned to you yet.</p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {assignedForms.map((form) => (
+            <div key={form._id} className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900">{form.patientName}</h4>
+                  <p className="text-sm text-gray-600">
+                    Age: {form.age} | Sex: {form.sex}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Submitted: {new Date(form.createdAt).toLocaleDateString()}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Patient: {form.patientId?.name} ({form.patientId?.email})
+                  </p>
+                  {form.assignedAt && (
+                    <p className="text-sm text-gray-500">
+                      Assigned: {new Date(form.assignedAt).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(form.status)}`}>
+                  {form.status === 'assigned' ? 'Pending Review' : 'Completed'}
+                </span>
+              </div>
+
+              <div className="mb-4">
+                <p className="text-sm text-gray-700 mb-2">
+                  <strong>Prescription Details:</strong>
+                </p>
+                <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
+                  {form.prescriptionDetails}
+                </p>
+                {form.additionalNotes && (
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-700 mb-1">
+                      <strong>Additional Notes:</strong>
+                    </p>
+                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
+                      {form.additionalNotes}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex space-x-2">
+                  {form.prescriptionUrl && (
+                    <button
+                      onClick={() => window.open(form.prescriptionUrl, '_blank')}
+                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                    >
+                      📄 View Prescription
+                    </button>
+                  )}
+                  {form.resultPdfUrl && (
+                    <button
+                      onClick={() => window.open(form.resultPdfUrl, '_blank')}
+                      className="text-green-600 hover:text-green-800 text-sm font-medium"
+                    >
+                      📋 View Result
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {form.status === 'assigned' && (
+                <div className="border-t pt-4">
+                  <h5 className="text-sm font-semibold text-gray-800 mb-3">Upload Result</h5>
+                  
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Result Notes (Optional)
+                    </label>
+                    <textarea
+                      value={resultNotes[form._id] || ''}
+                      onChange={(e) => setResultNotes(prev => ({ ...prev, [form._id]: e.target.value }))}
+                      rows="3"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Add any notes about the analysis or recommendations..."
+                    />
+                  </div>
+
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <PdfUploader 
+                      onUploadSuccess={(data) => handlePdfUploadSuccess(data, form._id)}
+                      uploadType="pdf"
+                      label="Upload Result PDF"
+                      disabled={uploadingResult === form._id}
+                    />
+                    {uploadingResult === form._id && (
+                      <div className="mt-2 text-center">
+                        <div className="inline-flex items-center text-sm text-gray-600">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
+                          Uploading result...
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {form.status === 'completed' && (
+                <div className="border-t pt-4">
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <p className="text-sm text-green-800 font-medium">
+                      ✅ Result Uploaded Successfully
+                    </p>
+                    <p className="text-sm text-green-700 mt-1">
+                      Completed on: {new Date(form.completedAt).toLocaleDateString()}
+                    </p>
+                    {form.resultNotes && (
+                      <div className="mt-2">
+                        <p className="text-sm text-green-700 font-medium">Your Notes:</p>
+                        <p className="text-sm text-green-600 mt-1">{form.resultNotes}</p>
+                      </div>
+                    )}
+                    <p className="text-sm text-green-600 mt-2">
+                      Patient will pay ₹{form.paymentAmount} to download the result.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
