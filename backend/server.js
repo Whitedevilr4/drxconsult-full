@@ -80,6 +80,7 @@ app.use('/api/doctors', require('./routes/doctors'));
 app.use('/api/bookings', require('./routes/bookings'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/medical-history', require('./routes/medicalHistory'));
+app.use('/api/medical-forms', require('./routes/medicalForms')); // New medical forms route
 app.use('/api/uploads', require('./routes/uploads'));
 app.use('/api/uploads-v2', require('./routes/uploads-v2'));
 app.use('/api/admin', require('./routes/admin'));
