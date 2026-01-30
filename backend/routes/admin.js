@@ -884,12 +884,12 @@ router.get('/doctor-payments', auth, isAdmin, async (req, res) => {
       }).populate('patientId', 'name');
 
       const totalEarned = completedBookings.reduce((sum, booking) => {
-        return sum + (booking.doctorShare || 250);
+        return sum + (booking.doctorShare || 225);
       }, 0);
 
       const paidBookings = completedBookings.filter(booking => booking.doctorPaid);
       const totalPaid = paidBookings.reduce((sum, booking) => {
-        return sum + (booking.doctorShare || 250);
+        return sum + (booking.doctorShare || 225);
       }, 0);
 
       const unpaidBookings = completedBookings.filter(booking => !booking.doctorPaid);
@@ -907,7 +907,7 @@ router.get('/doctor-payments', auth, isAdmin, async (req, res) => {
           bookingId: booking._id,
           patientName: booking.patientId.name,
           date: booking.slotDate,
-          amount: booking.doctorShare || 250
+          amount: booking.doctorShare || 225
         }))
       };
     }));
@@ -958,7 +958,7 @@ router.post('/mark-doctor-payment-done', auth, isAdmin, async (req, res) => {
           };
         }
         
-        doctorPayments[doctorId].totalAmount += booking.doctorShare || 250;
+        doctorPayments[doctorId].totalAmount += booking.doctorShare || 225;
         doctorPayments[doctorId].bookingCount += 1;
       }
     }
