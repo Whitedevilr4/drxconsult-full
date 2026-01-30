@@ -169,6 +169,19 @@ router.post('/', auth, async (req, res) => {
       s.date.toISOString() === new Date(slotDate).toISOString() && s.startTime === slotTime
     );
     
+    console.log('🔍 Slot validation:', {
+      slotFound: !!slot,
+      slotDate: slotDate,
+      slotTime: slotTime,
+      currentTime: new Date().toISOString(),
+      slot: slot ? {
+        date: slot.date,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        isBooked: slot.isBooked
+      } : null
+    });
+    
     if (!slot) {
       return res.status(400).json({ message: 'This slot is not available. Please select another slot.' });
     }
@@ -180,6 +193,13 @@ router.post('/', auth, async (req, res) => {
     // Check if slot has expired by comparing both start and end times
     const now = new Date();
     const slotBaseDate = new Date(slot.date);
+    
+    console.log('⏰ Time comparison:', {
+      now: now.toISOString(),
+      slotBaseDate: slotBaseDate.toISOString(),
+      startTime: slot.startTime,
+      endTime: slot.endTime
+    });
     
     // Helper function to parse time and return date object
     const parseTimeToDate = (timeString, baseDate) => {
@@ -204,6 +224,7 @@ router.post('/', auth, async (req, res) => {
           minutes = parseInt(timeMatch[2]);
         } else {
           // Invalid time format, return null
+          console.log('❌ Invalid time format:', timeString);
           return null;
         }
       }
@@ -216,18 +237,29 @@ router.post('/', auth, async (req, res) => {
     const startDateTime = parseTimeToDate(slot.startTime, slotBaseDate);
     const endDateTime = parseTimeToDate(slot.endTime, slotBaseDate);
     
+    console.log('📅 Parsed times:', {
+      startDateTime: startDateTime ? startDateTime.toISOString() : null,
+      endDateTime: endDateTime ? endDateTime.toISOString() : null,
+      startExpired: startDateTime ? startDateTime <= now : false,
+      endExpired: endDateTime ? endDateTime <= now : false
+    });
+    
     // Check if either start time or end time has passed
     if (startDateTime && startDateTime <= now) {
+      console.log('❌ Slot expired: start time passed');
       return res.status(400).json({ message: 'This slot has expired (start time passed). Please select another available slot.' });
     }
     
     if (endDateTime && endDateTime <= now) {
+      console.log('❌ Slot expired: end time passed');
       return res.status(400).json({ message: 'This slot has expired (end time passed). Please select another available slot.' });
     }
     
+    console.log('✅ Slot is valid and not expired');
+    
     // Calculate payment amounts based on service type
-    const paymentAmount = serviceType === 'prescription_review' ? 200 : 500;
-    const professionalShare = serviceType === 'prescription_review' ? 100 : 250;
+    const paymentAmount = serviceType === 'prescription_review' ? 149 : 449;
+    const professionalShare = serviceType === 'prescription_review' ? 75 : 225;
     
     // Create booking with enhanced details
     const bookingData = {
