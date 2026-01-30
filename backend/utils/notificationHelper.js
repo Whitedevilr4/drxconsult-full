@@ -267,3 +267,177 @@ module.exports = {
   notifyComplaintSubmitted,
   notifyComplaintUpdated
 };
+// Medical Form Notifications
+
+// Notify when medical form is submitted
+async function notifyMedicalFormSubmitted({ patientId, patientName, formId }) {
+  try {
+    // Notify patient
+    await createNotification({
+      userId: patientId,
+      type: 'medical_form_submitted',
+      title: 'Medical Form Submitted',
+      message: `Your medical form has been submitted successfully and is under review. Form ID: ${formId}`,
+      medicalFormId: formId
+    });
+
+    // Notify all admins about new medical form
+    const admins = await User.find({ role: 'admin' });
+    for (const admin of admins) {
+      await createNotification({
+        userId: admin._id,
+        type: 'medical_form_new',
+        title: 'New Medical Form Submitted',
+        message: `${patientName} has submitted a new medical form for review. Form ID: ${formId}`,
+        patientId: patientId,
+        medicalFormId: formId
+      });
+    }
+
+    console.log('Medical form submission notifications sent');
+  } catch (err) {
+    console.error('Error sending medical form submission notifications:', err);
+  }
+}
+
+// Notify when medical form is assigned to professional
+async function notifyMedicalFormAssigned({ patientId, patientName, professionalId, professionalName, professionalType, formId, assignedBy }) {
+  try {
+    // Notify patient
+    await createNotification({
+      userId: patientId,
+      type: 'medical_form_assigned',
+      title: 'Medical Form Assigned',
+      message: `Your medical form has been assigned to ${professionalName} (${professionalType}) for review.`,
+      medicalFormId: formId,
+      [professionalType === 'doctor' ? 'doctorId' : 'pharmacistId']: professionalId
+    });
+
+    // Notify professional
+    await createNotification({
+      userId: professionalId,
+      type: 'medical_form_assignment',
+      title: 'New Medical Form Assignment',
+      message: `You have been assigned a medical form from ${patientName} for review. Form ID: ${formId}`,
+      patientId: patientId,
+      medicalFormId: formId
+    });
+
+    // Notify admin who assigned
+    await createNotification({
+      userId: assignedBy,
+      type: 'medical_form_assignment_confirmed',
+      title: 'Medical Form Assignment Confirmed',
+      message: `Medical form ${formId} has been successfully assigned to ${professionalName}.`,
+      patientId: patientId,
+      medicalFormId: formId,
+      [professionalType === 'doctor' ? 'doctorId' : 'pharmacistId']: professionalId
+    });
+
+    console.log('Medical form assignment notifications sent');
+  } catch (err) {
+    console.error('Error sending medical form assignment notifications:', err);
+  }
+}
+
+// Notify when medical form analysis is completed
+async function notifyMedicalFormCompleted({ patientId, patientName, professionalId, professionalName, professionalType, formId, resultNotes }) {
+  try {
+    // Notify patient
+    await createNotification({
+      userId: patientId,
+      type: 'medical_form_completed',
+      title: 'Medical Analysis Complete',
+      message: `Your medical form analysis by ${professionalName} is complete! Pay ₹29 to download your report.`,
+      medicalFormId: formId,
+      [professionalType === 'doctor' ? 'doctorId' : 'pharmacistId']: professionalId
+    });
+
+    // Notify professional
+    await createNotification({
+      userId: professionalId,
+      type: 'medical_form_result_uploaded',
+      title: 'Medical Form Analysis Submitted',
+      message: `Your analysis for ${patientName}'s medical form has been submitted successfully. Patient will be notified.`,
+      patientId: patientId,
+      medicalFormId: formId
+    });
+
+    // Notify all admins
+    const admins = await User.find({ role: 'admin' });
+    for (const admin of admins) {
+      await createNotification({
+        userId: admin._id,
+        type: 'medical_form_analysis_completed',
+        title: 'Medical Form Analysis Completed',
+        message: `${professionalName} has completed analysis for ${patientName}'s medical form. Awaiting patient payment.`,
+        patientId: patientId,
+        medicalFormId: formId,
+        [professionalType === 'doctor' ? 'doctorId' : 'pharmacistId']: professionalId
+      });
+    }
+
+    console.log('Medical form completion notifications sent');
+  } catch (err) {
+    console.error('Error sending medical form completion notifications:', err);
+  }
+}
+
+// Notify when medical form payment is completed
+async function notifyMedicalFormPaid({ patientId, patientName, professionalId, professionalName, professionalType, formId, paymentId, amount }) {
+  try {
+    // Notify patient
+    await createNotification({
+      userId: patientId,
+      type: 'medical_form_paid',
+      title: 'Payment Successful - Report Ready',
+      message: `Payment successful! Your medical analysis report is now ready for download. Payment ID: ${paymentId}`,
+      medicalFormId: formId,
+      [professionalType === 'doctor' ? 'doctorId' : 'pharmacistId']: professionalId
+    });
+
+    // Notify professional about earning
+    await createNotification({
+     userId: professionalId,
+     type: 'medical_form_payment_received',
+     title: 'Payment Received',
+     message: `Payment received for ${patientName}'s medical form analysis. You earned ₹${amount/2} (50% of ₹${amount}).`,
+     patientId: patientId,
+     medicalFormId: formId
+   });
+
+    // Notify all admins
+    const admins = await User.find({ role: 'admin' });
+    for (const admin of admins) {
+      await createNotification({
+        userId: admin._id,
+        type: 'medical_form_payment_completed',
+        title: 'Medical Form Payment Completed',
+        message: `${patientName} completed payment (₹${amount}) for medical form ${formId}. Professional: ${professionalName}`,
+        patientId: patientId,
+        medicalFormId: formId,
+        [professionalType === 'doctor' ? 'doctorId' : 'pharmacistId']: professionalId
+      });
+    }
+
+    console.log('Medical form payment notifications sent');
+  } catch (err) {
+    console.error('Error sending medical form payment notifications:', err);
+  }
+}
+
+module.exports = {
+  createNotification,
+  notifyBookingConfirmed,
+  notifyMeetingLinkAdded,
+  notifyTestResultUploaded,
+  notifyPaymentApproved,
+  notifyReviewSubmitted,
+  notifyComplaintSubmitted,
+  notifyComplaintUpdated,
+  // Medical Form Notifications
+  notifyMedicalFormSubmitted,
+  notifyMedicalFormAssigned,
+  notifyMedicalFormCompleted,
+  notifyMedicalFormPaid
+};
