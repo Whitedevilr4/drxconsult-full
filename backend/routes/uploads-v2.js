@@ -47,6 +47,98 @@ const pdfUpload = multer({
   }
 });
 
+// Main upload route that handles both images and PDFs
+const generalUpload = multer({ 
+  storage,
+  fileFilter: (req, file, cb) => {
+    // Accept both images and PDFs
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files (JPEG, PNG, GIF, WebP) and PDF files are allowed'), false);
+    }
+  },
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
+
+// Main upload endpoint that routes to appropriate service
+router.post('/', auth, generalUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const file = req.file;
+    const isPdf = file.mimetype === 'application/pdf';
+
+    if (isPdf) {
+      // Handle PDF upload to Supabase
+      const result = await uploadPdfToSupabase(file, 'pdfs', '');
+
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      res.json({
+        message: 'PDF uploaded successfully',
+        url: result.publicUrl,
+        filename: file.originalname,
+        type: 'pdf',
+        size: file.size,
+        path: result.path
+      });
+    } else {
+      // Handle image upload to Cloudinary
+      const uploadResult = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            resource_type: 'image',
+            folder: 'prescriptions',
+            transformation: [
+              { quality: 'auto:good' },
+              { fetch_format: 'auto' }
+            ]
+          },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+        uploadStream.end(file.buffer);
+      });
+
+      res.json({
+        message: 'Image uploaded successfully',
+        url: uploadResult.secure_url,
+        filename: file.originalname,
+        type: 'image',
+        size: file.size,
+        cloudinary_id: uploadResult.public_id
+      });
+    }
+
+  } catch (err) {
+    console.error('Upload error:', err);
+    
+    let errorMessage = 'Upload failed';
+    if (err.message.includes('File too large')) {
+      errorMessage = 'File size too large. Maximum size is 10MB.';
+    } else if (err.message.includes('Invalid file type')) {
+      errorMessage = 'Invalid file type. Only images and PDFs are allowed.';
+    } else if (err.message.includes('Supabase not configured')) {
+      errorMessage = 'Storage service not configured. Please contact support.';
+    }
+    
+    res.status(500).json({ 
+      message: errorMessage, 
+      error: err.message
+    });
+  }
+});
+
 // Upload prescription images to Cloudinary
 router.post('/prescription', auth, imageUpload.single('file'), async (req, res) => {
   try {
