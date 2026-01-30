@@ -30,7 +30,7 @@ export default function BookProfessional() {
     {
       id: 'prescription_review',
       title: 'Know Your Prescription',
-      price: 200,
+      price: 149,
       description: 'Get expert guidance on your current prescription',
       features: [
         'Review of your current medications',
@@ -44,7 +44,7 @@ export default function BookProfessional() {
     {
       id: 'full_consultation',
       title: 'Full Consultation',
-      price: 500,
+      price: 449,
       description: 'Comprehensive health consultation with medication review',
       features: [
         'Complete health assessment',
