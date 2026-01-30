@@ -8,6 +8,8 @@ import ComplaintList from '@/components/ComplaintList'
 import ComplaintForm from '@/components/ComplaintForm'
 import ComplaintDetail from '@/components/ComplaintDetail'
 import SubscriptionStatus from '@/components/SubscriptionStatus'
+import MedicalFormSubmission from '@/components/MedicalFormSubmission'
+import MedicalFormsList from '@/components/MedicalFormsList'
 import { toast } from 'react-toastify'
 
 export default function PatientDashboard() {
@@ -26,6 +28,9 @@ export default function PatientDashboard() {
   const [selectedComplaint, setSelectedComplaint] = useState(null)
   const [complaintsLoading, setComplaintsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('bookings')
+  
+  // Medical Forms state
+  const [medicalFormsRefresh, setMedicalFormsRefresh] = useState(0)
 
   const dummyBookings = [
     {
@@ -130,6 +135,11 @@ export default function PatientDashboard() {
       fetchComplaints(token)
     }
     setSelectedComplaint(null)
+  }
+
+  const handleMedicalFormSubmitted = (newForm) => {
+    setMedicalFormsRefresh(prev => prev + 1)
+    toast.success('Medical form submitted successfully!')
   }
 
   const handleLogout = () => {
@@ -249,6 +259,16 @@ export default function PatientDashboard() {
             >
               Test Results
             </button>
+            <button
+              onClick={() => setActiveTab('medical-forms')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'medical-forms'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Medical Forms
+            </button>
           </nav>
         </div>
 
@@ -295,7 +315,7 @@ export default function PatientDashboard() {
                         <p className="font-medium mt-2">Date: {new Date(booking.slotDate).toLocaleDateString()}</p>
                         <p>Time: {booking.slotTime}</p>
                         <p className="text-sm text-gray-600 mt-1">
-                          Amount: <span className="font-semibold">₹{booking.paymentAmount || (booking.serviceType === 'prescription_review' ? 200 : 500)}</span>
+                          Amount: <span className="font-semibold">₹{booking.paymentAmount || (booking.serviceType === 'prescription_review' ? 149 : 449)}</span>
                         </p>
                       </div>
                       <span className={`text-xs px-3 py-1 rounded-full font-medium ${
@@ -616,6 +636,20 @@ export default function PatientDashboard() {
                 <p className="text-gray-500">Your test results will appear here once uploaded by the admin.</p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Medical Forms Tab */}
+        {activeTab === 'medical-forms' && (
+          <div className="max-w-4xl">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div>
+                <MedicalFormSubmission onFormSubmitted={handleMedicalFormSubmitted} />
+              </div>
+              <div>
+                <MedicalFormsList refreshTrigger={medicalFormsRefresh} />
+              </div>
+            </div>
           </div>
         )}
 
