@@ -29,8 +29,25 @@ const HealthReportDownload = () => {
       const isValidPDF = pdfHeader[0] === 0x25 && pdfHeader[1] === 0x50 && pdfHeader[2] === 0x44 && pdfHeader[3] === 0x46; // %PDF
       
       if (!isValidPDF) {
-        console.error('Invalid PDF header in response');
-        throw new Error('Received file is not a valid PDF');
+        console.log('Response is not a valid PDF, checking if it\'s HTML...');
+        // Check if it's HTML content
+        const text = new TextDecoder().decode(uint8Array);
+        if (text.includes('<!DOCTYPE html>') || text.includes('<html')) {
+          console.log('Received HTML fallback, opening in new window');
+          const newWindow = window.open('', '_blank');
+          if (newWindow) {
+            newWindow.document.write(text);
+            newWindow.document.close();
+            newWindow.document.title = 'Health Report (HTML Format)';
+            toast.info('PDF generation failed. Opened HTML version instead.');
+          } else {
+            toast.warning('Popup blocked. Please allow popups for this site.');
+          }
+          return;
+        } else {
+          console.error('Invalid file format - not PDF or HTML');
+          throw new Error('Received file is not a valid PDF or HTML');
+        }
       }
       
       // Create blob with proper MIME type
@@ -620,27 +637,30 @@ const HealthReportDownload = () => {
   };
 
   return (
-    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
+    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 md:p-6">
+      {/* Mobile-first responsive layout */}
+      <div className="space-y-4">
+        {/* Header and description */}
+        <div>
           <h3 className="text-lg font-semibold text-blue-800 mb-2 flex items-center">
             📄 Health Report
           </h3>
-          <p className="text-blue-700 text-sm mb-4">
+          <p className="text-blue-700 text-sm mb-3">
             Download a comprehensive PDF report of all your health tracking data. 
             Perfect for sharing with healthcare providers or keeping personal records.
           </p>
-          <div className="text-xs text-blue-600 bg-blue-100 rounded-lg p-3">
+          <div className="text-xs text-blue-600 bg-blue-100 rounded-lg p-3 mb-4">
             <strong>Report includes:</strong> Vaccination records, blood pressure readings, diabetes tracking, 
             sleep patterns, mood analysis, medication adherence, and more.
           </div>
         </div>
         
-        <div className="ml-6 flex flex-col space-y-3">
+        {/* Action buttons - stacked on mobile, horizontal on desktop */}
+        <div className="flex flex-col sm:flex-row gap-3">
           <button
             onClick={handleViewInBrowser}
             disabled={isGenerating}
-            className="bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white px-6 py-2 rounded-lg transition-colors flex items-center space-x-2"
+            className="bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center space-x-2 text-sm font-medium"
           >
             {isGenerating ? (
               <>
@@ -658,7 +678,7 @@ const HealthReportDownload = () => {
           <button
             onClick={handlePreviewReport}
             disabled={isGenerating}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-6 py-2 rounded-lg transition-colors flex items-center space-x-2"
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center space-x-2 text-sm font-medium"
           >
             {isGenerating ? (
               <>
@@ -676,7 +696,7 @@ const HealthReportDownload = () => {
           <button
             onClick={handleDownloadReport}
             disabled={isGenerating}
-            className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-6 py-2 rounded-lg transition-colors flex items-center space-x-2"
+            className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center space-x-2 text-sm font-medium"
           >
             {isGenerating ? (
               <>
@@ -693,10 +713,11 @@ const HealthReportDownload = () => {
         </div>
       </div>
       
+      {/* Footer info */}
       <div className="mt-4 pt-4 border-t border-blue-200">
-        <div className="flex items-center text-xs text-blue-600">
-          <span className="mr-2">ℹ️</span>
-          <span>
+        <div className="flex items-start text-xs text-blue-600">
+          <span className="mr-2 mt-0.5">ℹ️</span>
+          <span className="leading-relaxed">
             Report generated by <strong>DrXConsult.in</strong> • 
             All data is self-reported by patient • 
             For medical advice, consult healthcare professionals
