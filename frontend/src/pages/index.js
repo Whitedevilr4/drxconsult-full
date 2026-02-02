@@ -39,7 +39,7 @@ export default function Home() {
     },
     {
       title: "Professional Counseling",
-      description: "Get personalized advice from certified pharmacists & Doctors",
+      description: "Get personalized advice from certified pharmacists",
       icon: "👨‍⚕️"
     },
     {
@@ -510,6 +510,79 @@ export default function Home() {
             >
               Book Your Consultation Today
             </button>
+          </div>
+        </div>
+
+        {/* Health Trackers Section */}
+        <div className="bg-white py-12 sm:py-16">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-8 sm:mb-12">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800 mb-3 sm:mb-4">
+                Health Tracking Tools
+              </h2>
+              <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto">
+                Monitor your health with our comprehensive tracking tools designed to help you stay on top of your wellness journey
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 text-center hover:shadow-lg transition-shadow">
+                <div className="text-4xl mb-4">💉</div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Child Vaccine Tracker</h3>
+                <p className="text-sm text-gray-600 mb-4">Track your child's vaccination schedule and never miss important immunizations</p>
+                <a 
+                  href="/health-trackers/child-vaccine"
+                  className="inline-block bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors"
+                >
+                  Start Tracking
+                </a>
+              </div>
+              
+              <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-xl p-6 text-center hover:shadow-lg transition-shadow">
+                <div className="text-4xl mb-4">🌸</div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Period & PCOS Tracker</h3>
+                <p className="text-sm text-gray-600 mb-4">Monitor menstrual cycles and assess PCOS risk with our comprehensive tracker</p>
+                <a 
+                  href="/health-trackers/period-pcos"
+                  className="inline-block bg-pink-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-pink-700 transition-colors"
+                >
+                  Start Tracking
+                </a>
+              </div>
+              
+              <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 text-center hover:shadow-lg transition-shadow">
+                <div className="text-4xl mb-4">❤️</div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Blood Pressure Tracker</h3>
+                <p className="text-sm text-gray-600 mb-4">Monitor your blood pressure readings and track your cardiovascular health</p>
+                <a 
+                  href="/health-trackers/bp-tracker"
+                  className="inline-block bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700 transition-colors"
+                >
+                  Start Tracking
+                </a>
+              </div>
+              
+              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 text-center hover:shadow-lg transition-shadow">
+                <div className="text-4xl mb-4">🩺</div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Diabetes Tracker</h3>
+                <p className="text-sm text-gray-600 mb-4">Track glucose levels and manage your diabetes with detailed monitoring</p>
+                <a 
+                  href="/health-trackers/diabetes-tracker"
+                  className="inline-block bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition-colors"
+                >
+                  Start Tracking
+                </a>
+              </div>
+            </div>
+            
+            <div className="text-center mt-8">
+              <a 
+                href="/health-trackers"
+                className="inline-block bg-gray-800 text-white px-8 py-3 rounded-lg font-semibold hover:bg-gray-900 transition-colors"
+              >
+                View All Health Trackers
+              </a>
+            </div>
           </div>
         </div>
 
