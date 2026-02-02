@@ -37,7 +37,7 @@ export default function Navbar() {
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
             <div className="text-2xl font-bold text-blue-600">
-              💊 DrX Consult
+              💊 DRx Consult
             </div>
           </Link>
 
@@ -49,6 +49,15 @@ export default function Navbar() {
             >
               Home
             </Link>
+            
+            {user && (
+              <Link 
+                href="/health-trackers" 
+                className={`hover:text-blue-600 transition ${router.pathname.includes('health-trackers') ? 'text-blue-600 font-semibold' : 'text-gray-700'}`}
+              >
+                Health Trackers
+              </Link>
+            )}
             
             {user ? (
               <>
@@ -114,6 +123,16 @@ export default function Navbar() {
             >
               Home
             </Link>
+            
+            {user && (
+              <Link 
+                href="/health-trackers" 
+                className="block py-2 text-gray-700 hover:text-blue-600"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Health Trackers
+              </Link>
+            )}
             
             {user ? (
               <>
