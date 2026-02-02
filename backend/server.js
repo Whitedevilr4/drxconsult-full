@@ -90,6 +90,8 @@ app.use('/api/pdf-proxy', require('./routes/pdf-proxy'));
 app.use('/api/complaints', require('./routes/complaints'));
 app.use('/api/website', require('./routes/website'));
 app.use('/api/subscriptions', require('./routes/subscriptions'));
+app.use('/api/health-trackers', require('./routes/healthTrackers'));
+app.use('/api/health-report', require('./routes/healthReport'));
 
 app.get('/', (req, res) => {
   res.json({
