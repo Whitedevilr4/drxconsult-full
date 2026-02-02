@@ -451,19 +451,6 @@ const PeriodPCOSTracker = () => {
 
   const currentPhase = getCyclePhase(currentCycleDay, tracker.averageCycleLength);
 
-  // Debug logging (remove in production)
-  console.log('Period Tracker Debug:', {
-    lastPeriodDate: tracker.lastPeriodDate,
-    cycleLength: tracker.averageCycleLength,
-    nextPeriod: nextPeriod.toLocaleDateString(),
-    ovulationDate: ovulationDate.toLocaleDateString(),
-    daysUntilPeriod,
-    daysUntilOvulation,
-    currentCycleDay,
-    daysSinceLastPeriod,
-    today: new Date().toLocaleDateString()
-  });
-
   return (
     <div className="max-w-6xl mx-auto p-6">
       <div className="mb-6">
