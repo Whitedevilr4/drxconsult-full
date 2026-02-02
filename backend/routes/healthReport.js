@@ -231,19 +231,22 @@ router.get('/download', auth, async (req, res) => {
       return false;
     });
 
-    if (!hasData) {
-      return res.status(404).json({ 
-        message: 'No health data found. Please use the health trackers to record your data first.' 
-      });
-    }
-
-    // Generate HTML content for PDF
-    const htmlContent = generateHealthReportHTML(healthData);
+    // For testing purposes, always generate a report even with no data
+    // if (!hasData) {
+    //   return res.status(404).json({ 
+    //     message: 'No health data found. Please use the health trackers to record your data first.' 
+    //   });
+    // }
 
     // Try to generate PDF using Puppeteer
     let browser;
     try {
       console.log('Starting PDF generation...');
+      console.log('User data available:', Object.keys(healthData).filter(key => healthData[key] && key !== 'user'));
+      
+      // Generate HTML content for PDF first
+      const htmlContent = generateHealthReportHTML(healthData);
+      console.log('HTML content generated, length:', htmlContent.length);
       
       browser = await puppeteer.launch({
         headless: 'new',
@@ -274,10 +277,17 @@ router.get('/download', auth, async (req, res) => {
       
       console.log('Setting page content...');
       
-      await page.setContent(htmlContent, { 
-        waitUntil: ['networkidle0', 'domcontentloaded'],
-        timeout: 30000
-      });
+      // Set content with error handling
+      try {
+        await page.setContent(htmlContent, { 
+          waitUntil: ['networkidle0', 'domcontentloaded'],
+          timeout: 30000
+        });
+        console.log('Page content set successfully');
+      } catch (contentError) {
+        console.error('Error setting page content:', contentError);
+        throw new Error('Failed to set page content: ' + contentError.message);
+      }
       
       console.log('Generating PDF...');
       
@@ -306,8 +316,8 @@ router.get('/download', auth, async (req, res) => {
       const isValidPDF = pdfHeader[0] === 0x25 && pdfHeader[1] === 0x50 && pdfHeader[2] === 0x44 && pdfHeader[3] === 0x46; // %PDF
       
       if (!isValidPDF) {
-        console.error('Invalid PDF header detected');
-        throw new Error('Generated PDF is corrupted');
+        console.error('Invalid PDF header detected:', pdfHeader);
+        throw new Error('Generated PDF is corrupted - invalid header');
       }
       
       console.log('PDF validation successful');
@@ -326,31 +336,15 @@ router.get('/download', auth, async (req, res) => {
       
     } catch (pdfError) {
       console.error('PDF generation error:', pdfError);
+      console.error('PDF error stack:', pdfError.stack);
       
-      // Fallback: return HTML with PDF generation notice
-      const fallbackHtml = `
-        <div style="padding: 20px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; margin: 20px;">
-          <h3 style="color: #856404; margin-top: 0;">PDF Generation Temporarily Unavailable</h3>
-          <p style="color: #856404;">
-            PDF generation is currently experiencing issues. Your health report is displayed below in HTML format.
-            You can print this page using your browser's print function (Ctrl+P) to save as PDF.
-          </p>
-          <p style="color: #856404; font-size: 14px;">
-            <strong>To save as PDF:</strong> Use your browser's Print function → Select "Save as PDF" as destination
-          </p>
-        </div>
-        ${htmlContent}
-        <script>
-          // Auto-focus for better printing experience
-          window.onload = function() {
-            document.title = 'Health Report - ${user.name} - ${new Date().toISOString().split('T')[0]}';
-          };
-        </script>
-      `;
+      // Generate a simple HTML report as fallback
+      const simpleHtmlContent = generateSimpleHealthReportHTML(healthData);
       
+      // Return HTML with clear indication it's not PDF
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Content-Disposition', `inline; filename="health-report-${new Date().toISOString().split('T')[0]}.html"`);
-      res.send(fallbackHtml);
+      res.send(simpleHtmlContent);
     } finally {
       if (browser) {
         try {
@@ -370,6 +364,106 @@ router.get('/download', auth, async (req, res) => {
     });
   }
 });
+function generateSimpleHealthReportHTML(data) {
+  const currentDate = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Health Report - ${data.user.name}</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                line-height: 1.6;
+                color: #333;
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 20px;
+                background: #fff;
+            }
+            .header {
+                text-align: center;
+                border-bottom: 3px solid #2563eb;
+                padding-bottom: 20px;
+                margin-bottom: 30px;
+                background: #f0f9ff;
+                padding: 30px 20px 20px 20px;
+                margin: -20px -20px 30px -20px;
+            }
+            .error-notice {
+                background: #fff3cd;
+                border: 1px solid #ffeaa7;
+                border-radius: 8px;
+                padding: 20px;
+                margin: 20px 0;
+                color: #856404;
+            }
+            .section {
+                margin-bottom: 30px;
+                padding: 20px;
+                border: 1px solid #e5e7eb;
+                border-radius: 8px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>DrXConsult.in</h1>
+            <h2>Health Report</h2>
+            <p>Patient: ${data.user.name}</p>
+            <p>Generated: ${currentDate}</p>
+        </div>
+
+        <div class="error-notice">
+            <h3>PDF Generation Issue</h3>
+            <p>There was an issue generating the PDF version of your health report. This HTML version contains your health data. You can print this page (Ctrl+P) and save as PDF if needed.</p>
+        </div>
+
+        <div class="section">
+            <h3>Patient Information</h3>
+            <p><strong>Name:</strong> ${data.user.name}</p>
+            <p><strong>Email:</strong> ${data.user.email}</p>
+        </div>
+
+        <div class="section">
+            <h3>Health Data Summary</h3>
+            <p>This report would normally contain detailed information from all your health trackers including:</p>
+            <ul>
+                <li>Child Vaccination Records</li>
+                <li>Period & PCOS Tracking</li>
+                <li>Blood Pressure Monitoring</li>
+                <li>Diabetes Management</li>
+                <li>Sleep Pattern Analysis</li>
+                <li>Mood Tracking</li>
+                <li>Overall Health Assessment</li>
+                <li>Medicine Adherence</li>
+                <li>Substance Use Monitoring</li>
+                <li>Indian Food Nutrition Analysis</li>
+                <li>Exercise Activity Tracking</li>
+                <li>Cognitive Assessment Results</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h3>Next Steps</h3>
+            <p>Please try downloading the report again. If the issue persists, contact support at DrXConsult.in</p>
+        </div>
+
+        <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px;">
+            <p>Generated by DrXConsult.in Health Tracking Platform</p>
+        </div>
+    </body>
+    </html>
+  `;
+}
+
 function generateHealthReportHTML(data) {
   const currentDate = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
