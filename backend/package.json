@@ -27,8 +27,9 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^9.1.5",
     "multer": "^2.0.2",
+    "node-cron": "^3.0.3",
     "nodemailer": "^7.0.12",
-    "puppeteer": "^24.36.1",
+    "puppeteer-core": "^24.36.1",
     "razorpay": "^2.9.2"
   },
   "devDependencies": {
