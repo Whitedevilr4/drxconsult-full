@@ -8,6 +8,7 @@ const SleepTracker = require('../models/SleepTracker');
 const MoodTracker = require('../models/MoodTracker');
 const OverallHealthTracker = require('../models/OverallHealthTracker');
 const MedicineTracker = require('../models/MedicineTracker');
+const medicineScheduler = require('../utils/medicineScheduler');
 const SubstanceUseTracker = require('../models/SubstanceUseTracker');
 const FoodTracker = require('../models/FoodTracker');
 const { auth } = require('../middleware/auth');
@@ -787,6 +788,22 @@ router.get('/medicine-tracker', auth, async (req, res) => {
     if (!tracker) {
       return res.json({ medicines: [], medicineLog: [] });
     }
+
+    // On-demand processing for Vercel compatibility
+    // Check for overdue medicines when user accesses the tracker
+    const isVercel = process.env.VERCEL || process.env.VERCEL_ENV;
+    if (isVercel) {
+      try {
+        await medicineScheduler.processTrackerOverdueMedicines(tracker, new Date());
+        // Refresh tracker data after processing
+        const updatedTracker = await MedicineTracker.findOne({ userId: req.user.userId });
+        return res.json(updatedTracker || tracker);
+      } catch (error) {
+        console.error('Error processing overdue medicines on-demand:', error);
+        // Continue with original tracker data if processing fails
+      }
+    }
+
     res.json(tracker);
   } catch (error) {
     console.error('Error fetching medicine tracker:', error);
@@ -886,16 +903,156 @@ router.patch('/medicine-tracker/log/:logId', auth, async (req, res) => {
       return res.status(404).json({ message: 'Medicine log entry not found' });
     }
 
+    // Update log entry
     logEntry.status = status;
     if (takenAt) logEntry.takenAt = new Date(takenAt);
     if (actualDosage) logEntry.actualDosage = actualDosage;
     if (notes) logEntry.notes = notes;
     if (sideEffectsExperienced) logEntry.sideEffectsExperienced = sideEffectsExperienced;
 
+    // Add timestamp for manual updates
+    if (status === 'taken' && !takenAt) {
+      logEntry.takenAt = new Date();
+    }
+
     await tracker.save();
     res.json(logEntry);
   } catch (error) {
     console.error('Error updating medicine log:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Get today's medicine schedule
+router.get('/medicine-tracker/today', auth, async (req, res) => {
+  try {
+    const tracker = await MedicineTracker.findOne({ userId: req.user.userId });
+    if (!tracker) {
+      return res.json({ todaySchedule: [], upcomingSchedule: [] });
+    }
+
+    // Process any overdue medicines first
+    await medicineScheduler.processTrackerOverdueMedicines(tracker, new Date());
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Get today's schedule
+    const todaySchedule = tracker.medicineLog
+      .filter(log => {
+        const logDate = new Date(log.scheduledDate);
+        logDate.setHours(0, 0, 0, 0);
+        return logDate.getTime() === today.getTime();
+      })
+      .sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime))
+      .map(log => {
+        const medicine = tracker.medicines.id(log.medicineId);
+        return {
+          ...log.toObject(),
+          medicineName: medicine?.medicineName || 'Unknown Medicine',
+          medicineType: medicine?.medicineType || 'unknown',
+          purpose: medicine?.purpose || ''
+        };
+      });
+
+    // Get upcoming schedule (next 3 days)
+    const threeDaysFromNow = new Date(today);
+    threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
+
+    const upcomingSchedule = tracker.medicineLog
+      .filter(log => {
+        const logDate = new Date(log.scheduledDate);
+        logDate.setHours(0, 0, 0, 0);
+        return logDate >= tomorrow && logDate <= threeDaysFromNow;
+      })
+      .sort((a, b) => {
+        const dateCompare = new Date(a.scheduledDate) - new Date(b.scheduledDate);
+        if (dateCompare !== 0) return dateCompare;
+        return a.scheduledTime.localeCompare(b.scheduledTime);
+      })
+      .map(log => {
+        const medicine = tracker.medicines.id(log.medicineId);
+        return {
+          ...log.toObject(),
+          medicineName: medicine?.medicineName || 'Unknown Medicine',
+          medicineType: medicine?.medicineType || 'unknown',
+          purpose: medicine?.purpose || ''
+        };
+      });
+
+    res.json({ todaySchedule, upcomingSchedule });
+  } catch (error) {
+    console.error('Error getting today\'s medicine schedule:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Get medicine adherence analysis
+router.get('/medicine-tracker/adherence', auth, async (req, res) => {
+  try {
+    const tracker = await MedicineTracker.findOne({ userId: req.user.userId });
+    if (!tracker) {
+      return res.json({
+        riskLevel: 'Low',
+        adherenceRate: 100,
+        totalScheduled: 0,
+        taken: 0,
+        missed: 0,
+        recommendations: ['Add your medications to start tracking adherence']
+      });
+    }
+
+    // Process any overdue medicines first
+    await medicineScheduler.processTrackerOverdueMedicines(tracker, new Date());
+
+    // Generate adherence analysis
+    const analysis = tracker.generateAdherenceAnalysis();
+    res.json(analysis);
+  } catch (error) {
+    console.error('Error getting medicine adherence:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Force process overdue medicines (manual trigger)
+router.post('/medicine-tracker/process-overdue', auth, async (req, res) => {
+  try {
+    const tracker = await MedicineTracker.findOne({ userId: req.user.userId });
+    if (!tracker) {
+      return res.status(404).json({ message: 'Medicine tracker not found' });
+    }
+
+    const result = await medicineScheduler.processTrackerOverdueMedicines(tracker, new Date());
+    
+    res.json({
+      message: 'Overdue medicines processed successfully',
+      processed: result.processed,
+      markedMissed: result.markedMissed
+    });
+  } catch (error) {
+    console.error('Error processing overdue medicines:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Generate missing log entries for existing medicines
+router.post('/medicine-tracker/generate-logs', auth, async (req, res) => {
+  try {
+    const tracker = await MedicineTracker.findOne({ userId: req.user.userId });
+    if (!tracker) {
+      return res.status(404).json({ message: 'Medicine tracker not found' });
+    }
+
+    const hasChanges = await medicineScheduler.generateMissingLogEntries(tracker);
+    
+    res.json({
+      message: hasChanges ? 'Missing log entries generated successfully' : 'No missing log entries found',
+      hasChanges
+    });
+  } catch (error) {
+    console.error('Error generating missing log entries:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
