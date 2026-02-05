@@ -31,6 +31,7 @@ const HealthTrackerCards = () => {
         moodResponse,
         overallResponse,
         medicineResponse,
+        medicineTodayResponse,
         substanceResponse,
         foodResponse
       ] = await Promise.allSettled([
@@ -42,6 +43,7 @@ const HealthTrackerCards = () => {
         axios.get('/health-trackers/mood-tracker'),
         axios.get('/health-trackers/overall-health-tracker'),
         axios.get('/health-trackers/medicine-tracker'),
+        axios.get('/health-trackers/medicine-tracker/today'),
         axios.get('/health-trackers/substance-tracker'),
         axios.get('/health-trackers/food-tracker')
       ]);
@@ -55,6 +57,7 @@ const HealthTrackerCards = () => {
         mood: moodResponse.status === 'fulfilled' ? moodResponse.value.data : { entries: [] },
         overall: overallResponse.status === 'fulfilled' ? overallResponse.value.data : { entries: [] },
         medicine: medicineResponse.status === 'fulfilled' ? medicineResponse.value.data : { medicines: [], medicineLog: [] },
+        medicineToday: medicineTodayResponse.status === 'fulfilled' ? medicineTodayResponse.value.data : { todaySchedule: [], upcomingSchedule: [] },
         substance: substanceResponse.status === 'fulfilled' ? substanceResponse.value.data : { entries: [] },
         food: foodResponse.status === 'fulfilled' ? foodResponse.value.data : { meals: [] }
       });
@@ -75,7 +78,15 @@ const HealthTrackerCards = () => {
       healthScore: 0,
       alerts: [],
       insights: [],
-      recommendations: []
+      recommendations: [],
+      medicineStatus: {
+        todayTaken: 0,
+        todayPending: 0,
+        todayMissed: 0,
+        adherenceRate: 0,
+        totalDoses: 0,
+        autoMissed: 0
+      }
     };
 
     // Child Vaccine Tracker Analysis
@@ -269,30 +280,113 @@ const HealthTrackerCards = () => {
       }
     }
 
-    // Medicine Tracker Analysis
+    // Enhanced Medicine Tracker Analysis with Automatic Tracking
     if (data.medicine && (data.medicine.medicines?.length > 0 || data.medicine.medicineLog?.length > 0)) {
       overview.totalTrackers++;
       overview.activeTrackers++;
       overview.recentEntries += Math.min(data.medicine.medicineLog?.length || 0, 7);
 
       const activeMedicines = data.medicine.medicines?.filter(med => med.isActive) || [];
-      const recentLog = data.medicine.medicineLog?.slice(0, 7) || [];
+      const recentLog = data.medicine.medicineLog?.slice(0, 14) || []; // Check last 2 weeks
+      
+      // Use today's schedule data if available
+      const todaySchedule = data.medicineToday?.todaySchedule || [];
+      
       const missedDoses = recentLog.filter(log => log.status === 'missed').length;
       const takenDoses = recentLog.filter(log => log.status === 'taken').length;
+      const autoMissedDoses = recentLog.filter(log => log.status === 'missed' && log.autoMarked).length;
       const totalDoses = recentLog.length;
+
+      // Today's medicine status from today's schedule
+      const todayTaken = todaySchedule.filter(log => log.status === 'taken').length;
+      const todayMissed = todaySchedule.filter(log => log.status === 'missed').length;
+      const todayPending = todaySchedule.filter(log => log.status === 'pending').length;
+
+      // Update medicine status for dashboard
+      overview.medicineStatus = {
+        todayTaken,
+        todayPending,
+        todayMissed,
+        adherenceRate: totalDoses > 0 ? Math.round((takenDoses / totalDoses) * 100) : 0,
+        totalDoses,
+        autoMissed: autoMissedDoses
+      };
 
       if (activeMedicines.length > 0) {
         overview.insights.push({
           type: 'info',
-          title: 'Active Medications',
-          message: `Tracking ${activeMedicines.length} active medication(s)`,
+          title: 'Smart Medicine Tracking Active',
+          message: `Tracking ${activeMedicines.length} active medication(s) with automatic missed dose detection`,
           tracker: 'Medicine'
         });
       }
 
+      // Today's medicine status alerts
+      if (todayPending > 0) {
+        const now = new Date();
+        const pendingOverdue = todaySchedule.filter(log => {
+          if (log.status !== 'pending') return false;
+          const scheduleDateTime = new Date(`${log.scheduledDate}T${log.scheduledTime}`);
+          const timeDiff = (now - scheduleDateTime) / (1000 * 60); // minutes
+          return timeDiff > 120; // 2 hours grace period
+        }).length;
+
+        if (pendingOverdue > 0) {
+          overview.alerts.push({
+            type: 'warning',
+            title: 'Overdue Medications Today',
+            message: `${pendingOverdue} dose(s) overdue - will be auto-marked as missed soon`,
+            tracker: 'Medicine'
+          });
+        } else if (todayPending > 0) {
+          overview.alerts.push({
+            type: 'info',
+            title: 'Pending Medications Today',
+            message: `${todayPending} dose(s) scheduled for today - don't forget!`,
+            tracker: 'Medicine'
+          });
+        }
+      }
+
+      if (todayTaken > 0) {
+        overview.insights.push({
+          type: 'success',
+          title: 'Today\'s Progress',
+          message: `${todayTaken} dose(s) taken today - great job staying on track!`,
+          tracker: 'Medicine'
+        });
+      }
+
+      if (todayMissed > 0) {
+        overview.alerts.push({
+          type: 'warning',
+          title: 'Missed Doses Today',
+          message: `${todayMissed} dose(s) missed today - try to stay consistent`,
+          tracker: 'Medicine'
+        });
+      }
+
+      // Automatic tracking insights
+      if (autoMissedDoses > 0) {
+        overview.insights.push({
+          type: 'info',
+          title: 'Automatic Tracking Working',
+          message: `${autoMissedDoses} missed doses auto-detected in the last 2 weeks`,
+          tracker: 'Medicine'
+        });
+      }
+
+      // Overall adherence analysis
       if (totalDoses > 0) {
         const adherenceRate = Math.round((takenDoses / totalDoses) * 100);
-        if (adherenceRate < 80) {
+        if (adherenceRate < 70) {
+          overview.alerts.push({
+            type: 'danger',
+            title: 'Critical Medication Adherence',
+            message: `${adherenceRate}% adherence rate - ${missedDoses} missed doses in 2 weeks`,
+            tracker: 'Medicine'
+          });
+        } else if (adherenceRate < 85) {
           overview.alerts.push({
             type: 'warning',
             title: 'Low Medication Adherence',
@@ -302,17 +396,49 @@ const HealthTrackerCards = () => {
         } else if (adherenceRate >= 95) {
           overview.insights.push({
             type: 'success',
-            title: 'Excellent Adherence',
-            message: `${adherenceRate}% medication adherence rate`,
+            title: 'Excellent Medication Adherence',
+            message: `${adherenceRate}% adherence rate - you're doing great!`,
+            tracker: 'Medicine'
+          });
+        } else {
+          overview.insights.push({
+            type: 'success',
+            title: 'Good Medication Adherence',
+            message: `${adherenceRate}% adherence rate - keep up the good work!`,
             tracker: 'Medicine'
           });
         }
       }
 
-      if (missedDoses > 3) {
+      // Smart recommendations based on patterns
+      if (missedDoses > 5) {
         overview.recommendations.push({
           title: 'Improve Medication Adherence',
-          message: 'Set up reminders and consider pill organizers for better compliance',
+          message: 'Consider setting phone alarms, using pill organizers, or asking family for reminders',
+          tracker: 'Medicine'
+        });
+      }
+
+      if (autoMissedDoses > 3) {
+        overview.recommendations.push({
+          title: 'Reduce Auto-Missed Doses',
+          message: 'Set earlier reminders to avoid the 2-hour grace period for automatic missed marking',
+          tracker: 'Medicine'
+        });
+      }
+
+      // Weekly pattern analysis
+      const weeklyMissed = recentLog.filter(log => {
+        const logDate = new Date(log.scheduledTime);
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        return log.status === 'missed' && logDate >= weekAgo;
+      }).length;
+
+      if (weeklyMissed > 2) {
+        overview.recommendations.push({
+          title: 'Weekly Medication Review',
+          message: `${weeklyMissed} doses missed this week - consider adjusting your routine`,
           tracker: 'Medicine'
         });
       }
@@ -547,8 +673,8 @@ const HealthTrackerCards = () => {
     },
     {
       id: 'medicine-tracker',
-      title: 'Medicine Tracker',
-      description: 'Track medications, schedules, and adherence with smart reminders',
+      title: 'Smart Medicine Tracker',
+      description: 'AI-powered medication tracking with automatic missed dose detection and adherence monitoring',
       icon: '💊',
       color: 'bg-teal-500',
       route: '/health-trackers/medicine-tracker'
@@ -594,8 +720,8 @@ const HealthTrackerCards = () => {
   return (
     <div className="max-w-6xl mx-auto p-6">
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">Health Check Section</h1>
-        <p className="text-gray-600">Monitor and track your health with our comprehensive tracking tools</p>
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">Smart Health Check Section</h1>
+        <p className="text-gray-600">Monitor and track your health with AI-powered tools and automatic tracking</p>
       </div>
 
       {/* Health Overview Dashboard */}
@@ -603,8 +729,8 @@ const HealthTrackerCards = () => {
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">📊 Your Health Overview</h2>
           
-          {/* Health Score and Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          {/* Enhanced Health Score and Quick Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
             <div className={`${getScoreBg(healthOverview.healthScore)} border rounded-lg p-4 text-center`}>
               <div className={`text-3xl font-bold ${getScoreColor(healthOverview.healthScore)}`}>
                 {healthOverview.healthScore}
@@ -622,6 +748,76 @@ const HealthTrackerCards = () => {
             <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 text-center">
               <div className="text-3xl font-bold text-indigo-600">{healthOverview.alerts.length}</div>
               <div className="text-sm text-gray-600">Health Alerts</div>
+            </div>
+            <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 text-center">
+              <div className="text-2xl font-bold text-teal-600">💊</div>
+              <div className="text-xs text-gray-600">Auto Tracking</div>
+              <div className="text-xs text-teal-600 font-medium">Active</div>
+            </div>
+          </div>
+
+          {/* Medicine Tracking Status - Real-time */}
+          <div className="bg-gradient-to-r from-teal-50 to-blue-50 border border-teal-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-teal-800 flex items-center">
+                <span className="mr-2">💊</span>
+                Smart Medicine Tracking Status
+              </h3>
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={fetchHealthOverview}
+                  className="text-sm text-teal-600 hover:text-teal-800 bg-white border border-teal-200 rounded-lg px-3 py-1 hover:bg-teal-50 transition-colors"
+                  disabled={loading}
+                >
+                  {loading ? '⟳' : '🔄'} Refresh
+                </button>
+                <div className="flex items-center text-sm text-teal-600">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                  Auto-tracking Active
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-white rounded-lg p-3 border border-teal-100">
+                <div className="text-sm text-gray-600">Today's Progress</div>
+                <div className="text-lg font-bold text-green-600">
+                  {healthOverview.medicineStatus?.todayTaken || 0} taken
+                </div>
+                <div className="text-xs text-gray-500">
+                  {healthOverview.medicineStatus?.todayPending || 0} pending
+                </div>
+              </div>
+              <div className="bg-white rounded-lg p-3 border border-teal-100">
+                <div className="text-sm text-gray-600">Today's Missed</div>
+                <div className="text-lg font-bold text-red-600">
+                  {healthOverview.medicineStatus?.todayMissed || 0} missed
+                </div>
+                <div className="text-xs text-gray-500">
+                  Doses not taken
+                </div>
+              </div>
+              <div className="bg-white rounded-lg p-3 border border-teal-100">
+                <div className="text-sm text-gray-600">2-Week Adherence</div>
+                <div className="text-lg font-bold text-blue-600">
+                  {healthOverview.medicineStatus?.adherenceRate || 0}%
+                </div>
+                <div className="text-xs text-gray-500">
+                  {healthOverview.medicineStatus?.totalDoses || 0} total doses
+                </div>
+              </div>
+              <div className="bg-white rounded-lg p-3 border border-teal-100">
+                <div className="text-sm text-gray-600">Auto-Detected</div>
+                <div className="text-lg font-bold text-orange-600">
+                  {healthOverview.medicineStatus?.autoMissed || 0} missed
+                </div>
+                <div className="text-xs text-gray-500">
+                  Automatically marked
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 text-xs text-teal-700 bg-teal-100 rounded-lg p-2">
+              <strong>How it works:</strong> Medicines are automatically marked as "missed" if not taken within 2 hours of scheduled time. 
+              System checks every 15 minutes to ensure accurate tracking.
             </div>
           </div>
 
@@ -785,6 +981,20 @@ const HealthTrackerCards = () => {
             <div>
               <h3 className="font-medium text-blue-800">Better Doctor Visits</h3>
               <p className="text-blue-600 text-sm">Share comprehensive health data with your healthcare provider</p>
+            </div>
+          </div>
+          <div className="flex items-start space-x-3">
+            <div className="text-teal-500 text-xl">🤖</div>
+            <div>
+              <h3 className="font-medium text-blue-800">Smart Automation</h3>
+              <p className="text-blue-600 text-sm">AI automatically tracks missed medications and updates your health reports</p>
+            </div>
+          </div>
+          <div className="flex items-start space-x-3">
+            <div className="text-teal-500 text-xl">💊</div>
+            <div>
+              <h3 className="font-medium text-blue-800">Medication Adherence</h3>
+              <p className="text-blue-600 text-sm">2-hour grace period before auto-marking missed doses - never lose track again</p>
             </div>
           </div>
         </div>
