@@ -6,6 +6,7 @@ require('dotenv').config();
 const { cleanupExpiredSlots } = require('./utils/slotCleanup');
 const { cleanupExpiredOTPs } = require('./utils/otpService');
 const { testSupabaseConnection, initializeStorageBuckets } = require('./config/supabase');
+const medicineScheduler = require('./utils/medicineScheduler');
 
 const app = express();
 
