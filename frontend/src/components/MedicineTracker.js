@@ -5,9 +5,12 @@ import { toast } from 'react-toastify';
 const MedicineTracker = () => {
   const [medicines, setMedicines] = useState([]);
   const [medicineLog, setMedicineLog] = useState([]);
+  const [todaySchedule, setTodaySchedule] = useState([]);
+  const [upcomingSchedule, setUpcomingSchedule] = useState([]);
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [processingOverdue, setProcessingOverdue] = useState(false);
   const [formData, setFormData] = useState({
     medicineName: '',
     medicineType: 'tablet',
@@ -55,19 +58,41 @@ const MedicineTracker = () => {
 
   const fetchMedicineData = async () => {
     try {
-      const [trackerResponse, analysisResponse] = await Promise.all([
+      const [trackerResponse, todayResponse, adherenceResponse] = await Promise.all([
         axios.get('/health-trackers/medicine-tracker'),
-        axios.get('/health-trackers/medicine-tracker/analysis')
+        axios.get('/health-trackers/medicine-tracker/today'),
+        axios.get('/health-trackers/medicine-tracker/adherence')
       ]);
       
       setMedicines(trackerResponse.data.medicines || []);
       setMedicineLog(trackerResponse.data.medicineLog || []);
-      setAnalysis(analysisResponse.data);
+      setTodaySchedule(todayResponse.data.todaySchedule || []);
+      setUpcomingSchedule(todayResponse.data.upcomingSchedule || []);
+      setAnalysis(adherenceResponse.data);
     } catch (error) {
       console.error('Error fetching medicine data:', error);
       toast.error('Failed to load medicine data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const processOverdueMedicines = async () => {
+    try {
+      setProcessingOverdue(true);
+      const response = await axios.post('/health-trackers/medicine-tracker/process-overdue');
+      
+      if (response.data.markedMissed > 0) {
+        toast.info(`${response.data.markedMissed} overdue medicines marked as missed`);
+        fetchMedicineData(); // Refresh data
+      } else {
+        toast.success('No overdue medicines found');
+      }
+    } catch (error) {
+      console.error('Error processing overdue medicines:', error);
+      toast.error('Failed to process overdue medicines');
+    } finally {
+      setProcessingOverdue(false);
     }
   };
 
@@ -158,10 +183,22 @@ const MedicineTracker = () => {
   };
 
   const getTodaysDoses = () => {
-    const today = new Date().toDateString();
-    return medicineLog.filter(log => 
-      new Date(log.scheduledDate).toDateString() === today
-    ).sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
+    return todaySchedule.sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
+  };
+
+  const getUpcomingDoses = () => {
+    return upcomingSchedule.slice(0, 10); // Show next 10 upcoming doses
+  };
+
+  const isOverdue = (scheduledDate, scheduledTime) => {
+    const now = new Date();
+    const scheduled = new Date(scheduledDate);
+    const [hours, minutes] = scheduledTime.split(':').map(Number);
+    scheduled.setHours(hours, minutes, 0, 0);
+    
+    // Consider overdue if more than 2 hours past scheduled time
+    const overdueThreshold = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
+    return now.getTime() > (scheduled.getTime() + overdueThreshold);
   };
 
   const getStatusColor = (status) => {
@@ -201,12 +238,31 @@ const MedicineTracker = () => {
           <h1 className="text-3xl font-bold text-gray-800">Medicine Tracker</h1>
           <p className="text-gray-600">Track your medications and never miss a dose</p>
         </div>
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"
-        >
-          Add Medicine
-        </button>
+        <div className="flex space-x-3">
+          <button
+            onClick={processOverdueMedicines}
+            disabled={processingOverdue}
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
+          >
+            {processingOverdue ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span>Processing...</span>
+              </>
+            ) : (
+              <>
+                <span>🔄</span>
+                <span>Check Overdue</span>
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"
+          >
+            Add Medicine
+          </button>
+        </div>
       </div>
 
       {/* Add Medicine Form Modal */}
@@ -473,30 +529,88 @@ const MedicineTracker = () => {
             </div>
           )}
 
+          {/* Automatic Tracking Info */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
+            <div className="flex items-start space-x-3">
+              <div className="text-2xl">🤖</div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-blue-800 mb-2">
+                  Automatic Medicine Tracking
+                </h3>
+                <div className="text-blue-700 text-sm space-y-2">
+                  <p>
+                    <strong>Smart Missed Dose Detection:</strong> If you forget to mark a medicine as taken, 
+                    our system automatically marks it as "missed" 2 hours after the scheduled time.
+                  </p>
+                  <p>
+                    <strong>Real-time Updates:</strong> Your adherence reports and health analytics are 
+                    automatically updated to reflect missed doses, giving you accurate health insights.
+                  </p>
+                  <p>
+                    <strong>No Manual Tracking Required:</strong> Just mark medicines as taken when you take them. 
+                    Everything else is handled automatically in the background.
+                  </p>
+                </div>
+                <div className="mt-3 flex items-center space-x-4 text-sm">
+                  <div className="flex items-center space-x-1 text-green-600">
+                    <span>✅</span>
+                    <span>System checks every 15 minutes</span>
+                  </div>
+                  <div className="flex items-center space-x-1 text-blue-600">
+                    <span>⏰</span>
+                    <span>2-hour grace period</span>
+                  </div>
+                  <div className="flex items-center space-x-1 text-purple-600">
+                    <span>📊</span>
+                    <span>Auto-updated reports</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Today's Doses */}
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-2xl font-bold mb-6">Today's Medication Schedule</h2>
+            <h2 className="text-2xl font-bold mb-6 flex items-center">
+              📅 Today's Medication Schedule
+              <span className="ml-3 text-sm font-normal text-gray-500">
+                ({getTodaysDoses().length} doses scheduled)
+              </span>
+            </h2>
             {getTodaysDoses().length === 0 ? (
               <p className="text-gray-500 text-center py-8">No medications scheduled for today</p>
             ) : (
               <div className="space-y-3">
                 {getTodaysDoses().map((log) => {
-                  const medicine = medicines.find(m => m._id === log.medicineId);
+                  const isLogOverdue = log.status === 'due' && isOverdue(log.scheduledDate, log.scheduledTime);
+                  
                   return (
-                    <div key={log._id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow">
+                    <div key={log._id} className={`flex items-center justify-between p-4 border rounded-lg hover:shadow-sm transition-shadow ${
+                      isLogOverdue ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                    }`}>
                       <div className="flex-1">
                         <div className="flex items-center space-x-3">
-                          <div className="font-medium">{medicine?.medicineName}</div>
+                          <div className="font-medium">{log.medicineName}</div>
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(log.status)}`}>
                             {formatLabel(log.status)}
                           </span>
+                          {isLogOverdue && (
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                              OVERDUE
+                            </span>
+                          )}
                         </div>
                         <div className="text-sm text-gray-600 mt-1">
-                          {formatTime(log.scheduledTime)} • {medicine?.schedule.find(s => s.time === log.scheduledTime)?.dosage}
+                          {formatTime(log.scheduledTime)} • {log.actualDosage}
                         </div>
-                        {medicine?.schedule.find(s => s.time === log.scheduledTime)?.instructions && (
+                        {log.notes && (
                           <div className="text-sm text-gray-500 mt-1">
-                            {medicine.schedule.find(s => s.time === log.scheduledTime).instructions}
+                            {log.notes}
+                          </div>
+                        )}
+                        {log.takenAt && (
+                          <div className="text-sm text-green-600 mt-1">
+                            ✅ Taken at {new Date(log.takenAt).toLocaleTimeString()}
                           </div>
                         )}
                       </div>
@@ -515,7 +629,21 @@ const MedicineTracker = () => {
                             >
                               Mark Missed
                             </button>
+                            <button
+                              onClick={() => handleLogUpdate(log._id, 'skipped')}
+                              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm transition-colors"
+                            >
+                              Skip
+                            </button>
                           </>
+                        )}
+                        {log.status === 'missed' && (
+                          <button
+                            onClick={() => handleLogUpdate(log._id, 'taken')}
+                            className="bg-green-100 hover:bg-green-200 text-green-700 px-3 py-1 rounded text-sm transition-colors"
+                          >
+                            Mark as Taken
+                          </button>
                         )}
                       </div>
                     </div>
@@ -524,6 +652,43 @@ const MedicineTracker = () => {
               </div>
             )}
           </div>
+
+          {/* Upcoming Doses */}
+          {getUpcomingDoses().length > 0 && (
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h2 className="text-2xl font-bold mb-6 flex items-center">
+                ⏰ Upcoming Medication Schedule
+                <span className="ml-3 text-sm font-normal text-gray-500">
+                  (Next {getUpcomingDoses().length} doses)
+                </span>
+              </h2>
+              <div className="space-y-3">
+                {getUpcomingDoses().map((log) => (
+                  <div key={log._id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg bg-blue-50">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3">
+                        <div className="font-medium">{log.medicineName}</div>
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                          {formatLabel(log.medicineType)}
+                        </span>
+                      </div>
+                      <div className="text-sm text-gray-600 mt-1">
+                        {new Date(log.scheduledDate).toLocaleDateString()} at {formatTime(log.scheduledTime)} • {log.actualDosage}
+                      </div>
+                      {log.notes && (
+                        <div className="text-sm text-gray-500 mt-1">
+                          {log.notes}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-sm text-blue-600 font-medium">
+                      {log.purpose}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Active Medicines */}
           <div className="bg-white rounded-lg shadow-md p-6">
