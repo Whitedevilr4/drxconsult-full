@@ -164,6 +164,14 @@ app.listen(PORT, async () => {
     cleanupExpiredSlots();
     cleanupExpiredOTPs();
   }, 60 * 60 * 1000);
+  // Initialize medicine scheduler
+  try {
+    console.log('🏥 Initializing medicine scheduler...');
+    medicineScheduler.start();
+    console.log('✅ Medicine scheduler started successfully');
+  } catch (error) {
+    console.error('❌ Medicine scheduler initialization error:', error);
+  }
 
   console.log('✅ Server initialization complete');
 });
