@@ -48,6 +48,10 @@ export default function Login() {
         router.push('/admin/dashboard')
       } else if (res.data.user.role === 'pharmacist') {
         router.push('/pharmacist/dashboard')
+      } else if (res.data.user.role === 'doctor') {
+        router.push('/doctor/dashboard')
+      } else if (res.data.user.role === 'nutritionist') {
+        router.push('/nutritionist/dashboard')
       } else {
         router.push('/patient/dashboard')
       }
@@ -94,6 +98,10 @@ export default function Login() {
       router.push('/admin/dashboard')
     } else if (data.user.role === 'pharmacist') {
       router.push('/pharmacist/dashboard')
+    } else if (data.user.role === 'doctor') {
+      router.push('/doctor/dashboard')
+    } else if (data.user.role === 'nutritionist') {
+      router.push('/nutritionist/dashboard')
     } else {
       router.push('/patient/dashboard')
     }
