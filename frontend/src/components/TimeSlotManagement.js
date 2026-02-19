@@ -24,11 +24,11 @@ export default function TimeSlotManagement() {
       const user = JSON.parse(localStorage.getItem('user') || '{}');
 
       // Determine professional type based on user role
-      const profType = user.role === 'doctor' ? 'doctor' : 'pharmacist';
+      const profType = user.role === 'doctor' ? 'doctor' : user.role === 'nutritionist' ? 'nutritionist' : 'pharmacist';
       setProfessionalType(profType);
 
       // Get all professionals of the appropriate type
-      const endpoint = profType === 'doctor' ? 'doctors' : 'pharmacists';
+      const endpoint = profType === 'doctor' ? 'doctors' : profType === 'nutritionist' ? 'nutritionists' : 'pharmacists';
       const res = await axios.get(
         `${process.env.NEXT_PUBLIC_API_URL}/${endpoint}`,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -99,7 +99,7 @@ export default function TimeSlotManagement() {
         }
       ];
 
-      const endpoint = professionalType === 'doctor' ? 'doctors' : 'pharmacists';
+      const endpoint = professionalType === 'doctor' ? 'doctors' : professionalType === 'nutritionist' ? 'nutritionists' : 'pharmacists';
       
       const response = await axios.put(
         `${process.env.NEXT_PUBLIC_API_URL}/${endpoint}/slots`,
@@ -126,7 +126,7 @@ export default function TimeSlotManagement() {
       const token = localStorage.getItem('token');
       const updatedSlots = slots.filter((_, i) => i !== index);
 
-      const endpoint = professionalType === 'doctor' ? 'doctors' : 'pharmacists';
+      const endpoint = professionalType === 'doctor' ? 'doctors' : professionalType === 'nutritionist' ? 'nutritionists' : 'pharmacists';
       await axios.put(
         `${process.env.NEXT_PUBLIC_API_URL}/${endpoint}/slots`,
         { slots: updatedSlots },
