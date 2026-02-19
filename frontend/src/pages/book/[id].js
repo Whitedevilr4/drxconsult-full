@@ -8,11 +8,24 @@ import { toast } from 'react-toastify'
 export default function BookProfessional() {
   const router = useRouter()
   const { id, type } = router.query // Add type parameter to distinguish between pharmacist and doctor
+  
+  // Determine professional type from URL immediately
+  const getTypeFromUrl = () => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const typeParam = urlParams.get('type')
+      if (typeParam === 'doctor') return 'doctor'
+      if (typeParam === 'nutritionist') return 'nutritionist'
+      return 'pharmacist'
+    }
+    return 'pharmacist'
+  }
+  
   const [professional, setProfessional] = useState(null)
   const [selectedSlot, setSelectedSlot] = useState(null)
   const [loading, setLoading] = useState(false)
   const [pageLoading, setPageLoading] = useState(true)
-  const [professionalType, setProfessionalType] = useState('pharmacist') // Default to pharmacist
+  const [professionalType, setProfessionalType] = useState(getTypeFromUrl()) // Initialize from URL directly
   
   // Service selection and patient details
   const [showServiceModal, setShowServiceModal] = useState(false)
@@ -26,7 +39,8 @@ export default function BookProfessional() {
   const [showPatientForm, setShowPatientForm] = useState(false)
   const [showPrescriptionUploader, setShowPrescriptionUploader] = useState(false)
 
-  const services = [
+  // Pharmacist services (two options)
+  const pharmacistServices = [
     {
       id: 'prescription_review',
       title: 'Know Your Prescription',
@@ -58,14 +72,40 @@ export default function BookProfessional() {
     }
   ]
 
-  useEffect(() => {
-    if (id) {
-      // Determine professional type from query parameter or default to pharmacist
-      const profType = type === 'doctor' ? 'doctor' : 'pharmacist'
-      setProfessionalType(profType)
-      fetchProfessional(profType)
+  // Doctor service (single option)
+  const doctorServices = [
+    {
+      id: 'doctor_consultation',
+      title: 'Doctor Consultation',
+      price: 499,
+      description: 'Quick 15-minute tele-consultation with a qualified doctor',
+      features: [
+        'Medical assessment',
+        'Diagnosis and treatment advice',
+        'Prescription if required',
+        'Health recommendations',
+        '15-minute tele-consultation'
+      ],
+      icon: '🩺'
     }
-  }, [id, type])
+  ]
+
+  // Select services based on professional type - CRITICAL: Check type from query first
+  const services = professionalType === 'doctor' ? doctorServices : professionalType === 'nutritionist' ? [] : pharmacistServices
+
+  useEffect(() => {
+    // Update professional type when query params change
+    if (type) {
+      const profType = type === 'doctor' ? 'doctor' : type === 'nutritionist' ? 'nutritionist' : 'pharmacist'
+      setProfessionalType(profType)
+    }
+  }, [type])
+
+  useEffect(() => {
+    if (id && professionalType) {
+      fetchProfessional(professionalType)
+    }
+  }, [id, professionalType])
 
   const fetchProfessional = async (profType) => {
     try {
@@ -77,7 +117,7 @@ export default function BookProfessional() {
       }
       
       // Fetch professional details based on type
-      const endpoint = profType === 'doctor' ? 'doctors' : 'pharmacists'
+      const endpoint = profType === 'doctor' ? 'doctors' : profType === 'nutritionist' ? 'nutritionists' : 'pharmacists'
       const professionalRes = await axios.get(`${apiUrl}/${endpoint}/${id}`)
       
       // Fetch available slots with booking status - include type parameter
@@ -103,7 +143,19 @@ export default function BookProfessional() {
     }
     
     setSelectedSlot(slot)
-    setShowServiceModal(true)
+    
+    // Check URL directly for professional type
+    const urlType = new URLSearchParams(window.location.search).get('type')
+    const isDoctor = urlType === 'doctor' || professionalType === 'doctor' || type === 'doctor'
+    const isNutritionist = urlType === 'nutritionist' || professionalType === 'nutritionist' || type === 'nutritionist'
+    
+    // For doctors and nutritionists, show service modal with details
+    if (isDoctor || isNutritionist) {
+      setShowServiceModal(true)
+    } else {
+      // For pharmacists, show service selection modal
+      setShowServiceModal(true)
+    }
   }
 
   const handleServiceSelection = (service) => {
@@ -169,6 +221,8 @@ export default function BookProfessional() {
         // Add the appropriate ID based on professional type
         if (professionalType === 'doctor') {
           bookingData.doctorId = id
+        } else if (professionalType === 'nutritionist') {
+          bookingData.nutritionistId = id
         } else {
           bookingData.pharmacistId = id
         }
@@ -199,7 +253,7 @@ export default function BookProfessional() {
         paymentRequired = false;
         
         // Show confirmation for free subscription booking
-        const sessionType = professionalType === 'doctor' ? 'doctor consultation' : 'pharmacist session';
+        const sessionType = professionalType === 'doctor' ? 'doctor consultation' : professionalType === 'nutritionist' ? 'nutritionist consultation' : 'pharmacist session';
         const confirmFreeBooking = window.confirm(
           `Great! This ${sessionType} will be covered by your ${subscriptionCheck.data.subscription.planName} subscription.\n\n` +
           `${professionalType === 'doctor' ? 'Doctor consultations' : 'Sessions'} used: ${subscriptionCheck.data.sessionsUsed}/${subscriptionCheck.data.sessionsLimit}\n\n` +
@@ -212,8 +266,8 @@ export default function BookProfessional() {
         }
       } else if (subscriptionCheck.data.subscription) {
         // Show pricing info when subscription limit exceeded
-        const sessionType = professionalType === 'doctor' ? 'doctor consultation' : 'pharmacist session';
-        const limitType = professionalType === 'doctor' ? 'Doctor consultation' : 'Session';
+        const sessionType = professionalType === 'doctor' ? 'doctor consultation' : professionalType === 'nutritionist' ? 'nutritionist consultation' : 'pharmacist session';
+        const limitType = professionalType === 'doctor' ? 'Doctor consultation' : professionalType === 'nutritionist' ? 'Nutritionist consultation' : 'Session';
         const confirmPaidBooking = window.confirm(
           `Your ${subscriptionCheck.data.subscription.planName} subscription limit has been reached.\n\n` +
           `${limitType} limit: ${subscriptionCheck.data.sessionsUsed}/${subscriptionCheck.data.sessionsLimit}\n\n` +
@@ -228,7 +282,7 @@ export default function BookProfessional() {
         }
       } else {
         // Show pricing info for users without subscription
-        const sessionType = professionalType === 'doctor' ? 'doctor consultation' : 'pharmacist session';
+        const sessionType = professionalType === 'doctor' ? 'doctor consultation' : professionalType === 'nutritionist' ? 'nutritionist consultation' : 'pharmacist session';
         const confirmPaidBooking = window.confirm(
           `You don't have an active subscription.\n\n` +
           `This ${sessionType} will be charged at normal price: ₹${selectedService.price}\n\n` +
@@ -257,6 +311,8 @@ export default function BookProfessional() {
         // Add the appropriate ID based on professional type
         if (professionalType === 'doctor') {
           bookingData.doctorId = id
+        } else if (professionalType === 'nutritionist') {
+          bookingData.nutritionistId = id
         } else {
           bookingData.pharmacistId = id
         }
@@ -333,6 +389,8 @@ export default function BookProfessional() {
             // Add the appropriate ID based on professional type
             if (professionalType === 'doctor') {
               bookingData.doctorId = id
+            } else if (professionalType === 'nutritionist') {
+              bookingData.nutritionistId = id
             } else {
               bookingData.pharmacistId = id
             }
@@ -577,7 +635,11 @@ export default function BookProfessional() {
             <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6">
                 <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold">Choose Your Service</h2>
+                  <h2 className="text-2xl font-bold">
+                    {professionalType === 'doctor' ? 'Doctor Consultation Details' : 
+                     professionalType === 'nutritionist' ? 'Nutritionist Consultation Details' : 
+                     'Choose Your Service'}
+                  </h2>
                   <button
                     onClick={() => setShowServiceModal(false)}
                     className="text-gray-500 hover:text-gray-700 text-2xl"
@@ -586,8 +648,143 @@ export default function BookProfessional() {
                   </button>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {services.map((service) => (
+                <div className={`grid grid-cols-1 ${services.length > 1 ? 'md:grid-cols-2' : ''} gap-6 ${services.length === 1 ? 'max-w-xl mx-auto' : ''}`}>
+                  {/* For doctors - show single service with details */}
+                  {professionalType === 'doctor' && (
+                    <div
+                      className="border-2 border-blue-300 rounded-lg p-6 hover:border-blue-400 transition-colors cursor-pointer bg-blue-50"
+                      onClick={() => {
+                        const consultationFee = professional?.consultationFee || 499
+                        const doctorService = {
+                          id: 'doctor_consultation',
+                          title: 'Doctor Consultation',
+                          price: consultationFee,
+                          description: 'Professional medical consultation with a qualified doctor',
+                          features: [
+                            'Complete medical assessment',
+                            'Diagnosis and treatment advice',
+                            'Prescription if required',
+                            'Health recommendations',
+                            'Follow-up guidance',
+                            '15-minute tele-consultation'
+                          ],
+                          icon: '🩺'
+                        }
+                        handleServiceSelection(doctorService)
+                      }}
+                    >
+                      <div className="text-center mb-4">
+                        <div className="text-5xl mb-3">🩺</div>
+                        <h3 className="text-2xl font-bold mb-2">Doctor Consultation</h3>
+                        <div className="text-4xl font-bold text-blue-600 mb-3">₹{professional?.consultationFee || 499}</div>
+                        <p className="text-gray-700 text-base">Professional medical consultation with a qualified doctor</p>
+                      </div>
+                      
+                      <div className="space-y-3 mb-4">
+                        <h4 className="font-semibold text-base text-gray-800 border-b pb-2">What's included:</h4>
+                        <ul className="text-sm text-gray-700 space-y-2">
+                          <li className="flex items-start">
+                            <span className="text-green-500 mr-2 mt-0.5 text-lg">✓</span>
+                            <span>Complete medical assessment</span>
+                          </li>
+                          <li className="flex items-start">
+                            <span className="text-green-500 mr-2 mt-0.5 text-lg">✓</span>
+                            <span>Diagnosis and treatment advice</span>
+                          </li>
+                          <li className="flex items-start">
+                            <span className="text-green-500 mr-2 mt-0.5 text-lg">✓</span>
+                            <span>Prescription if required</span>
+                          </li>
+                          <li className="flex items-start">
+                            <span className="text-green-500 mr-2 mt-0.5 text-lg">✓</span>
+                            <span>Health recommendations</span>
+                          </li>
+                          <li className="flex items-start">
+                            <span className="text-green-500 mr-2 mt-0.5 text-lg">✓</span>
+                            <span>Follow-up guidance</span>
+                          </li>
+                          <li className="flex items-start">
+                            <span className="text-green-500 mr-2 mt-0.5 text-lg">✓</span>
+                            <span>15-minute tele-consultation</span>
+                          </li>
+                        </ul>
+                      </div>
+                      
+                      <button className="w-full mt-4 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold text-lg">
+                        Proceed to Book
+                      </button>
+                    </div>
+                  )}
+
+                  {/* For nutritionists - show single service with details */}
+                  {professionalType === 'nutritionist' && (
+                    <div
+                      className="border-2 border-green-300 rounded-lg p-6 hover:border-green-400 transition-colors cursor-pointer bg-green-50"
+                      onClick={() => {
+                        const consultationFee = professional?.consultationFee || 500
+                        const nutritionistService = {
+                          id: 'nutritionist_consultation',
+                          title: 'Nutritionist Consultation',
+                          price: consultationFee,
+                          description: 'Professional nutrition and diet consultation',
+                          features: [
+                            'Personalized diet plan',
+                            'Nutritional assessment',
+                            'Meal planning guidance',
+                            'Health and wellness advice',
+                            'Lifestyle recommendations',
+                            '30-minute consultation'
+                          ],
+                          icon: '🥗'
+                        }
+                        handleServiceSelection(nutritionistService)
+                      }}
+                    >
+                      <div className="text-center mb-4">
+                        <div className="text-5xl mb-3">🥗</div>
+                        <h3 className="text-2xl font-bold mb-2">Nutritionist Consultation</h3>
+                        <div className="text-4xl font-bold text-green-600 mb-3">₹{professional?.consultationFee || 500}</div>
+                        <p className="text-gray-700 text-base">Professional nutrition and diet consultation</p>
+                      </div>
+                      
+                      <div className="space-y-3 mb-4">
+                        <h4 className="font-semibold text-base text-gray-800 border-b pb-2">What's included:</h4>
+                        <ul className="text-sm text-gray-700 space-y-2">
+                          <li className="flex items-start">
+                            <span className="text-green-500 mr-2 mt-0.5 text-lg">✓</span>
+                            <span>Personalized diet plan</span>
+                          </li>
+                          <li className="flex items-start">
+                            <span className="text-green-500 mr-2 mt-0.5 text-lg">✓</span>
+                            <span>Nutritional assessment</span>
+                          </li>
+                          <li className="flex items-start">
+                            <span className="text-green-500 mr-2 mt-0.5 text-lg">✓</span>
+                            <span>Meal planning guidance</span>
+                          </li>
+                          <li className="flex items-start">
+                            <span className="text-green-500 mr-2 mt-0.5 text-lg">✓</span>
+                            <span>Health and wellness advice</span>
+                          </li>
+                          <li className="flex items-start">
+                            <span className="text-green-500 mr-2 mt-0.5 text-lg">✓</span>
+                            <span>Lifestyle recommendations</span>
+                          </li>
+                          <li className="flex items-start">
+                            <span className="text-green-500 mr-2 mt-0.5 text-lg">✓</span>
+                            <span>30-minute consultation</span>
+                          </li>
+                        </ul>
+                      </div>
+                      
+                      <button className="w-full mt-4 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors font-semibold text-lg">
+                        Proceed to Book
+                      </button>
+                    </div>
+                  )}
+
+                  {/* For pharmacists - show multiple service options */}
+                  {professionalType === 'pharmacist' && services.map((service) => (
                     <div
                       key={service.id}
                       className="border-2 border-gray-200 rounded-lg p-6 hover:border-blue-300 transition-colors cursor-pointer"
