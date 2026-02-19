@@ -78,6 +78,7 @@ app.use(async (req, res, next) => {
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/pharmacists', require('./routes/pharmacists'));
 app.use('/api/doctors', require('./routes/doctors'));
+app.use('/api/nutritionists', require('./routes/nutritionists'));
 app.use('/api/bookings', require('./routes/bookings'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/medical-history', require('./routes/medicalHistory'));
