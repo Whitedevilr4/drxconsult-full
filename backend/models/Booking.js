@@ -4,6 +4,7 @@ const bookingSchema = new mongoose.Schema({
   patientId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   pharmacistId: { type: mongoose.Schema.Types.ObjectId, ref: 'Pharmacist' },
   doctorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Doctor' },
+  nutritionistId: { type: mongoose.Schema.Types.ObjectId, ref: 'Nutritionist' },
   slotDate: { type: Date, required: true },
   slotTime: { type: String, required: true },
   meetLink: String,
@@ -16,22 +17,23 @@ const bookingSchema = new mongoose.Schema({
   // Service Type and Pricing
   serviceType: { 
     type: String, 
-    enum: ['prescription_review', 'full_consultation'], 
+    enum: ['prescription_review', 'full_consultation', 'doctor_consultation', 'nutritionist_consultation'], 
     required: true 
   },
   serviceDescription: {
     type: String,
     default: function() {
-      return this.serviceType === 'prescription_review' 
-        ? 'Know Your Prescription' 
-        : 'Full Consultation';
+      if (this.serviceType === 'prescription_review') return 'Know Your Prescription';
+      if (this.serviceType === 'doctor_consultation') return 'Doctor Consultation';
+      if (this.serviceType === 'nutritionist_consultation') return 'Nutritionist Consultation';
+      return 'Full Consultation';
     }
   },
   
   // Provider type
   providerType: {
     type: String,
-    enum: ['pharmacist', 'doctor'],
+    enum: ['pharmacist', 'doctor', 'nutritionist'],
     required: true,
     default: 'pharmacist'
   },
@@ -44,27 +46,42 @@ const bookingSchema = new mongoose.Schema({
     additionalNotes: String
   },
   
-  // Payment tracking - Dynamic based on service type
+  // Payment tracking - Dynamic based on service type and doctor fee
   paymentAmount: { 
     type: Number, 
-    default: function() {
-      return this.serviceType === 'prescription_review' ? 149 : 449;
-    }
+    required: true // Will be set from frontend based on service/doctor
   },
   pharmacistShare: { 
     type: Number, 
     default: function() {
-      return this.serviceType === 'prescription_review' ? 75 : 225; // 50% share
+      if (this.serviceType === 'prescription_review') return 75;
+      return 225; // full_consultation - 50% share
     }
   },
   doctorShare: { 
     type: Number, 
     default: function() {
-      return this.serviceType === 'prescription_review' ? 75 : 225; // 50% share
+      // For doctor consultations, calculate 50% of paymentAmount
+      if (this.serviceType === 'doctor_consultation' && this.paymentAmount) {
+        return Math.round(this.paymentAmount * 0.5);
+      }
+      if (this.serviceType === 'prescription_review') return 75;
+      return 225; // full_consultation - 50% share
+    }
+  },
+  nutritionistShare: { 
+    type: Number, 
+    default: function() {
+      // For nutritionist consultations, calculate 50% of paymentAmount
+      if (this.serviceType === 'nutritionist_consultation' && this.paymentAmount) {
+        return Math.round(this.paymentAmount * 0.5);
+      }
+      return 0;
     }
   },
   pharmacistPaid: { type: Boolean, default: false },
   doctorPaid: { type: Boolean, default: false },
+  nutritionistPaid: { type: Boolean, default: false },
   paidAt: Date,
   paidBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   
