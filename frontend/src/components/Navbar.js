@@ -107,6 +107,7 @@ export default function Navbar() {
     if (user.role === 'admin') return '/admin/dashboard'
     if (user.role === 'pharmacist') return '/pharmacist/dashboard'
     if (user.role === 'doctor') return '/doctor/dashboard'
+    if (user.role === 'nutritionist') return '/nutritionist/dashboard'
     return '/patient/dashboard'
   }
 
