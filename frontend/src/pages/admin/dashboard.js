@@ -218,12 +218,15 @@ export default function AdminDashboard() {
                   <option value="overview">Overview</option>
                   <option value="add-pharmacist">Add Pharmacist</option>
                   <option value="add-doctor">Add Doctor</option>
+                  <option value="add-nutritionist">Add Nutritionist</option>
                   <option value="manage-pharmacists">Manage Pharmacists</option>
                   <option value="manage-doctors">Manage Doctors</option>
+                  <option value="manage-nutritionists">Manage Nutritionists</option>
                   <option value="upload-results">Upload Test Results</option>
                   <option value="analytics">📊 Analytics</option>
                   <option value="payments">💰 Pharmacist Payments</option>
                   <option value="doctor-payments">💰 Doctor Payments</option>
+                  <option value="nutritionist-payments">💰 Nutritionist Payments</option>
                   <option value="reviews">⭐ Reviews</option>
                   <option value="complaints">📝 Complaints</option>
                   <option value="website">🌐 Website</option>
@@ -266,6 +269,16 @@ export default function AdminDashboard() {
                   Add Doctor
                 </button>
                 <button
+                  onClick={() => setActiveTab('add-nutritionist')}
+                  className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
+                    activeTab === 'add-nutritionist'
+                      ? 'border-b-2 border-blue-600 text-blue-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Add Nutritionist
+                </button>
+                <button
                   onClick={() => setActiveTab('manage-pharmacists')}
                   className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
                     activeTab === 'manage-pharmacists'
@@ -284,6 +297,16 @@ export default function AdminDashboard() {
                   }`}
                 >
                   Manage Doctors
+                </button>
+                <button
+                  onClick={() => setActiveTab('manage-nutritionists')}
+                  className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
+                    activeTab === 'manage-nutritionists'
+                      ? 'border-b-2 border-blue-600 text-blue-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Manage Nutritionists
                 </button>
                 <button
                   onClick={() => setActiveTab('upload-results')}
@@ -324,6 +347,16 @@ export default function AdminDashboard() {
                   }`}
                 >
                   💰 Doctor Payments
+                </button>
+                <button
+                  onClick={() => setActiveTab('nutritionist-payments')}
+                  className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
+                    activeTab === 'nutritionist-payments'
+                      ? 'border-b-2 border-yellow-600 text-yellow-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  💰 Nutritionist Payments
                 </button>
                 <button
                   onClick={() => setActiveTab('reviews')}
@@ -402,13 +435,16 @@ export default function AdminDashboard() {
               {activeTab === 'overview' && <OverviewTab users={users} pharmacists={pharmacists} patients={patients} />}
               {activeTab === 'add-pharmacist' && <AddPharmacistTab onSuccess={() => fetchData(localStorage.getItem('token'))} />}
               {activeTab === 'add-doctor' && <AddDoctorTab onSuccess={() => fetchData(localStorage.getItem('token'))} />}
+              {activeTab === 'add-nutritionist' && <AddNutritionistTab onSuccess={() => fetchData(localStorage.getItem('token'))} />}
               {activeTab === 'manage-pharmacists' && <ManageUsersTab users={users} pharmacists={pharmacists} onUpdate={() => fetchData(localStorage.getItem('token'))} />}
               {activeTab === 'manage-doctors' && <ManageDoctorsTab onUpdate={() => fetchData(localStorage.getItem('token'))} />}
+              {activeTab === 'manage-nutritionists' && <ManageNutritionistsTab onUpdate={() => fetchData(localStorage.getItem('token'))} />}
               {activeTab === 'upload-results' && <UploadResultsTab patients={patients} />}
 
               {activeTab === 'analytics' && <AnalyticsTab />}
               {activeTab === 'payments' && <PaymentsTab />}
               {activeTab === 'doctor-payments' && <DoctorPaymentsTab />}
+              {activeTab === 'nutritionist-payments' && <NutritionistPaymentsTab />}
               {activeTab === 'reviews' && <ReviewsTab pharmacists={pharmacists} doctors={doctors} />}
               {activeTab === 'manage' && <ManageUsersTab users={users} pharmacists={pharmacists} onUpdate={() => fetchData(localStorage.getItem('token'))} />}
               {activeTab === 'complaints' && <ComplaintsTab complaints={complaints} loading={complaintsLoading} onComplaintClick={handleComplaintClick} onRefresh={() => fetchComplaints(localStorage.getItem('token'))} />}
@@ -1165,8 +1201,8 @@ function PaymentsTab() {
           </div>
           <div className="bg-white p-4 rounded-lg shadow">
             <p className="text-gray-600 text-sm font-medium">Per Booking</p>
-            <p className="text-3xl font-bold text-purple-600">₹449</p>
-            <p className="text-xs text-gray-500 mt-1">Standard rate</p>
+            <p className="text-3xl font-bold text-purple-600">₹149-₹449</p>
+            <p className="text-xs text-gray-500 mt-1">Pharmacist services</p>
           </div>
         </div>
 
@@ -4051,8 +4087,8 @@ function DoctorPaymentsTab() {
           </div>
           <div className="bg-white p-4 rounded-lg shadow">
             <p className="text-gray-600 text-sm font-medium">Per Consultation</p>
-            <p className="text-3xl font-bold text-purple-600">₹449</p>
-            <p className="text-xs text-gray-500 mt-1">Standard rate</p>
+            <p className="text-3xl font-bold text-purple-600">Dynamic</p>
+            <p className="text-xs text-gray-500 mt-1">Based on doctor's fee</p>
           </div>
         </div>
 
@@ -4173,6 +4209,400 @@ function DoctorPaymentsTab() {
             <p className="text-gray-500">No doctor payment data found.</p>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+// Add Nutritionist Tab Component
+function AddNutritionistTab({ onSuccess }) {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    phone: '',
+    specialization: '',
+    qualification: '',
+    experience: '',
+    description: '',
+    photo: '',
+    consultationFee: '500',
+    licenseNumber: ''
+  })
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+  const [generatedCredentials, setGeneratedCredentials] = useState(null)
+
+  const handleImageUpload = (data) => {
+    setFormData(prev => ({...prev, photo: data.url}))
+    setMessage('Profile picture uploaded successfully!')
+    setTimeout(() => setMessage(''), 3000)
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setMessage('')
+    setError('')
+
+    try {
+      const token = localStorage.getItem('token')
+      const res = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/admin/nutritionists`,
+        formData,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+
+      setMessage('Nutritionist created successfully!')
+      setGeneratedCredentials({
+        email: formData.email,
+        password: formData.password
+      })
+      
+      setFormData({
+        name: '',
+        email: '',
+        password: '',
+        phone: '',
+        specialization: '',
+        qualification: '',
+        experience: '',
+        description: '',
+        photo: '',
+        consultationFee: '500',
+        licenseNumber: ''
+      })
+      
+      onSuccess()
+    } catch (err) {
+      console.error('Error creating nutritionist:', err)
+      setError(err.response?.data?.message || 'Failed to create nutritionist')
+    }
+  }
+
+  return (
+    <div>
+      <h2 className="text-xl font-bold mb-4">Add New Nutritionist</h2>
+      
+      {message && (
+        <div className="bg-green-100 text-green-700 p-4 rounded mb-4">
+          {message}
+          {generatedCredentials && (
+            <div className="mt-2 p-3 bg-white rounded">
+              <p className="font-semibold">Login Credentials:</p>
+              <p>Email: <code className="bg-gray-100 px-2 py-1 rounded">{generatedCredentials.email}</code></p>
+              <p>Password: <code className="bg-gray-100 px-2 py-1 rounded">{generatedCredentials.password}</code></p>
+              <p className="text-sm text-gray-600 mt-2">⚠️ Save these credentials! They won't be shown again.</p>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {error && <div className="bg-red-100 text-red-700 p-4 rounded mb-4">{error}</div>}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <ImageUploader 
+            onUploadSuccess={handleImageUpload}
+            uploadType="prescription"
+            currentImage={formData.photo}
+            label="Profile Picture (Optional)"
+          />
+          {formData.photo && (
+            <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-sm">
+              <p className="text-green-700 font-medium">✓ Profile picture ready</p>
+              <p className="text-xs text-gray-600 truncate">{formData.photo}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-gray-700 mb-2">Name *</label>
+            <input type="text" className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-600" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required />
+          </div>
+          <div>
+            <label className="block text-gray-700 mb-2">Email/Username *</label>
+            <input type="text" className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-600" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} required />
+          </div>
+          <div>
+            <label className="block text-gray-700 mb-2">Password *</label>
+            <input type="password" className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-600" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} required minLength={6} />
+          </div>
+          <div>
+            <label className="block text-gray-700 mb-2">Phone</label>
+            <input type="tel" className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-600" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
+          </div>
+          <div>
+            <label className="block text-gray-700 mb-2">Specialization *</label>
+            <input type="text" className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-600" placeholder="e.g., Clinical Nutrition" value={formData.specialization} onChange={(e) => setFormData({...formData, specialization: e.target.value})} required />
+          </div>
+          <div>
+            <label className="block text-gray-700 mb-2">Qualification *</label>
+            <input type="text" className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-600" placeholder="e.g., MSc Nutrition" value={formData.qualification} onChange={(e) => setFormData({...formData, qualification: e.target.value})} required />
+          </div>
+          <div>
+            <label className="block text-gray-700 mb-2">Experience (Years) *</label>
+            <input type="number" className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-600" value={formData.experience} onChange={(e) => setFormData({...formData, experience: e.target.value})} required min="0" />
+          </div>
+          <div>
+            <label className="block text-gray-700 mb-2">License Number *</label>
+            <input type="text" className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-600" placeholder="Dietician License" value={formData.licenseNumber} onChange={(e) => setFormData({...formData, licenseNumber: e.target.value})} required />
+          </div>
+          <div>
+            <label className="block text-gray-700 mb-2">Consultation Fee (₹)</label>
+            <input type="number" className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-600" value={formData.consultationFee} onChange={(e) => setFormData({...formData, consultationFee: e.target.value})} min="0" />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-gray-700 mb-2">Description</label>
+          <textarea className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-600" placeholder="Brief description..." rows="3" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} />
+        </div>
+
+        <button type="submit" className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Create Nutritionist</button>
+      </form>
+    </div>
+  )
+}
+
+// Manage Nutritionists Tab Component  
+function ManageNutritionistsTab({ onUpdate }) {
+  const [nutritionists, setNutritionists] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [editingNutritionist, setEditingNutritionist] = useState(null)
+  const [editForm, setEditForm] = useState({})
+
+  useEffect(() => {
+    fetchNutritionists()
+  }, [])
+
+  const fetchNutritionists = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/nutritionists`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setNutritionists(res.data)
+      setLoading(false)
+    } catch (err) {
+      console.error('Error fetching nutritionists:', err)
+      setLoading(false)
+    }
+  }
+
+  const handleToggleStatus = async (nutritionistId, currentStatus) => {
+    try {
+      const token = localStorage.getItem('token')
+      const newStatus = currentStatus === 'online' ? 'offline' : 'online'
+      await axios.patch(`${process.env.NEXT_PUBLIC_API_URL}/admin/nutritionists/${nutritionistId}/status`, { status: newStatus }, { headers: { Authorization: `Bearer ${token}` } })
+      fetchNutritionists()
+      toast.success('Status updated successfully')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to update status')
+    }
+  }
+
+  const handleEdit = (nutritionist) => {
+    setEditingNutritionist(nutritionist._id)
+    setEditForm({
+      specialization: nutritionist.specialization,
+      qualification: nutritionist.qualification,
+      experience: nutritionist.experience,
+      description: nutritionist.description || '',
+      status: nutritionist.status,
+      photo: nutritionist.photo || '',
+      consultationFee: nutritionist.consultationFee,
+      licenseNumber: nutritionist.licenseNumber
+    })
+  }
+
+  const handlePhotoUpload = (data) => {
+    setEditForm(prev => ({...prev, photo: data.url}))
+  }
+
+  const handleSaveEdit = async (nutritionistId) => {
+    try {
+      const token = localStorage.getItem('token')
+      await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/admin/nutritionists/${nutritionistId}`, editForm, { headers: { Authorization: `Bearer ${token}` } })
+      setEditingNutritionist(null)
+      fetchNutritionists()
+      toast.success('Nutritionist updated successfully')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to update nutritionist')
+    }
+  }
+
+  const handleDelete = async (nutritionistId, name) => {
+    if (!window.confirm(`Are you sure you want to delete ${name}?`)) return
+    try {
+      const token = localStorage.getItem('token')
+      await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/admin/nutritionists/${nutritionistId}`, { headers: { Authorization: `Bearer ${token}` } })
+      fetchNutritionists()
+      toast.success('Nutritionist deleted successfully')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to delete nutritionist')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+        <p className="mt-2 text-gray-600">Loading nutritionists...</p>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <h2 className="text-xl font-bold mb-4">Manage Nutritionists</h2>
+      <div className="space-y-6">
+        {nutritionists.map(nutritionist => (
+          <div key={nutritionist._id} className="bg-white border rounded-lg p-4">
+            {editingNutritionist === nutritionist._id ? (
+              <div className="space-y-3">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <ImageUploader onUploadSuccess={handlePhotoUpload} uploadType="prescription" currentImage={editForm.photo} label="Update Profile Picture" />
+                </div>
+                <input type="text" className="w-full px-3 py-2 border rounded" placeholder="Specialization" value={editForm.specialization} onChange={(e) => setEditForm({...editForm, specialization: e.target.value})} />
+                <input type="text" className="w-full px-3 py-2 border rounded" placeholder="Qualification" value={editForm.qualification} onChange={(e) => setEditForm({...editForm, qualification: e.target.value})} />
+                <input type="number" className="w-full px-3 py-2 border rounded" placeholder="Experience" value={editForm.experience} onChange={(e) => setEditForm({...editForm, experience: e.target.value})} />
+                <input type="number" className="w-full px-3 py-2 border rounded" placeholder="Fee" value={editForm.consultationFee} onChange={(e) => setEditForm({...editForm, consultationFee: e.target.value})} />
+                <input type="text" className="w-full px-3 py-2 border rounded" placeholder="License" value={editForm.licenseNumber} onChange={(e) => setEditForm({...editForm, licenseNumber: e.target.value})} />
+                <textarea className="w-full px-3 py-2 border rounded" placeholder="Description" rows="2" value={editForm.description} onChange={(e) => setEditForm({...editForm, description: e.target.value})} />
+                <div className="flex space-x-2">
+                  <button onClick={() => handleSaveEdit(nutritionist._id)} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Save</button>
+                  <button onClick={() => setEditingNutritionist(null)} className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500">Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex items-start space-x-3">
+                    <img src={nutritionist.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(nutritionist.userId?.name || 'User')}&size=80&background=10b981&color=fff`} alt={nutritionist.userId?.name} className="w-16 h-16 rounded-full object-cover border-2 border-green-200" onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(nutritionist.userId?.name || 'User')}&size=80&background=10b981&color=fff` }} />
+                    <div>
+                      <h3 className="font-semibold text-lg">{nutritionist.userId?.name}</h3>
+                      <p className="text-sm text-gray-600">{nutritionist.userId?.email}</p>
+                      <p className="text-sm text-green-600">{nutritionist.specialization}</p>
+                      <p className="text-sm text-gray-500">{nutritionist.qualification} • {nutritionist.experience} years</p>
+                      <p className="text-sm text-gray-700 mt-1">Fee: ₹{nutritionist.consultationFee}</p>
+                      {nutritionist.description && <p className="text-sm text-gray-500 mt-1">{nutritionist.description}</p>}
+                    </div>
+                  </div>
+                  <button onClick={() => handleToggleStatus(nutritionist._id, nutritionist.status)} className={`px-3 py-1 rounded text-sm font-medium ${nutritionist.status === 'online' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>{nutritionist.status === 'online' ? '🟢 Online' : '⚫ Offline'}</button>
+                </div>
+                <div className="flex space-x-2 mt-3">
+                  <button onClick={() => handleEdit(nutritionist)} className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700">Edit</button>
+                  <button onClick={() => handleDelete(nutritionist._id, nutritionist.userId?.name)} className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700">Delete</button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+        {nutritionists.length === 0 && <div className="text-center py-8"><p className="text-gray-500">No nutritionists found.</p></div>}
+      </div>
+    </div>
+  )
+}
+
+// Nutritionist Payments Tab Component
+function NutritionistPaymentsTab() {
+  const [payments, setPayments] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [selectedBookings, setSelectedBookings] = useState([])
+  const [message, setMessage] = useState('')
+  const [adminRevenue, setAdminRevenue] = useState({ totalRevenue: 0, platformShare: 0, nutritionistShare: 0, totalBookings: 0 })
+
+  useEffect(() => {
+    fetchNutritionistPayments()
+  }, [])
+
+  const fetchNutritionistPayments = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/nutritionist-payments`, { headers: { Authorization: `Bearer ${token}` } })
+      setPayments(res.data)
+      const totalRevenue = res.data.reduce((sum, p) => sum + (p.totalEarned * 2), 0)
+      const nutritionistShare = res.data.reduce((sum, p) => sum + p.totalEarned, 0)
+      const platformShare = totalRevenue - nutritionistShare
+      const totalBookings = res.data.reduce((sum, p) => sum + p.completedBookings, 0)
+      setAdminRevenue({ totalRevenue, platformShare, nutritionistShare, totalBookings })
+      setLoading(false)
+    } catch (err) {
+      console.error('Error fetching nutritionist payments:', err)
+      setError(err.response?.data?.message || 'Failed to load payment data')
+      setLoading(false)
+    }
+  }
+
+  const handleMarkAsPaid = async (nutritionistId, bookingIds) => {
+    try {
+      const token = localStorage.getItem('token')
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/admin/mark-nutritionist-payment-done`, { bookingIds }, { headers: { Authorization: `Bearer ${token}` } })
+      setMessage('Payment marked as done!')
+      toast.success('Payment marked as done!')
+      setSelectedBookings([])
+      fetchNutritionistPayments()
+      setTimeout(() => setMessage(''), 3000)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to mark payment')
+    }
+  }
+
+  if (loading) return (<div className="text-center py-8"><div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div><p className="mt-2 text-gray-600">Loading...</p></div>)
+
+  return (
+    <div>
+      <h2 className="text-2xl font-bold mb-6">💰 Nutritionist Payment Management</h2>
+      {error && <div className="bg-red-100 text-red-700 p-4 rounded mb-4"><p>{error}</p><button onClick={fetchNutritionistPayments} className="mt-2 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Retry</button></div>}
+      {message && <div className="bg-green-100 text-green-700 p-4 rounded mb-4">{message}</div>}
+      <div className="bg-gradient-to-r from-green-50 to-teal-50 p-6 rounded-lg shadow-lg mb-8">
+        <h3 className="text-xl font-bold text-gray-800 mb-4">Platform Revenue (Nutritionists)</h3>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white p-4 rounded-lg shadow"><p className="text-gray-600 text-sm font-medium">Total Revenue</p><p className="text-3xl font-bold text-green-600">₹{adminRevenue.totalRevenue}</p><p className="text-xs text-gray-500 mt-1">{adminRevenue.totalBookings} consultations</p></div>
+          <div className="bg-white p-4 rounded-lg shadow"><p className="text-gray-600 text-sm font-medium">Platform Share</p><p className="text-3xl font-bold text-teal-600">₹{adminRevenue.platformShare}</p></div>
+          <div className="bg-white p-4 rounded-lg shadow"><p className="text-gray-600 text-sm font-medium">Nutritionist Share</p><p className="text-3xl font-bold text-orange-600">₹{adminRevenue.nutritionistShare}</p></div>
+          <div className="bg-white p-4 rounded-lg shadow"><p className="text-gray-600 text-sm font-medium">Per Consultation</p><p className="text-3xl font-bold text-purple-600">Dynamic</p></div>
+        </div>
+      </div>
+      <h3 className="text-xl font-bold mb-4">Payment Management</h3>
+      <div className="space-y-6">
+        {payments.map((payment) => (
+          <div key={payment.nutritionistId} className="bg-white border rounded-lg p-6">
+            <div className="flex justify-between items-start mb-4">
+              <div><h3 className="text-lg font-bold">{payment.name}</h3><p className="text-sm text-gray-600">{payment.email}</p><p className="text-sm text-gray-600">{payment.completedBookings} consultations</p></div>
+              <div className="text-right"><p className="text-2xl font-bold text-green-600">₹{payment.totalEarned}</p><p className="text-xs text-gray-500">Total Earned</p></div>
+            </div>
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="bg-green-50 p-3 rounded"><p className="text-xs text-green-600 font-medium">Paid</p><p className="text-xl font-bold text-green-700">₹{payment.totalPaid}</p></div>
+              <div className="bg-yellow-50 p-3 rounded"><p className="text-xs text-yellow-600 font-medium">Outstanding</p><p className="text-xl font-bold text-yellow-700">₹{payment.outstanding}</p></div>
+              <div className="bg-blue-50 p-3 rounded"><p className="text-xs text-blue-600 font-medium">Unpaid</p><p className="text-xl font-bold text-blue-700">{payment.unpaidBookings.length}</p></div>
+            </div>
+            {payment.unpaidBookings.length > 0 && (
+              <div className="border-t pt-4">
+                <p className="font-medium mb-2">Unpaid Consultations:</p>
+                <div className="space-y-2 mb-3">
+                  {payment.unpaidBookings.map((booking) => (
+                    <div key={booking.bookingId} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                      <div className="flex items-center space-x-2">
+                        <input type="checkbox" checked={selectedBookings.includes(booking.bookingId)} onChange={(e) => { if (e.target.checked) { setSelectedBookings([...selectedBookings, booking.bookingId]) } else { setSelectedBookings(selectedBookings.filter(id => id !== booking.bookingId)) } }} className="w-4 h-4" />
+                        <div><p className="text-sm font-medium">{booking.patientName}</p><p className="text-xs text-gray-500">{new Date(booking.date).toLocaleDateString()}</p></div>
+                      </div>
+                      <p className="text-sm font-bold text-green-600">₹{booking.amount}</p>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => { const bookingIds = payment.unpaidBookings.filter(b => selectedBookings.includes(b.bookingId)).map(b => b.bookingId); if (bookingIds.length > 0) { handleMarkAsPaid(payment.nutritionistId, bookingIds) } else { toast.warning('Please select consultations') } }} disabled={selectedBookings.length === 0} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-400">Mark Selected as Paid ({selectedBookings.filter(id => payment.unpaidBookings.some(b => b.bookingId === id)).length})</button>
+              </div>
+            )}
+          </div>
+        ))}
+        {payments.length === 0 && <div className="text-center py-8"><p className="text-gray-500">No payment data found.</p></div>}
       </div>
     </div>
   )
