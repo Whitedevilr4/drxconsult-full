@@ -857,9 +857,15 @@ export default function DoctorDashboard() {
                           <span className={`ml-3 px-2 py-1 text-xs rounded-full font-medium ${
                             booking.serviceType === 'prescription_review' 
                               ? 'bg-blue-100 text-blue-700' 
+                              : booking.serviceType === 'doctor_consultation'
+                              ? 'bg-red-100 text-red-700'
                               : 'bg-purple-100 text-purple-700'
                           }`}>
-                            {booking.serviceType === 'prescription_review' ? '📋 Prescription Review' : '👨‍⚕️ Full Consultation'}
+                            {booking.serviceType === 'prescription_review' 
+                              ? '📋 Prescription Review' 
+                              : booking.serviceType === 'doctor_consultation'
+                              ? '🩺 Doctor Consultation'
+                              : '💊 Full Consultation'}
                           </span>
                         </div>
                         <p className="text-sm text-gray-600">Email: {booking.patientId?.email}</p>
@@ -925,9 +931,9 @@ export default function DoctorDashboard() {
                         {/* Payment Amount Display */}
                         {booking.status === 'completed' && (
                           <p className="text-sm text-gray-600 mt-1">
-                            Your share: <span className="font-semibold text-gray-800">₹{booking.doctorShare || (booking.serviceType === 'prescription_review' ? 75 : 225)}</span>
+                            Your share: <span className="font-semibold text-gray-800">₹{booking.doctorShare || Math.round((booking.paymentAmount || 0) * 0.5)}</span>
                             <span className="text-xs text-gray-500 ml-1">
-                              (from ₹{booking.paymentAmount || (booking.serviceType === 'prescription_review' ? 149 : 449)} {booking.serviceType === 'prescription_review' ? 'prescription review' : 'consultation'})
+                              (from ₹{booking.paymentAmount || 0} consultation)
                             </span>
                             {booking.doctorPaid && booking.paidAt && (
                               <span className="text-xs text-green-600 ml-2">
