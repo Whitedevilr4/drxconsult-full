@@ -17,11 +17,11 @@ const {
 
 const router = express.Router();
 
-// Get available slots for a professional (public) - supports both pharmacists and doctors
+// Get available slots for a professional (public) - supports pharmacists, doctors, and nutritionists
 router.get('/available-slots/:professionalId', async (req, res) => {
   try {
     const { professionalId } = req.params;
-    const { type } = req.query; // 'pharmacist' or 'doctor'
+    const { type } = req.query; // 'pharmacist', 'doctor', or 'nutritionist'
     
     let professional;
     let activeBookings;
@@ -38,6 +38,21 @@ router.get('/available-slots/:professionalId', async (req, res) => {
       // Get all active bookings for this doctor
       activeBookings = await Booking.find({
         doctorId: professionalId,
+        status: { $in: ['confirmed', 'pending'] }
+      });
+    } else if (type === 'nutritionist') {
+      // Clean up expired slots for nutritionist (reuse doctor cleanup logic)
+      await cleanupExpiredSlotsForDoctor(professionalId);
+      
+      const Nutritionist = require('../models/Nutritionist');
+      professional = await Nutritionist.findById(professionalId);
+      if (!professional) {
+        return res.status(404).json({ message: 'Nutritionist not found' });
+      }
+      
+      // Get all active bookings for this nutritionist
+      activeBookings = await Booking.find({
+        nutritionistId: professionalId,
         status: { $in: ['confirmed', 'pending'] }
       });
     } else {
@@ -81,12 +96,13 @@ router.get('/available-slots/:professionalId', async (req, res) => {
   }
 });
 
-// Create booking (patient) - supports both pharmacists and doctors
+// Create booking (patient) - supports pharmacists, doctors, and nutritionists
 router.post('/', auth, async (req, res) => {
   try {
     const { 
       pharmacistId, 
       doctorId,
+      nutritionistId,
       slotDate, 
       slotTime, 
       paymentId,
@@ -103,18 +119,32 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ message: 'Age, sex, and prescription are required' });
     }
     
-    // Validate service type
-    if (!['prescription_review', 'full_consultation'].includes(serviceType)) {
-      return res.status(400).json({ message: 'Invalid service type' });
+    // Validate service type based on provider type
+    if (nutritionistId) {
+      // For nutritionists, only allow nutritionist_consultation
+      if (serviceType !== 'nutritionist_consultation') {
+        return res.status(400).json({ message: 'Invalid service type for nutritionist. Only "nutritionist_consultation" is allowed.' });
+      }
+    } else if (doctorId) {
+      // For doctors, only allow doctor_consultation
+      if (serviceType !== 'doctor_consultation') {
+        return res.status(400).json({ message: 'Invalid service type for doctor. Only "doctor_consultation" is allowed.' });
+      }
+    } else {
+      // For pharmacists, allow prescription_review and full_consultation
+      if (!['prescription_review', 'full_consultation'].includes(serviceType)) {
+        return res.status(400).json({ message: 'Invalid service type for pharmacist. Only "prescription_review" or "full_consultation" are allowed.' });
+      }
     }
     
-    // Ensure either pharmacistId or doctorId is provided, but not both
-    if (!pharmacistId && !doctorId) {
-      return res.status(400).json({ message: 'Either pharmacistId or doctorId is required' });
+    // Ensure only one professional ID is provided
+    const professionalIds = [pharmacistId, doctorId, nutritionistId].filter(Boolean);
+    if (professionalIds.length === 0) {
+      return res.status(400).json({ message: 'Either pharmacistId, doctorId, or nutritionistId is required' });
     }
     
-    if (pharmacistId && doctorId) {
-      return res.status(400).json({ message: 'Cannot book with both pharmacist and doctor' });
+    if (professionalIds.length > 1) {
+      return res.status(400).json({ message: 'Cannot book with multiple professionals' });
     }
     
     let professional;
@@ -129,13 +159,21 @@ router.post('/', auth, async (req, res) => {
       }
       professionalUser = await User.findById(professional.userId);
       professionalType = 'pharmacist';
-    } else {
+    } else if (doctorId) {
       professional = await Doctor.findById(doctorId);
       if (!professional) {
         return res.status(404).json({ message: 'Doctor not found' });
       }
       professionalUser = await User.findById(professional.userId);
       professionalType = 'doctor';
+    } else {
+      const Nutritionist = require('../models/Nutritionist');
+      professional = await Nutritionist.findById(nutritionistId);
+      if (!professional) {
+        return res.status(404).json({ message: 'Nutritionist not found' });
+      }
+      professionalUser = await User.findById(professional.userId);
+      professionalType = 'nutritionist';
     }
     
     // Check if there's an active booking for this slot (primary check)
@@ -154,8 +192,10 @@ router.post('/', auth, async (req, res) => {
     
     if (pharmacistId) {
       existingBookingQuery.pharmacistId = pharmacistId;
-    } else {
+    } else if (doctorId) {
       existingBookingQuery.doctorId = doctorId;
+    } else {
+      existingBookingQuery.nutritionistId = nutritionistId;
     }
     
     const existingBooking = await Booking.findOne(existingBookingQuery);
@@ -258,8 +298,23 @@ router.post('/', auth, async (req, res) => {
     console.log('✅ Slot is valid and not expired');
     
     // Calculate payment amounts based on service type
-    const paymentAmount = serviceType === 'prescription_review' ? 149 : 449;
-    const professionalShare = serviceType === 'prescription_review' ? 75 : 225;
+    let paymentAmount, professionalShare;
+    
+    if (serviceType === 'prescription_review') {
+      paymentAmount = 149;
+      professionalShare = 75;
+    } else if (serviceType === 'doctor_consultation') {
+      // For doctors, use their consultationFee from profile
+      paymentAmount = professional.consultationFee || 499;
+      professionalShare = Math.round(paymentAmount * 0.5); // 50% of consultation fee
+    } else if (serviceType === 'nutritionist_consultation') {
+      // For nutritionists, use their consultationFee from profile
+      paymentAmount = professional.consultationFee || 500;
+      professionalShare = Math.round(paymentAmount * 0.5); // 50% of consultation fee
+    } else { // full_consultation
+      paymentAmount = 449;
+      professionalShare = 225;
+    }
     
     // Create booking with enhanced details
     const bookingData = {
@@ -280,21 +335,22 @@ router.post('/', auth, async (req, res) => {
     };
     
     // Add professional-specific fields and validate
-    if (pharmacistId && doctorId) {
-      return res.status(400).json({ message: 'Cannot have both pharmacistId and doctorId' });
-    }
-    if (!pharmacistId && !doctorId) {
-      return res.status(400).json({ message: 'Either pharmacistId or doctorId must be provided' });
+    if ((pharmacistId ? 1 : 0) + (doctorId ? 1 : 0) + (nutritionistId ? 1 : 0) !== 1) {
+      return res.status(400).json({ message: 'Exactly one professional ID must be provided' });
     }
     
     if (pharmacistId) {
       bookingData.pharmacistId = pharmacistId;
       bookingData.pharmacistShare = professionalShare;
       bookingData.providerType = 'pharmacist';
-    } else {
+    } else if (doctorId) {
       bookingData.doctorId = doctorId;
       bookingData.doctorShare = professionalShare;
       bookingData.providerType = 'doctor';
+    } else {
+      bookingData.nutritionistId = nutritionistId;
+      bookingData.nutritionistShare = professionalShare;
+      bookingData.providerType = 'nutritionist';
     }
     
     const booking = new Booking(bookingData);
@@ -361,6 +417,14 @@ router.get('/my-bookings', auth, async (req, res) => {
         return res.json([]);
       }
       query = { doctorId: doctor._id };
+    } else if (req.user.role === 'nutritionist') {
+      // For nutritionist, first find their nutritionist profile
+      const Nutritionist = require('../models/Nutritionist');
+      const nutritionist = await Nutritionist.findOne({ userId: req.user.userId });
+      if (!nutritionist) {
+        return res.json([]);
+      }
+      query = { nutritionistId: nutritionist._id };
     } else {
       query = { patientId: req.user.userId };
     }
@@ -376,6 +440,13 @@ router.get('/my-bookings', auth, async (req, res) => {
       })
       .populate({
         path: 'doctorId',
+        populate: {
+          path: 'userId',
+          select: 'name email phone'
+        }
+      })
+      .populate({
+        path: 'nutritionistId',
         populate: {
           path: 'userId',
           select: 'name email phone'
@@ -480,6 +551,17 @@ router.put('/:id/test-result', auth, async (req, res) => {
       }
     }
     
+    // Check if user is the nutritionist for this booking
+    if (booking.nutritionistId && !isAuthorized) {
+      const Nutritionist = require('../models/Nutritionist');
+      const nutritionist = await Nutritionist.findOne({ userId: req.user.userId });
+      if (nutritionist && booking.nutritionistId.toString() === nutritionist._id.toString()) {
+        professional = nutritionist;
+        professionalUser = await User.findById(nutritionist.userId);
+        isAuthorized = true;
+      }
+    }
+    
     if (!isAuthorized) {
       return res.status(403).json({ message: 'Not authorized to update this booking' });
     }
@@ -491,10 +573,13 @@ router.put('/:id/test-result', auth, async (req, res) => {
     booking.testResults.push(testResultUrl);
     await booking.save();
     
+    // Determine professional type
+    const professionalType = booking.nutritionistId ? 'nutritionist' : booking.doctorId ? 'doctor' : 'pharmacist';
+    
     // Send notifications
     await notifyTestResultUploaded({
       booking,
-      pharmacistName: professionalUser?.name || (booking.doctorId ? 'Doctor' : 'Pharmacist')
+      pharmacistName: professionalUser?.name || (booking.nutritionistId ? 'Nutritionist' : booking.doctorId ? 'Doctor' : 'Pharmacist')
     });
     
     // Send email notification to patient
@@ -505,7 +590,8 @@ router.put('/:id/test-result', auth, async (req, res) => {
         patient.email,
         booking,
         patient.name,
-        professionalUser?.name || (booking.doctorId ? 'Doctor' : 'Pharmacist')
+        professionalUser?.name || (booking.nutritionistId ? 'Nutritionist' : booking.doctorId ? 'Doctor' : 'Pharmacist'),
+        professionalType
       );
     }
     
@@ -556,6 +642,17 @@ router.patch('/:id/meeting-link', auth, async (req, res) => {
       }
     }
     
+    // Check if user is the nutritionist for this booking
+    if (booking.nutritionistId && !isAuthorized) {
+      const Nutritionist = require('../models/Nutritionist');
+      const nutritionist = await Nutritionist.findOne({ userId: req.user.userId });
+      if (nutritionist && booking.nutritionistId.toString() === nutritionist._id.toString()) {
+        professional = nutritionist;
+        professionalUser = await User.findById(nutritionist.userId);
+        isAuthorized = true;
+      }
+    }
+    
     if (!isAuthorized) {
       return res.status(403).json({ message: 'Not authorized to update this booking' });
     }
@@ -563,10 +660,13 @@ router.patch('/:id/meeting-link', auth, async (req, res) => {
     booking.meetLink = meetLink.trim();
     await booking.save();
     
+    // Determine professional type
+    const professionalType = booking.nutritionistId ? 'nutritionist' : booking.doctorId ? 'doctor' : 'pharmacist';
+    
     // Send notifications
     await notifyMeetingLinkAdded({
       booking,
-      pharmacistName: professionalUser?.name || (booking.doctorId ? 'Doctor' : 'Pharmacist')
+      pharmacistName: professionalUser?.name || (booking.nutritionistId ? 'Nutritionist' : booking.doctorId ? 'Doctor' : 'Pharmacist')
     });
     
     // Send email notification to patient
@@ -577,7 +677,8 @@ router.patch('/:id/meeting-link', auth, async (req, res) => {
         patient.email,
         booking,
         patient.name,
-        professionalUser?.name || (booking.doctorId ? 'Doctor' : 'Pharmacist')
+        professionalUser?.name || (booking.nutritionistId ? 'Nutritionist' : booking.doctorId ? 'Doctor' : 'Pharmacist'),
+        professionalType
       );
     }
     
@@ -591,7 +692,7 @@ router.patch('/:id/meeting-link', auth, async (req, res) => {
   }
 });
 
-// Update treatment status (pharmacist or doctor)
+// Update treatment status (pharmacist, doctor, or nutritionist)
 router.patch('/:id/treatment-status', auth, async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
@@ -613,6 +714,15 @@ router.patch('/:id/treatment-status', auth, async (req, res) => {
     if (booking.doctorId && !isAuthorized) {
       const doctor = await Doctor.findOne({ userId: req.user.userId });
       if (doctor && booking.doctorId.toString() === doctor._id.toString()) {
+        isAuthorized = true;
+      }
+    }
+    
+    // Check if user is the nutritionist for this booking
+    if (booking.nutritionistId && !isAuthorized) {
+      const Nutritionist = require('../models/Nutritionist');
+      const nutritionist = await Nutritionist.findOne({ userId: req.user.userId });
+      if (nutritionist && booking.nutritionistId.toString() === nutritionist._id.toString()) {
         isAuthorized = true;
       }
     }
