@@ -57,11 +57,11 @@ const emailTemplates = {
         
         <p>Hello ${patientName},</p>
         
-        <p>Your ${booking.serviceType === 'prescription_review' ? 'prescription review' : 'consultation'} session has been successfully booked!</p>
+        <p>Your ${booking.serviceType === 'prescription_review' ? 'prescription review' : booking.serviceType === 'doctor_consultation' ? 'doctor consultation' : 'consultation'} session has been successfully booked!</p>
         
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <h3 style="margin-top: 0; color: #2c3e50;">Booking Details:</h3>
-          <p><strong>Service:</strong> ${booking.serviceType === 'prescription_review' ? 'Know Your Prescription (₹149)' : 'Full Consultation (₹449)'}</p>
+          <p><strong>Service:</strong> ${booking.serviceType === 'prescription_review' ? 'Know Your Prescription (₹149)' : booking.serviceType === 'doctor_consultation' ? 'Doctor Consultation (₹499)' : 'Full Consultation (₹449)'}</p>
           <p><strong>Professional:</strong> ${professionalName}</p>
           <p><strong>Date:</strong> ${new Date(booking.slotDate).toLocaleDateString()}</p>
           <p><strong>Time:</strong> ${booking.slotTime}</p>
@@ -75,7 +75,9 @@ const emailTemplates = {
           <h4 style="margin-top: 0; color: #856404;">Service Details:</h4>
           ${booking.serviceType === 'prescription_review' 
             ? '<p>📋 <strong>Prescription Review:</strong> Our professional will review your uploaded prescription and provide guidance on medication usage, side effects, and interactions.</p>'
-            : '<p>👨‍⚕️ <strong>Full Consultation:</strong> Comprehensive consultation including prescription review, health assessment, and personalized medication counseling.</p>'
+            : booking.serviceType === 'doctor_consultation'
+            ? '<p>🩺 <strong>Doctor Consultation:</strong> Comprehensive medical consultation with a qualified doctor including diagnosis, treatment plan, and prescription if required.</p>'
+            : '<p>💊 <strong>Full Consultation:</strong> Comprehensive consultation including prescription review, health assessment, and personalized medication counseling.</p>'
           }
         </div>
         
@@ -98,11 +100,11 @@ const emailTemplates = {
         
         <p>Hello,</p>
         
-        <p>You have received a new booking for a ${booking.serviceType === 'prescription_review' ? 'prescription review' : 'consultation'} session.</p>
+        <p>You have received a new booking for a ${booking.serviceType === 'prescription_review' ? 'prescription review' : booking.serviceType === 'doctor_consultation' ? 'doctor consultation' : 'consultation'} session.</p>
         
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <h3 style="margin-top: 0; color: #2c3e50;">Booking Details:</h3>
-          <p><strong>Service Type:</strong> ${booking.serviceType === 'prescription_review' ? 'Know Your Prescription (₹149)' : 'Full Consultation (₹449)'}</p>
+          <p><strong>Service Type:</strong> ${booking.serviceType === 'prescription_review' ? 'Know Your Prescription (₹149)' : booking.serviceType === 'doctor_consultation' ? 'Doctor Consultation (₹499)' : 'Full Consultation (₹449)'}</p>
           <p><strong>Patient:</strong> ${patientName}</p>
           <p><strong>Email:</strong> ${patientEmail}</p>
           ${patientPhone ? `<p><strong>Phone:</strong> ${patientPhone}</p>` : ''}
@@ -121,7 +123,7 @@ const emailTemplates = {
         
         <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0;">
           <h4 style="margin-top: 0; color: #856404;">Your Earnings:</h4>
-          <p><strong>Your Share:</strong> ₹${booking.pharmacistShare || booking.doctorShare || (booking.serviceType === 'prescription_review' ? 75 : 225)}</p>
+          <p><strong>Your Share:</strong> ₹${booking.pharmacistShare || booking.doctorShare || (booking.serviceType === 'prescription_review' ? 75 : booking.serviceType === 'doctor_consultation' ? 250 : 225)}</p>
           <p><em>50% of the total booking amount</em></p>
         </div>
         
@@ -143,7 +145,7 @@ const emailTemplates = {
     `
   }),
 
-  meetingLinkAdded: (booking, patientName, pharmacistName) => ({
+  meetingLinkAdded: (booking, patientName, pharmacistName, professionalType = 'pharmacist') => ({
     subject: 'Meeting Link Added -Drx Consult Patient Counselling App',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -153,11 +155,11 @@ const emailTemplates = {
         
         <p>Hello ${patientName},</p>
         
-        <p>Your pharmacist has added the meeting link for your upcoming counselling session.</p>
+        <p>Your ${professionalType === 'nutritionist' ? 'nutritionist' : professionalType === 'doctor' ? 'doctor' : 'pharmacist'} has added the meeting link for your upcoming ${professionalType === 'nutritionist' ? 'nutrition' : professionalType === 'doctor' ? 'medical' : 'counselling'} session.</p>
         
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <h3 style="margin-top: 0; color: #2c3e50;">Session Details:</h3>
-          <p><strong>Pharmacist:</strong> ${pharmacistName}</p>
+          <p><strong>${professionalType === 'nutritionist' ? 'Nutritionist' : professionalType === 'doctor' ? 'Doctor' : 'Pharmacist'}:</strong> ${pharmacistName}</p>
           <p><strong>Date:</strong> ${new Date(booking.slotDate).toLocaleDateString()}</p>
           <p><strong>Time:</strong> ${booking.slotTime}</p>
           <p><strong>Meeting Link:</strong> <a href="${booking.meetLink}" style="color: #3498db;">Join Meeting</a></p>
@@ -170,27 +172,27 @@ const emailTemplates = {
     `
   }),
 
-  reportSubmitted: (booking, patientName, pharmacistName) => ({
+  reportSubmitted: (booking, patientName, pharmacistName, professionalType = 'pharmacist') => ({
     subject: 'Counselling Report Available -Drx Consult Patient Counselling App',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background-color: #d1ecf1; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-          <h2 style="color: #0c5460; margin: 0;">📋 Counselling Report Ready</h2>
+          <h2 style="color: #0c5460; margin: 0;">📋 ${professionalType === 'nutritionist' ? 'Nutrition' : professionalType === 'doctor' ? 'Medical' : 'Counselling'} Report Ready</h2>
         </div>
         
         <p>Hello ${patientName},</p>
         
-        <p>Your counselling report from ${pharmacistName} is now available.</p>
+        <p>Your ${professionalType === 'nutritionist' ? 'nutrition' : professionalType === 'doctor' ? 'medical' : 'counselling'} report from ${pharmacistName} is now available.</p>
         
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <h3 style="margin-top: 0; color: #2c3e50;">Session Details:</h3>
-          <p><strong>Pharmacist:</strong> ${pharmacistName}</p>
+          <p><strong>${professionalType === 'nutritionist' ? 'Nutritionist' : professionalType === 'doctor' ? 'Doctor' : 'Pharmacist'}:</strong> ${pharmacistName}</p>
           <p><strong>Date:</strong> ${new Date(booking.slotDate).toLocaleDateString()}</p>
           <p><strong>Time:</strong> ${booking.slotTime}</p>
           <p><strong>Status:</strong> Completed</p>
         </div>
         
-        <p>You can view and download your counselling report by logging into your patient dashboard.</p>
+        <p>You can view and download your ${professionalType === 'nutritionist' ? 'nutrition' : professionalType === 'doctor' ? 'medical' : 'counselling'} report by logging into your patient dashboard.</p>
         
         <div style="text-align: center; margin: 30px 0;">
           <a href="${process.env.FRONTEND_URL}/patient/dashboard" 
@@ -204,7 +206,7 @@ const emailTemplates = {
     `
   }),
 
-  testResultUploaded: (booking, patientName, pharmacistName) => ({
+  testResultUploaded: (booking, patientName, pharmacistName, professionalType = 'pharmacist') => ({
     subject: 'Test Results Available - Drx Consult',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -218,7 +220,7 @@ const emailTemplates = {
         
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <h3 style="margin-top: 0; color: #2c3e50;">Details:</h3>
-          <p><strong>Pharmacist:</strong> ${pharmacistName}</p>
+          <p><strong>${professionalType === 'nutritionist' ? 'Nutritionist' : professionalType === 'doctor' ? 'Doctor' : 'Pharmacist'}:</strong> ${pharmacistName}</p>
           <p><strong>Session Date:</strong> ${new Date(booking.slotDate).toLocaleDateString()}</p>
           <p><strong>Upload Date:</strong> ${new Date().toLocaleDateString()}</p>
         </div>
@@ -232,7 +234,7 @@ const emailTemplates = {
           </a>
         </div>
         
-        <p>Please review your results and follow any recommendations provided by your pharmacist.</p>
+        <p>Please review your results and follow any recommendations provided by your ${professionalType === 'nutritionist' ? 'nutritionist' : professionalType === 'doctor' ? 'doctor' : 'pharmacist'}.</p>
       </div>
     `
   }),
@@ -660,11 +662,11 @@ const emailTemplates = {
         <div style="background-color: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
           <h3 style="color: #333; margin-top: 0;">Assignment Details</h3>
           <p style="margin: 5px 0;"><strong>Assigned to:</strong> ${professionalName}</p>
-          <p style="margin: 5px 0;"><strong>Professional Type:</strong> ${professionalType === 'doctor' ? 'Doctor' : 'Pharmacist'}</p>
+          <p style="margin: 5px 0;"><strong>Professional Type:</strong> ${professionalType === 'nutritionist' ? 'Nutritionist' : professionalType === 'doctor' ? 'Doctor' : 'Pharmacist'}</p>
           <p style="margin: 5px 0;"><strong>Form ID:</strong> ${formId}</p>
         </div>
         
-        <p>The ${professionalType} will carefully review your prescription and medical details to provide you with a comprehensive analysis.</p>
+        <p>The ${professionalType === 'nutritionist' ? 'nutritionist' : professionalType} will carefully review your prescription and medical details to provide you with a comprehensive analysis.</p>
         
         <p>You'll receive another email notification once the analysis is complete and ready for download.</p>
         
@@ -695,7 +697,7 @@ const emailTemplates = {
         
         <p>Dear ${patientName},</p>
         
-        <p>Excellent news! Your medical form analysis has been completed by ${professionalName} (${professionalType === 'doctor' ? 'Doctor' : 'Pharmacist'}).</p>
+        <p>Excellent news! Your medical form analysis has been completed by ${professionalName} (${professionalType === 'nutritionist' ? 'Nutritionist' : professionalType === 'doctor' ? 'Doctor' : 'Pharmacist'}).</p>
         
         <div style="background-color: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
           <h3 style="color: #333; margin-top: 0;">Analysis Summary</h3>
@@ -744,7 +746,7 @@ const emailTemplates = {
           <p style="margin: 5px 0;"><strong>Amount Paid:</strong> ₹29</p>
           <p style="margin: 5px 0;"><strong>Payment ID:</strong> ${paymentId}</p>
           <p style="margin: 5px 0;"><strong>Form ID:</strong> ${formId}</p>
-          <p style="margin: 5px 0;"><strong>Analyzed by:</strong> ${professionalName} (${professionalType === 'doctor' ? 'Doctor' : 'Pharmacist'})</p>
+          <p style="margin: 5px 0;"><strong>Analyzed by:</strong> ${professionalName} (${professionalType === 'nutritionist' ? 'Nutritionist' : professionalType === 'doctor' ? 'Doctor' : 'Pharmacist'})</p>
         </div>
         
         <div style="background-color: #e8f5e9; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4caf50;">
@@ -786,7 +788,7 @@ const emailTemplates = {
           <h3 style="color: #333; margin-top: 0;">Assignment Details</h3>
           <p style="margin: 5px 0;"><strong>Patient:</strong> ${patientName}</p>
           <p style="margin: 5px 0;"><strong>Form ID:</strong> ${formId}</p>
-          <p style="margin: 5px 0;"><strong>Your Role:</strong> ${professionalType === 'doctor' ? 'Doctor' : 'Pharmacist'}</p>
+          <p style="margin: 5px 0;"><strong>Your Role:</strong> ${professionalType === 'nutritionist' ? 'Nutritionist' : professionalType === 'doctor' ? 'Doctor' : 'Pharmacist'}</p>
         
         </div>
         
@@ -906,16 +908,16 @@ const sendPharmacistBookingNotification = async (pharmacistEmail, booking, patie
   return await sendEmail(pharmacistEmail, emailTemplates.professionalBookingNotification, booking, patientName, patientEmail, patientPhone);
 };
 
-const sendMeetingLinkEmail = async (patientEmail, booking, patientName, pharmacistName) => {
-  return await sendEmail(patientEmail, emailTemplates.meetingLinkAdded, booking, patientName, pharmacistName);
+const sendMeetingLinkEmail = async (patientEmail, booking, patientName, pharmacistName, professionalType = 'pharmacist') => {
+  return await sendEmail(patientEmail, emailTemplates.meetingLinkAdded, booking, patientName, pharmacistName, professionalType);
 };
 
-const sendReportSubmittedEmail = async (patientEmail, booking, patientName, pharmacistName) => {
-  return await sendEmail(patientEmail, emailTemplates.reportSubmitted, booking, patientName, pharmacistName);
+const sendReportSubmittedEmail = async (patientEmail, booking, patientName, pharmacistName, professionalType = 'pharmacist') => {
+  return await sendEmail(patientEmail, emailTemplates.reportSubmitted, booking, patientName, pharmacistName, professionalType);
 };
 
-const sendTestResultEmail = async (patientEmail, booking, patientName, pharmacistName) => {
-  return await sendEmail(patientEmail, emailTemplates.testResultUploaded, booking, patientName, pharmacistName);
+const sendTestResultEmail = async (patientEmail, booking, patientName, pharmacistName, professionalType = 'pharmacist') => {
+  return await sendEmail(patientEmail, emailTemplates.testResultUploaded, booking, patientName, pharmacistName, professionalType);
 };
 
 const sendUserSuspensionEmail = async (userEmail, userName, reason, adminName) => {
