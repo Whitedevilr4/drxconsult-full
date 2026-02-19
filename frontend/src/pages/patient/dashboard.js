@@ -301,21 +301,31 @@ export default function PatientDashboard() {
                       <div>
                         <div className="flex items-center mb-1">
                           <p className="font-semibold text-lg text-gray-800">
-                            {booking.doctorId ? '👨‍⚕️' : '💊'} {booking.doctorId?.userId?.name || booking.pharmacistId?.userId?.name || (booking.doctorId ? 'Doctor' : 'Pharmacist')}
+                            {booking.doctorId ? '👨‍⚕️' : booking.nutritionistId ? '🥗' : '💊'} {booking.doctorId?.userId?.name || booking.nutritionistId?.userId?.name || booking.pharmacistId?.userId?.name || (booking.doctorId ? 'Doctor' : booking.nutritionistId ? 'Nutritionist' : 'Pharmacist')}
                           </p>
                           <span className={`ml-3 px-2 py-1 text-xs rounded-full font-medium ${
                             booking.serviceType === 'prescription_review' 
                               ? 'bg-blue-100 text-blue-700' 
+                              : booking.serviceType === 'doctor_consultation'
+                              ? 'bg-red-100 text-red-700'
+                              : booking.serviceType === 'nutritionist_consultation'
+                              ? 'bg-green-100 text-green-700'
                               : 'bg-purple-100 text-purple-700'
                           }`}>
-                            {booking.serviceType === 'prescription_review' ? '📋 Prescription Review' : (booking.doctorId ? '👨‍⚕️ Doctor Consultation' : '💊 Pharmacist Consultation')}
+                            {booking.serviceType === 'prescription_review' 
+                              ? '📋 Prescription Review' 
+                              : booking.serviceType === 'doctor_consultation'
+                              ? '🩺 Doctor Consultation'
+                              : booking.serviceType === 'nutritionist_consultation'
+                              ? '🥗 Nutrition Consultation'
+                              : '💊 Full Consultation'}
                           </span>
                         </div>
-                        <p className="text-sm text-gray-600">{booking.doctorId?.specialization || booking.pharmacistId?.designation || ''}</p>
+                        <p className="text-sm text-gray-600">{booking.doctorId?.specialization || booking.nutritionistId?.specialization || booking.pharmacistId?.designation || ''}</p>
                         <p className="font-medium mt-2">Date: {new Date(booking.slotDate).toLocaleDateString()}</p>
                         <p>Time: {booking.slotTime}</p>
                         <p className="text-sm text-gray-600 mt-1">
-                          Amount: <span className="font-semibold">₹{booking.paymentAmount || (booking.serviceType === 'prescription_review' ? 149 : 449)}</span>
+                          Amount: <span className="font-semibold">₹{booking.paymentAmount || (booking.serviceType === 'prescription_review' ? 149 : booking.serviceType === 'doctor_consultation' ? 499 : booking.serviceType === 'nutritionist_consultation' ? 499 : 449)}</span>
                         </p>
                       </div>
                       <span className={`text-xs px-3 py-1 rounded-full font-medium ${
@@ -470,7 +480,7 @@ export default function PatientDashboard() {
                         ) : (
                           <div className="mb-3 bg-yellow-50 p-3 rounded border border-yellow-200">
                             <p className="text-sm text-yellow-800">
-                              ⏳ Waiting for {booking.doctorId ? 'doctor' : 'pharmacist'} to add meeting link. You'll be able to join once the link is provided.
+                              ⏳ Waiting for {booking.doctorId ? 'doctor' : booking.nutritionistId ? 'nutritionist' : 'pharmacist'} to add meeting link. You'll be able to join once the link is provided.
                             </p>
                           </div>
                         )}
