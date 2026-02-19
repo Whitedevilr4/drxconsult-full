@@ -2,16 +2,21 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import PharmacistCard from '@/components/PharmacistCard'
 import DoctorCard from '@/components/DoctorCard'
+import NutritionistCard from '@/components/NutritionistCard'
 import Layout from '@/components/Layout'
 import SEO from '@/components/SEO'
 
 export default function Home() {
   const [pharmacists, setPharmacists] = useState([])
   const [doctors, setDoctors] = useState([])
+  const [nutritionists, setNutritionists] = useState([])
   const [websiteSettings, setWebsiteSettings] = useState(null)
   const [loading, setLoading] = useState(true)
   const [currentSlide, setCurrentSlide] = useState(0)
   const [currentQuote, setCurrentQuote] = useState(0)
+  const [showAllPharmacists, setShowAllPharmacists] = useState(false)
+  const [showAllDoctors, setShowAllDoctors] = useState(false)
+  const [showAllNutritionists, setShowAllNutritionists] = useState(false)
 
   const slides = [
     {
@@ -174,11 +179,21 @@ export default function Home() {
     axios.get(`${apiUrl}/doctors`)
       .then(res => {
         setDoctors(res.data || [])
-        setLoading(false)
       })
       .catch(err => {
         console.error('Error fetching doctors:', err)
         setDoctors([])
+      })
+
+    // Fetch nutritionists
+    axios.get(`${apiUrl}/nutritionists`)
+      .then(res => {
+        setNutritionists(res.data || [])
+        setLoading(false)
+      })
+      .catch(err => {
+        console.error('Error fetching nutritionists:', err)
+        setNutritionists([])
         setLoading(false)
       })
   }, [])
@@ -358,10 +373,20 @@ export default function Home() {
                     <p className="text-gray-600">Expert pharmaceutical counseling and medication guidance</p>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 sm:gap-6">
-                    {pharmacists.map(pharmacist => (
+                    {(showAllPharmacists ? pharmacists : pharmacists.slice(0, 3)).map(pharmacist => (
                       <PharmacistCard key={pharmacist._id} pharmacist={pharmacist} />
                     ))}
                   </div>
+                  {pharmacists.length > 3 && (
+                    <div className="text-center mt-6">
+                      <button
+                        onClick={() => setShowAllPharmacists(!showAllPharmacists)}
+                        className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                      >
+                        {showAllPharmacists ? 'Show Less' : `View More (${pharmacists.length - 3} more)`}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -375,15 +400,52 @@ export default function Home() {
                     <p className="text-gray-600">Professional medical consultations and healthcare advice</p>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 sm:gap-6">
-                    {doctors.map(doctor => (
+                    {(showAllDoctors ? doctors : doctors.slice(0, 3)).map(doctor => (
                       <DoctorCard key={doctor._id} doctor={doctor} />
                     ))}
                   </div>
+                  {doctors.length > 3 && (
+                    <div className="text-center mt-6">
+                      <button
+                        onClick={() => setShowAllDoctors(!showAllDoctors)}
+                        className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                      >
+                        {showAllDoctors ? 'Show Less' : `View More (${doctors.length - 3} more)`}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Nutritionists Section */}
+              {nutritionists.length > 0 && (
+                <div>
+                  <div className="text-center mb-8">
+                    <h3 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">
+                      🥗 Nutritionists & Dieticians
+                    </h3>
+                    <p className="text-gray-600">Expert nutrition counseling and personalized diet plans</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 sm:gap-6">
+                    {(showAllNutritionists ? nutritionists : nutritionists.slice(0, 3)).map(nutritionist => (
+                      <NutritionistCard key={nutritionist._id} nutritionist={nutritionist} />
+                    ))}
+                  </div>
+                  {nutritionists.length > 3 && (
+                    <div className="text-center mt-6">
+                      <button
+                        onClick={() => setShowAllNutritionists(!showAllNutritionists)}
+                        className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium"
+                      >
+                        {showAllNutritionists ? 'Show Less' : `View More (${nutritionists.length - 3} more)`}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* No professionals available */}
-              {pharmacists.length === 0 && doctors.length === 0 && (
+              {pharmacists.length === 0 && doctors.length === 0 && nutritionists.length === 0 && (
                 <div className="text-center py-12">
                   <div className="text-6xl mb-4">🏥</div>
                   <h3 className="text-xl font-semibold text-gray-800 mb-2">No Healthcare Professionals Available</h3>
