@@ -272,7 +272,21 @@ router.post('/cancel', auth, async (req, res) => {
 // Check if user can book a session
 router.get('/can-book-session', auth, async (req, res) => {
   try {
-    const { professionalType } = req.query; // 'pharmacist' or 'doctor'
+    const { professionalType } = req.query; // 'pharmacist', 'doctor', or 'nutritionist'
+    
+    // Nutritionists are not covered by subscription - always charge normal price
+    if (professionalType === 'nutritionist') {
+      return res.json({ 
+        canBook: true,
+        canBookWithSubscription: false,
+        reason: 'Nutritionist consultations are not covered by subscription plans',
+        requiresSubscription: false,
+        bookingType: 'normal_price',
+        professionalType: 'nutritionist',
+        sessionsUsed: 0,
+        sessionsLimit: 0
+      });
+    }
     
     const subscription = await Subscription.findOne({
       userId: req.user.userId,
@@ -334,7 +348,18 @@ router.get('/can-book-session', auth, async (req, res) => {
 // Use a session (called when booking is confirmed)
 router.post('/use-session', auth, async (req, res) => {
   try {
-    const { bookingType, professionalType } = req.body; // 'subscription' or 'normal_price', 'pharmacist' or 'doctor'
+    const { bookingType, professionalType } = req.body; // 'subscription' or 'normal_price', 'pharmacist', 'doctor', or 'nutritionist'
+    
+    // Nutritionists are never covered by subscription
+    if (professionalType === 'nutritionist') {
+      return res.json({
+        message: 'Nutritionist consultation booked at normal price (not covered by subscription)',
+        bookingType: 'normal_price',
+        professionalType: 'nutritionist',
+        sessionsUsed: 0,
+        sessionsLimit: 0
+      });
+    }
     
     const subscription = await Subscription.findOne({
       userId: req.user.userId,
