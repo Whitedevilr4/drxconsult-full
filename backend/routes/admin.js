@@ -1010,4 +1010,327 @@ router.post('/mark-doctor-payment-done', auth, isAdmin, async (req, res) => {
   }
 });
 
+// Nutritionist Management Routes
+
+// Get all nutritionists (admin only)
+router.get('/nutritionists', auth, isAdmin, async (req, res) => {
+  try {
+    const Nutritionist = require('../models/Nutritionist');
+    const nutritionists = await Nutritionist.find()
+      .populate('userId', 'name email phone profilePicture createdAt')
+      .sort({ createdAt: -1 });
+    res.json(nutritionists);
+  } catch (err) {
+    console.error('Error fetching nutritionists:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Create new nutritionist (admin only)
+router.post('/nutritionists', [
+  auth,
+  isAdmin,
+  body('name').notEmpty().withMessage('Name is required'),
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('specialization').notEmpty().withMessage('Specialization is required'),
+  body('qualification').notEmpty().withMessage('Qualification is required'),
+  body('experience').isNumeric().withMessage('Experience must be a number'),
+  body('licenseNumber').notEmpty().withMessage('License number is required')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { 
+      name, 
+      email, 
+      password, 
+      phone, 
+      specialization, 
+      qualification, 
+      experience, 
+      description, 
+      photo, 
+      consultationFee,
+      licenseNumber 
+    } = req.body;
+
+    // Check if user already exists
+    let user = await User.findOne({ email });
+    if (user) {
+      return res.status(400).json({ message: 'User already exists with this email' });
+    }
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create user
+    user = new User({
+      name,
+      email,
+      password: hashedPassword,
+      phone: phone || '',
+      role: 'nutritionist',
+      profilePicture: photo || ''
+    });
+
+    await user.save();
+
+    // Create nutritionist profile
+    const Nutritionist = require('../models/Nutritionist');
+    const nutritionist = new Nutritionist({
+      userId: user._id,
+      specialization,
+      qualification,
+      experience: parseInt(experience),
+      description: description || '',
+      photo: photo || '',
+      consultationFee: consultationFee || 500,
+      licenseNumber
+    });
+
+    await nutritionist.save();
+
+    // Populate user data for response
+    await nutritionist.populate('userId', 'name email phone profilePicture');
+
+    res.status(201).json({
+      message: 'Nutritionist created successfully',
+      nutritionist,
+      credentials: {
+        email,
+        password
+      }
+    });
+
+  } catch (err) {
+    console.error('Error creating nutritionist:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Update nutritionist (admin only)
+router.put('/nutritionists/:id', auth, isAdmin, async (req, res) => {
+  try {
+    const Nutritionist = require('../models/Nutritionist');
+    const { specialization, qualification, experience, description, photo, status, consultationFee, licenseNumber } = req.body;
+    
+    const nutritionist = await Nutritionist.findByIdAndUpdate(
+      req.params.id,
+      {
+        specialization,
+        qualification,
+        experience,
+        description,
+        photo,
+        status,
+        consultationFee,
+        licenseNumber,
+        updatedAt: Date.now()
+      },
+      { new: true }
+    ).populate('userId', 'name email phone');
+
+    if (!nutritionist) {
+      return res.status(404).json({ message: 'Nutritionist not found' });
+    }
+
+    res.json(nutritionist);
+  } catch (err) {
+    console.error('Error updating nutritionist:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Update nutritionist status (admin only)
+router.patch('/nutritionists/:id/status', auth, isAdmin, async (req, res) => {
+  try {
+    const Nutritionist = require('../models/Nutritionist');
+    const { status } = req.body;
+    
+    const nutritionist = await Nutritionist.findByIdAndUpdate(
+      req.params.id,
+      { status, updatedAt: Date.now() },
+      { new: true }
+    );
+
+    if (!nutritionist) {
+      return res.status(404).json({ message: 'Nutritionist not found' });
+    }
+
+    res.json({ message: 'Nutritionist status updated successfully' });
+  } catch (err) {
+    console.error('Error updating nutritionist status:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Delete nutritionist (admin only)
+router.delete('/nutritionists/:id', auth, isAdmin, async (req, res) => {
+  try {
+    const Nutritionist = require('../models/Nutritionist');
+    const nutritionist = await Nutritionist.findById(req.params.id);
+    
+    if (!nutritionist) {
+      return res.status(404).json({ message: 'Nutritionist not found' });
+    }
+
+    // Update user role back to patient
+    await User.findByIdAndUpdate(nutritionist.userId, { role: 'patient' });
+    
+    // Delete nutritionist profile
+    await Nutritionist.findByIdAndDelete(req.params.id);
+
+    res.json({ message: 'Nutritionist deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting nutritionist:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Get nutritionist payment stats (admin only)
+router.get('/nutritionist-payments', auth, isAdmin, async (req, res) => {
+  try {
+    const Nutritionist = require('../models/Nutritionist');
+    const Booking = require('../models/Booking');
+    
+    const nutritionists = await Nutritionist.find().populate('userId', 'name email');
+    
+    const paymentStats = await Promise.all(nutritionists.map(async (nutritionist) => {
+      const completedBookings = await Booking.find({ 
+        nutritionistId: nutritionist._id,
+        status: 'completed'
+      }).populate('patientId', 'name');
+
+      const totalEarned = completedBookings.reduce((sum, booking) => {
+        return sum + (booking.nutritionistShare || 250);
+      }, 0);
+
+      const paidBookings = completedBookings.filter(booking => booking.nutritionistPaid);
+      const totalPaid = paidBookings.reduce((sum, booking) => {
+        return sum + (booking.nutritionistShare || 250);
+      }, 0);
+
+      const unpaidBookings = completedBookings.filter(booking => !booking.nutritionistPaid);
+
+      return {
+        nutritionistId: nutritionist._id,
+        name: nutritionist.userId.name,
+        email: nutritionist.userId.email,
+        totalEarned,
+        totalPaid,
+        outstanding: totalEarned - totalPaid,
+        completedBookings: completedBookings.length,
+        paidBookings: paidBookings.length,
+        unpaidBookings: unpaidBookings.map(booking => ({
+          bookingId: booking._id,
+          patientName: booking.patientId.name,
+          date: booking.slotDate,
+          amount: booking.nutritionistShare || 250
+        }))
+      };
+    }));
+
+    res.json(paymentStats);
+  } catch (err) {
+    console.error('Error fetching nutritionist payments:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Mark nutritionist payment as done (admin only)
+router.post('/mark-nutritionist-payment-done', auth, isAdmin, async (req, res) => {
+  try {
+    const { bookingIds } = req.body;
+    
+    if (!bookingIds || !Array.isArray(bookingIds)) {
+      return res.status(400).json({ message: 'Booking IDs array is required' });
+    }
+
+    const Booking = require('../models/Booking');
+    const Nutritionist = require('../models/Nutritionist');
+    
+    // Get booking details for notifications
+    const bookings = await Booking.find({ _id: { $in: bookingIds } })
+      .populate({
+        path: 'nutritionistId',
+        populate: { path: 'userId', select: 'name email' }
+      });
+    
+    // Group bookings by nutritionist
+    const nutritionistPayments = {};
+    
+    for (const booking of bookings) {
+      if (booking.nutritionistId && booking.nutritionistId.userId) {
+        const nutritionistId = booking.nutritionistId._id.toString();
+        const nutritionistUserId = booking.nutritionistId.userId._id.toString();
+        const nutritionistName = booking.nutritionistId.userId.name;
+        const nutritionistEmail = booking.nutritionistId.userId.email;
+        
+        if (!nutritionistPayments[nutritionistId]) {
+          nutritionistPayments[nutritionistId] = {
+            nutritionistUserId,
+            nutritionistName,
+            nutritionistEmail,
+            totalAmount: 0,
+            bookingCount: 0
+          };
+        }
+        
+        nutritionistPayments[nutritionistId].totalAmount += booking.nutritionistShare || 250;
+        nutritionistPayments[nutritionistId].bookingCount += 1;
+      }
+    }
+    
+    // Update payment status
+    const result = await Booking.updateMany(
+      { _id: { $in: bookingIds } },
+      { 
+        nutritionistPaid: true,
+        paidAt: new Date()
+      }
+    );
+    
+    // Send notifications and emails for each nutritionist
+    for (const payment of Object.values(nutritionistPayments)) {
+      if (payment.nutritionistUserId) {
+        // Send notification
+        await notifyPaymentApproved({
+          professionalUserId: payment.nutritionistUserId,
+          professionalName: payment.nutritionistName,
+          amount: payment.totalAmount,
+          bookingCount: payment.bookingCount,
+          professionalType: 'nutritionist'
+        });
+        
+        // Send payment email
+        try {
+          await sendPaymentReceivedEmail(
+            payment.nutritionistEmail,
+            payment.nutritionistName,
+            payment.totalAmount,
+            payment.bookingCount,
+            'nutritionist'
+          );
+          console.log(`✅ Payment email sent to nutritionist ${payment.nutritionistName} (${payment.nutritionistEmail})`);
+        } catch (emailError) {
+          console.error('Failed to send payment email to nutritionist:', emailError);
+        }
+      }
+    }
+
+    res.json({ 
+      message: `${result.modifiedCount} nutritionist payment(s) marked as done`,
+      modifiedCount: result.modifiedCount
+    });
+  } catch (err) {
+    console.error('Error marking nutritionist payments as done:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 module.exports = router;
