@@ -1,4 +1,6 @@
 const express = require('express');
+const { cleanupExpiredSlotsForDoctor } = require('../utils/slotCleanup');
+
 const router = express.Router();
 const Doctor = require('../models/Doctor');
 const User = require('../models/User');
@@ -69,6 +71,23 @@ router.get('/my-bookings', auth, async (req, res) => {
     res.json(bookings);
   } catch (error) {
     console.error('Error fetching doctor bookings:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get doctor profile - MUST come before /:id route
+router.get('/profile', auth, async (req, res) => {
+  try {
+    const doctor = await Doctor.findOne({ userId: req.user.userId })
+      .populate('userId', 'name email phone');
+    
+    if (!doctor) {
+      return res.status(404).json({ message: 'Doctor profile not found' });
+    }
+    
+    res.json(doctor);
+  } catch (error) {
+    console.error('Error fetching doctor profile:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -185,7 +204,33 @@ router.put('/:id', auth, async (req, res) => {
   }
 });
 
-// Update doctor status
+// Update doctor status (by doctor themselves)
+router.patch('/status', auth, async (req, res) => {
+  try {
+    const { status } = req.body;
+    
+    if (!['online', 'offline', 'busy'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status. Must be online, offline, or busy' });
+    }
+    
+    // Find doctor by user ID
+    const doctor = await Doctor.findOne({ userId: req.user.userId });
+    
+    if (!doctor) {
+      return res.status(404).json({ message: 'Doctor profile not found' });
+    }
+
+    doctor.status = status;
+    await doctor.save();
+
+    res.json({ message: 'Status updated successfully', status: doctor.status });
+  } catch (error) {
+    console.error('Error updating doctor status:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Update doctor status by ID (admin only)
 router.patch('/:id/status', auth, async (req, res) => {
   try {
     const { status } = req.body;
