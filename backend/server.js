@@ -1,6 +1,8 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const http = require('http');
+const { Server } = require('socket.io');
 require('dotenv').config();
 
 const { cleanupExpiredSlots } = require('./utils/slotCleanup');
@@ -9,7 +11,16 @@ const { testSupabaseConnection, initializeStorageBuckets } = require('./config/s
 const medicineScheduler = require('./utils/medicineScheduler');
 
 const app = express();
-
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
+});
+// Make io accessible to routes
+app.set('io', io);
 // =====================
 // Middleware
 // =====================
