@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '@/components/Layout';
+import PaymentDisclaimer from '@/components/PaymentDisclaimer';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
@@ -10,6 +11,8 @@ export default function SubscriptionPlans() {
   const [currentSubscription, setCurrentSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState(false);
+  const [showPaymentDisclaimer, setShowPaymentDisclaimer] = useState(false);
+  const [pendingSubscription, setPendingSubscription] = useState(null);
 
   useEffect(() => {
     fetchPlansAndSubscription();
@@ -41,6 +44,15 @@ export default function SubscriptionPlans() {
   };
 
   const handleSubscribe = async (planType, billingCycle) => {
+    // Show disclaimer first
+    setPendingSubscription({ planType, billingCycle, isUpgrade: false });
+    setShowPaymentDisclaimer(true);
+  };
+
+  const proceedWithSubscription = async () => {
+    const { planType, billingCycle, isUpgrade } = pendingSubscription;
+    setShowPaymentDisclaimer(false);
+    
     try {
       setSubscribing(true);
       const token = localStorage.getItem('token');
@@ -65,6 +77,7 @@ export default function SubscriptionPlans() {
         toast.success('Subscription created successfully! (Free for test users)');
         setCurrentSubscription(res.data.subscription);
         setSubscribing(false);
+        setPendingSubscription(null);
         return;
       }
       
@@ -123,6 +136,7 @@ export default function SubscriptionPlans() {
 
             toast.success('Subscription created successfully!');
             setCurrentSubscription(res.data.subscription);
+            setPendingSubscription(null);
           } catch (subscriptionErr) {
             console.error('Subscription creation error:', subscriptionErr);
             toast.error('Payment successful but subscription creation failed. Please contact support.');
@@ -131,6 +145,7 @@ export default function SubscriptionPlans() {
         modal: {
           ondismiss: function() {
             setSubscribing(false);
+            setPendingSubscription(null);
           }
         },
         theme: {
@@ -155,10 +170,20 @@ export default function SubscriptionPlans() {
       console.error('Error creating subscription:', err);
       toast.error(err.response?.data?.message || 'Failed to create subscription');
       setSubscribing(false);
+      setPendingSubscription(null);
     }
   };
 
   const handleUpgrade = async (planType, billingCycle) => {
+    // Show disclaimer first
+    setPendingSubscription({ planType, billingCycle, isUpgrade: true });
+    setShowPaymentDisclaimer(true);
+  };
+
+  const proceedWithUpgrade = async () => {
+    const { planType, billingCycle } = pendingSubscription;
+    setShowPaymentDisclaimer(false);
+    
     try {
       setSubscribing(true);
       const token = localStorage.getItem('token');
@@ -218,6 +243,7 @@ export default function SubscriptionPlans() {
 
             toast.success('Subscription updated successfully!');
             setCurrentSubscription(res.data.subscription);
+            setPendingSubscription(null);
           } catch (subscriptionErr) {
             console.error('Subscription update error:', subscriptionErr);
             toast.error('Payment successful but subscription update failed. Please contact support.');
@@ -226,6 +252,7 @@ export default function SubscriptionPlans() {
         modal: {
           ondismiss: function() {
             setSubscribing(false);
+            setPendingSubscription(null);
           }
         },
         theme: {
@@ -250,6 +277,7 @@ export default function SubscriptionPlans() {
       console.error('Error updating subscription:', err);
       toast.error(err.response?.data?.message || 'Failed to update subscription');
       setSubscribing(false);
+      setPendingSubscription(null);
     }
   };
 
@@ -325,35 +353,34 @@ export default function SubscriptionPlans() {
           )}
 
           {/* Subscription Plans */}
-          <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-8">
+          <div className="max-w-7xl mx-auto grid md:grid-cols-3 gap-8">
             {/* Essential Care Plan */}
             <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-green-200">
               <div className="bg-green-500 text-white p-6">
                 <div className="flex items-center mb-2">
                   <span className="text-2xl mr-2">🟢</span>
-                  <h2 className="text-2xl font-bold">PLAN 1: ESSENTIAL CARE</h2>
+                  <h2 className="text-2xl font-bold">ESSENTIAL CARE</h2>
                 </div>
-                <p className="text-green-100">Mass Market</p>
+                <p className="text-green-100">Basic Healthcare</p>
               </div>
 
               <div className="p-6">
                 {/* Pricing */}
                 <div className="mb-6">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-3xl font-bold text-gray-900">₹299</span>
+                    <span className="text-3xl font-bold text-gray-900">₹999</span>
                     <span className="text-gray-600">/ month</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-2xl font-bold text-gray-900">₹2,999</span>
+                    <span className="text-2xl font-bold text-gray-900">₹9,999</span>
                     <span className="text-gray-600">/ year</span>
                   </div>
-                  <p className="text-sm text-green-600 mt-2">Save ₹589 with yearly plan!</p>
                 </div>
 
                 {/* Best For */}
                 <div className="mb-6">
                   <h4 className="font-semibold text-gray-900 mb-2">👤 Best for</h4>
-                  <p className="text-gray-600">Individuals, students, working adults, medicine doubts</p>
+                  <p className="text-gray-600">Individuals seeking basic healthcare consultations</p>
                 </div>
 
                 {/* Includes */}
@@ -362,7 +389,15 @@ export default function SubscriptionPlans() {
                   <ul className="space-y-2">
                     <li className="flex items-center text-gray-700">
                       <span className="text-green-500 mr-2">✔</span>
-                      2 Pharmacist counselling sessions / month
+                      1 Pharmacist consultation
+                    </li>
+                    <li className="flex items-center text-gray-700">
+                      <span className="text-green-500 mr-2">✔</span>
+                      1 Doctor consultation
+                    </li>
+                    <li className="flex items-center text-gray-700">
+                      <span className="text-green-500 mr-2">✔</span>
+                      1 Dietitian consultation
                     </li>
                     <li className="flex items-center text-gray-700">
                       <span className="text-green-500 mr-2">✔</span>
@@ -370,32 +405,18 @@ export default function SubscriptionPlans() {
                     </li>
                     <li className="flex items-center text-gray-700">
                       <span className="text-green-500 mr-2">✔</span>
-                      Medicine timing & side-effect guidance
+                      Medicine guidance
                     </li>
                     <li className="flex items-center text-gray-700">
                       <span className="text-green-500 mr-2">✔</span>
-                      WhatsApp chat support (limited, non-emergency)
+                      WhatsApp support
                     </li>
                     <li className="flex items-center text-gray-700">
                       <span className="text-green-500 mr-2">✔</span>
-                      Access to verified health content
+                      Verified content
                     </li>
                   </ul>
                 </div>
-
-                {/* Not Included */}
-                <div className="mb-6">
-                  <h4 className="font-semibold text-gray-900 mb-3">❌ Not included</h4>
-                  <ul className="space-y-1">
-                    <li className="text-gray-500">Diagnosis</li>
-                    <li className="text-gray-500">Emergency care</li>
-                    <li className="text-gray-500">Unlimited usage</li>
-                  </ul>
-                </div>
-
-                <p className="text-sm text-gray-600 mb-6">
-                  🧠 Perfect entry plan. Low price, high volume.
-                </p>
 
                 {/* Action Buttons */}
                 <div className="space-y-3">
@@ -413,7 +434,7 @@ export default function SubscriptionPlans() {
                         disabled={subscribing}
                         className="w-full bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 disabled:opacity-50"
                       >
-                        {subscribing ? 'Processing...' : 'Start Yearly Plan (Save 17%)'}
+                        {subscribing ? 'Processing...' : 'Start Yearly Plan'}
                       </button>
                     </>
                   ) : (
@@ -425,38 +446,37 @@ export default function SubscriptionPlans() {
               </div>
             </div>
 
-            {/* Family & Chronic Care Plan */}
-            <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-blue-200 relative">
-              <div className="absolute top-4 right-4 bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full text-sm font-bold">
-                HERO PLAN
+            {/* Chronic Care Plan */}
+            <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-4 border-blue-500 relative transform scale-105">
+              <div className="absolute top-4 right-4 bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full text-sm font-bold z-10">
+                ⭐ MOST POPULAR
               </div>
               
               <div className="bg-blue-500 text-white p-6">
                 <div className="flex items-center mb-2">
                   <span className="text-2xl mr-2">🔵</span>
-                  <h2 className="text-2xl font-bold">PLAN 2: FAMILY & CHRONIC CARE</h2>
+                  <h2 className="text-2xl font-bold">CHRONIC CARE</h2>
                 </div>
-                <p className="text-blue-100">Hero Plan</p>
+                <p className="text-blue-100">Diabetes, PCOS & BP Care</p>
               </div>
 
               <div className="p-6">
                 {/* Pricing */}
                 <div className="mb-6">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-3xl font-bold text-gray-900">₹799</span>
+                    <span className="text-3xl font-bold text-gray-900">₹1,799</span>
                     <span className="text-gray-600">/ month</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-2xl font-bold text-gray-900">₹7,999</span>
+                    <span className="text-2xl font-bold text-gray-900">₹16,999</span>
                     <span className="text-gray-600">/ year</span>
                   </div>
-                  <p className="text-sm text-blue-600 mt-2">Save ₹1,589 with yearly plan!</p>
                 </div>
 
                 {/* Covers */}
                 <div className="mb-6">
                   <h4 className="font-semibold text-gray-900 mb-2">👨‍👩‍👧 Covers</h4>
-                  <p className="text-gray-600">Up to 4 members</p>
+                  <p className="text-gray-600">Up to 4 family members</p>
                 </div>
 
                 {/* Includes */}
@@ -465,19 +485,23 @@ export default function SubscriptionPlans() {
                   <ul className="space-y-2">
                     <li className="flex items-center text-gray-700">
                       <span className="text-blue-500 mr-2">✔</span>
-                      5 Pharmacist counselling sessions / month
+                      3 Pharmacist consultations
                     </li>
                     <li className="flex items-center text-gray-700">
                       <span className="text-blue-500 mr-2">✔</span>
-                      1 Doctor follow-up consultation / month
+                      2 Doctor consultations
                     </li>
                     <li className="flex items-center text-gray-700">
                       <span className="text-blue-500 mr-2">✔</span>
-                      Chronic medicine guidance (BP, diabetes, thyroid, asthma)
+                      2 Dietitian consultations with diet chart
                     </li>
                     <li className="flex items-center text-gray-700">
                       <span className="text-blue-500 mr-2">✔</span>
-                      Lab report & prescription explanation
+                      Diabetes, PCOS & BP care
+                    </li>
+                    <li className="flex items-center text-gray-700">
+                      <span className="text-blue-500 mr-2">✔</span>
+                      Lab report explanation
                     </li>
                     <li className="flex items-center text-gray-700">
                       <span className="text-blue-500 mr-2">✔</span>
@@ -492,26 +516,114 @@ export default function SubscriptionPlans() {
 
                 {/* Action Buttons */}
                 <div className="space-y-3">
-                  {!currentSubscription || currentSubscription.planType !== 'family' ? (
+                  {!currentSubscription || currentSubscription.planType !== 'chronic' ? (
                     <>
                       <button
-                        onClick={() => currentSubscription ? handleUpgrade('family', 'monthly') : handleSubscribe('family', 'monthly')}
+                        onClick={() => currentSubscription ? handleUpgrade('chronic', 'monthly') : handleSubscribe('chronic', 'monthly')}
                         disabled={subscribing}
                         className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50"
                       >
                         {subscribing ? 'Processing...' : currentSubscription ? 'Upgrade to Monthly' : 'Start Monthly Plan'}
                       </button>
                       <button
-                        onClick={() => currentSubscription ? handleUpgrade('family', 'yearly') : handleSubscribe('family', 'yearly')}
+                        onClick={() => currentSubscription ? handleUpgrade('chronic', 'yearly') : handleSubscribe('chronic', 'yearly')}
                         disabled={subscribing}
                         className="w-full bg-blue-500 text-white py-3 rounded-lg font-semibold hover:bg-blue-600 disabled:opacity-50"
                       >
-                        {subscribing ? 'Processing...' : currentSubscription ? 'Upgrade to Yearly (Save 17%)' : 'Start Yearly Plan (Save 17%)'}
+                        {subscribing ? 'Processing...' : currentSubscription ? 'Upgrade to Yearly' : 'Start Yearly Plan'}
                       </button>
                     </>
                   ) : (
                     <div className="text-center py-3 bg-blue-100 rounded-lg">
                       <span className="text-blue-800 font-semibold">Current Plan</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Fat to Fit Plan */}
+            <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-purple-200">
+              <div className="bg-purple-500 text-white p-6">
+                <div className="flex items-center mb-2">
+                  <span className="text-2xl mr-2">🟣</span>
+                  <h2 className="text-2xl font-bold">FAT TO FIT</h2>
+                </div>
+                <p className="text-purple-100">Weight Management</p>
+              </div>
+
+              <div className="p-6">
+                {/* Pricing */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-3xl font-bold text-gray-900">₹1,299</span>
+                    <span className="text-gray-600">/ month</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-2xl font-bold text-gray-900">₹12,999</span>
+                    <span className="text-gray-600">/ year</span>
+                  </div>
+                </div>
+
+                {/* Best For */}
+                <div className="mb-6">
+                  <h4 className="font-semibold text-gray-900 mb-2">🎯 Best for</h4>
+                  <p className="text-gray-600">Weight management and fitness goals</p>
+                </div>
+
+                {/* Includes */}
+                <div className="mb-6">
+                  <h4 className="font-semibold text-gray-900 mb-3">✅ Includes</h4>
+                  <ul className="space-y-2">
+                    <li className="flex items-center text-gray-700">
+                      <span className="text-purple-500 mr-2">✔</span>
+                      1 Doctor consultation
+                    </li>
+                    <li className="flex items-center text-gray-700">
+                      <span className="text-purple-500 mr-2">✔</span>
+                      2 Dietitian consultations
+                    </li>
+                    <li className="flex items-center text-gray-700">
+                      <span className="text-purple-500 mr-2">✔</span>
+                      Personalized diet plan
+                    </li>
+                    <li className="flex items-center text-gray-700">
+                      <span className="text-purple-500 mr-2">✔</span>
+                      Weight management guidance
+                    </li>
+                    <li className="flex items-center text-gray-700">
+                      <span className="text-purple-500 mr-2">✔</span>
+                      WhatsApp support
+                    </li>
+                    <li className="flex items-center text-gray-700">
+                      <span className="text-purple-500 mr-2">✔</span>
+                      Priority booking
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="space-y-3">
+                  {!currentSubscription || currentSubscription.planType !== 'fatToFit' ? (
+                    <>
+                      <button
+                        onClick={() => currentSubscription ? handleUpgrade('fatToFit', 'monthly') : handleSubscribe('fatToFit', 'monthly')}
+                        disabled={subscribing}
+                        className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 disabled:opacity-50"
+                      >
+                        {subscribing ? 'Processing...' : currentSubscription ? 'Upgrade to Monthly' : 'Start Monthly Plan'}
+                      </button>
+                      <button
+                        onClick={() => currentSubscription ? handleUpgrade('fatToFit', 'yearly') : handleSubscribe('fatToFit', 'yearly')}
+                        disabled={subscribing}
+                        className="w-full bg-purple-500 text-white py-3 rounded-lg font-semibold hover:bg-purple-600 disabled:opacity-50"
+                      >
+                        {subscribing ? 'Processing...' : currentSubscription ? 'Upgrade to Yearly' : 'Start Yearly Plan'}
+                      </button>
+                    </>
+                  ) : (
+                    <div className="text-center py-3 bg-purple-100 rounded-lg">
+                      <span className="text-purple-800 font-semibold">Current Plan</span>
                     </div>
                   )}
                 </div>
@@ -538,6 +650,20 @@ export default function SubscriptionPlans() {
             </div>
           </div>
         </div>
+
+        {/* Payment Disclaimer Modal */}
+        {showPaymentDisclaimer && pendingSubscription && (
+          <PaymentDisclaimer
+            onAccept={pendingSubscription.isUpgrade ? proceedWithUpgrade : proceedWithSubscription}
+            onCancel={() => {
+              setShowPaymentDisclaimer(false);
+              setPendingSubscription(null);
+              setSubscribing(false);
+            }}
+            amount={plans[pendingSubscription.planType][pendingSubscription.billingCycle].price}
+            serviceName={`${plans[pendingSubscription.planType].name} - ${pendingSubscription.billingCycle === 'monthly' ? 'Monthly' : 'Yearly'} Subscription`}
+          />
+        )}
       </div>
     </Layout>
   );
