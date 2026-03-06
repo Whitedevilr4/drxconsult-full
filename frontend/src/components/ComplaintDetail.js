@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import axios from 'axios';
+import { io } from 'socket.io-client';
+import { showBrowserNotification } from '@/utils/browserNotification';
+
+const SOCKET_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace('/api', '');
 
 export default function ComplaintDetail({ complaint, onClose, onUpdate, isAdmin = false }) {
   const [adminResponse, setAdminResponse] = useState('');
@@ -9,6 +13,58 @@ export default function ComplaintDetail({ complaint, onClose, onUpdate, isAdmin 
   const [resolutionMessage, setResolutionMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [rating, setRating] = useState(0);
+  const [localComplaint, setLocalComplaint] = useState(complaint);
+
+  // Socket.IO for real-time updates
+  useEffect(() => {
+    if (!isAdmin) {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const socket = io(SOCKET_URL, {
+        auth: { token },
+        transports: ['websocket', 'polling']
+      });
+
+      socket.on('connect', () => {
+        console.log('✅ Complaint detail socket connected');
+      });
+
+      socket.on('complaint-updated', (data) => {
+        if (data.complaintId === complaint._id) {
+          console.log('📨 Complaint updated in real-time:', data);
+          setLocalComplaint(data.complaint);
+          
+          // Show notification
+          if (data.type === 'admin_response') {
+            toast.info('Admin has responded to your complaint');
+            showBrowserNotification('complaint_response', {
+              complaintTitle: data.complaint.title
+            });
+          } else if (data.type === 'status_change') {
+            toast.info(`Complaint status changed to: ${data.status}`);
+            showBrowserNotification('complaint_status_update', {
+              complaintTitle: data.complaint.title,
+              status: data.status
+            });
+          }
+          
+          // Trigger parent refresh
+          onUpdate();
+        }
+      });
+
+      return () => {
+        socket.disconnect();
+      };
+    }
+  }, [complaint._id, isAdmin, onUpdate]);
+
+  // Update local state when prop changes
+  useEffect(() => {
+    setLocalComplaint(complaint);
+    setNewStatus(complaint.status);
+  }, [complaint]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -54,7 +110,7 @@ export default function ComplaintDetail({ complaint, onClose, onUpdate, isAdmin 
     try {
       const token = localStorage.getItem('token');
       await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/complaints/admin/${complaint._id}/respond`,
+        `${process.env.NEXT_PUBLIC_API_URL}/complaints/admin/${localComplaint._id}/respond`,
         { message: adminResponse },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -81,7 +137,7 @@ export default function ComplaintDetail({ complaint, onClose, onUpdate, isAdmin 
       }
 
       await axios.put(
-        `${process.env.NEXT_PUBLIC_API_URL}/complaints/admin/${complaint._id}/status`,
+        `${process.env.NEXT_PUBLIC_API_URL}/complaints/admin/${localComplaint._id}/status`,
         payload,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -106,7 +162,7 @@ export default function ComplaintDetail({ complaint, onClose, onUpdate, isAdmin 
     try {
       const token = localStorage.getItem('token');
       await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/complaints/admin/${complaint._id}/note`,
+        `${process.env.NEXT_PUBLIC_API_URL}/complaints/admin/${localComplaint._id}/note`,
         { note: internalNote },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -132,7 +188,7 @@ export default function ComplaintDetail({ complaint, onClose, onUpdate, isAdmin 
     try {
       const token = localStorage.getItem('token');
       await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/complaints/${complaint._id}/rating`,
+        `${process.env.NEXT_PUBLIC_API_URL}/complaints/${localComplaint._id}/rating`,
         { rating },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -153,8 +209,8 @@ export default function ComplaintDetail({ complaint, onClose, onUpdate, isAdmin 
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">{complaint.title}</h2>
-            <p className="text-sm text-gray-500">Complaint #{complaint._id.slice(-6)}</p>
+            <h2 className="text-2xl font-bold text-gray-900">{localComplaint.title}</h2>
+            <p className="text-sm text-gray-500">Complaint #{localComplaint._id.slice(-6)}</p>
           </div>
           <button
             onClick={onClose}
@@ -167,65 +223,65 @@ export default function ComplaintDetail({ complaint, onClose, onUpdate, isAdmin 
         <div className="p-6 space-y-6">
           {/* Status and Priority */}
           <div className="flex flex-wrap gap-3">
-            <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(complaint.status)}`}>
-              {complaint.status.replace('_', ' ').toUpperCase()}
+            <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(localComplaint.status)}`}>
+              {localComplaint.status.replace('_', ' ').toUpperCase()}
             </span>
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${getPriorityColor(complaint.priority)}`}>
-              {complaint.priority.toUpperCase()} PRIORITY
+            <span className={`px-3 py-1 rounded-full text-sm font-medium ${getPriorityColor(localComplaint.priority)}`}>
+              {localComplaint.priority.toUpperCase()} PRIORITY
             </span>
             <span className="px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
-              {getCategoryLabel(complaint.category)}
+              {getCategoryLabel(localComplaint.category)}
             </span>
           </div>
 
           {/* Complaint Details */}
           <div className="bg-gray-50 rounded-lg p-4">
             <h3 className="font-semibold text-gray-900 mb-2">Description</h3>
-            <p className="text-gray-700 whitespace-pre-wrap">{complaint.description}</p>
+            <p className="text-gray-700 whitespace-pre-wrap">{localComplaint.description}</p>
           </div>
 
           {/* Related Information */}
-          {(complaint.relatedBooking || complaint.relatedPharmacist) && (
+          {(localComplaint.relatedBooking || localComplaint.relatedPharmacist) && (
             <div className="bg-blue-50 rounded-lg p-4">
               <h3 className="font-semibold text-blue-900 mb-2">Related Information</h3>
-              {complaint.relatedBooking && (
+              {localComplaint.relatedBooking && (
                 <p className="text-blue-800">
-                  📅 Booking: {new Date(complaint.relatedBooking.slotDate).toLocaleDateString()} at {complaint.relatedBooking.slotTime}
+                  📅 Booking: {new Date(localComplaint.relatedBooking.slotDate).toLocaleDateString()} at {localComplaint.relatedBooking.slotTime}
                 </p>
               )}
-              {complaint.relatedPharmacist && (
+              {localComplaint.relatedPharmacist && (
                 <p className="text-blue-800">
-                  👨‍⚕️ Pharmacist: {complaint.relatedPharmacist.designation}
+                  👨‍⚕️ Pharmacist: {localComplaint.relatedPharmacist.designation}
                 </p>
               )}
             </div>
           )}
 
           {/* Admin Response */}
-          {complaint.adminResponse && (
+          {localComplaint.adminResponse && (
             <div className="bg-blue-50 rounded-lg p-4">
               <h3 className="font-semibold text-blue-900 mb-2">Admin Response</h3>
-              <p className="text-blue-800 mb-2">{complaint.adminResponse.message}</p>
+              <p className="text-blue-800 mb-2">{localComplaint.adminResponse.message}</p>
               <p className="text-sm text-blue-600">
-                Responded by {complaint.adminResponse.respondedBy?.name} on{' '}
-                {new Date(complaint.adminResponse.respondedAt).toLocaleDateString()}
+                Responded by {localComplaint.adminResponse.respondedBy?.name} on{' '}
+                {new Date(localComplaint.adminResponse.respondedAt).toLocaleDateString()}
               </p>
             </div>
           )}
 
           {/* Resolution */}
-          {complaint.resolution && complaint.resolution.message && (
+          {localComplaint.resolution && localComplaint.resolution.message && (
             <div className="bg-green-50 rounded-lg p-4">
               <h3 className="font-semibold text-green-900 mb-2">Resolution</h3>
-              <p className="text-green-800 mb-2">{complaint.resolution.message}</p>
+              <p className="text-green-800 mb-2">{localComplaint.resolution.message}</p>
               <p className="text-sm text-green-600">
-                Resolved by {complaint.resolution.resolvedBy?.name} on{' '}
-                {new Date(complaint.resolution.resolvedAt).toLocaleDateString()}
+                Resolved by {localComplaint.resolution.resolvedBy?.name} on{' '}
+                {new Date(localComplaint.resolution.resolvedAt).toLocaleDateString()}
               </p>
-              {complaint.resolution.satisfactionRating && (
+              {localComplaint.resolution.satisfactionRating && (
                 <div className="mt-2">
                   <p className="text-sm text-green-700">
-                    Customer Rating: {'⭐'.repeat(complaint.resolution.satisfactionRating)} ({complaint.resolution.satisfactionRating}/5)
+                    Customer Rating: {'⭐'.repeat(localComplaint.resolution.satisfactionRating)} ({localComplaint.resolution.satisfactionRating}/5)
                   </p>
                 </div>
               )}
@@ -233,11 +289,11 @@ export default function ComplaintDetail({ complaint, onClose, onUpdate, isAdmin 
           )}
 
           {/* Internal Notes (Admin Only) */}
-          {isAdmin && complaint.internalNotes && complaint.internalNotes.length > 0 && (
+          {isAdmin && localComplaint.internalNotes && localComplaint.internalNotes.length > 0 && (
             <div className="bg-yellow-50 rounded-lg p-4">
               <h3 className="font-semibold text-yellow-900 mb-2">Internal Notes</h3>
               <div className="space-y-2">
-                {complaint.internalNotes.map((note, index) => (
+                {localComplaint.internalNotes.map((note, index) => (
                   <div key={index} className="border-l-2 border-yellow-300 pl-3">
                     <p className="text-yellow-800">{note.note}</p>
                     <p className="text-xs text-yellow-600">
@@ -250,7 +306,7 @@ export default function ComplaintDetail({ complaint, onClose, onUpdate, isAdmin 
           )}
 
           {/* Rating Section (for resolved complaints) */}
-          {complaint.status === 'resolved' && !complaint.resolution?.satisfactionRating && !isAdmin && (
+          {localComplaint.status === 'resolved' && !localComplaint.resolution?.satisfactionRating && !isAdmin && (
             <div className="bg-yellow-50 rounded-lg p-4">
               <h3 className="font-semibold text-yellow-900 mb-3">Rate Your Experience</h3>
               <div className="flex items-center space-x-2 mb-3">
@@ -297,7 +353,7 @@ export default function ComplaintDetail({ complaint, onClose, onUpdate, isAdmin 
                   </select>
                   <button
                     onClick={handleStatusUpdate}
-                    disabled={loading || newStatus === complaint.status}
+                    disabled={loading || newStatus === localComplaint.status}
                     className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
                   >
                     Update Status
@@ -359,8 +415,8 @@ export default function ComplaintDetail({ complaint, onClose, onUpdate, isAdmin 
 
           {/* Timestamps */}
           <div className="text-sm text-gray-500 border-t pt-4">
-            <p>Created: {new Date(complaint.createdAt).toLocaleString()}</p>
-            <p>Last Updated: {new Date(complaint.updatedAt).toLocaleString()}</p>
+            <p>Created: {new Date(localComplaint.createdAt).toLocaleString()}</p>
+            <p>Last Updated: {new Date(localComplaint.updatedAt).toLocaleString()}</p>
           </div>
         </div>
       </div>
