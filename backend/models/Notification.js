@@ -11,6 +11,7 @@ const notificationSchema = new mongoose.Schema({
       'test_result_uploaded',
       'session_completed',
       'payment_approved',
+      'review_received',
       'new_complaint',
       'complaint_updated',
       // Medical Form notification types
@@ -24,7 +25,17 @@ const notificationSchema = new mongoose.Schema({
       'medical_form_analysis_completed',
       'medical_form_paid',
       'medical_form_payment_received',
-      'medical_form_payment_completed'
+      'medical_form_payment_completed',
+      // Hospital notification types
+      'hospital_query_new',
+      'hospital_query_accepted',
+      'hospital_query_rejected',
+      'hospital_query_closed',
+      'hospital_chat_message',
+      'hospital_booking_confirmed',
+      'ambulance_booking_created',
+      'ambulance_status_updated',
+      'bed_booking_status_updated'
     ], 
     required: true 
   },
