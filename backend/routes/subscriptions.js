@@ -522,6 +522,9 @@ router.get('/admin/analytics', auth, isAdmin, async (req, res) => {
     const yearlyRevenue = subscriptions
       .filter(s => s.billingCycle === 'yearly')
       .reduce((sum, s) => sum + s.price, 0);
+    
+    // Total monthly recurring revenue (yearly subscriptions divided by 12)
+    const totalMonthlyRecurring = monthlyRevenue + (yearlyRevenue / 12);
 
     res.json({
       analytics: {
@@ -539,7 +542,7 @@ router.get('/admin/analytics', auth, isAdmin, async (req, res) => {
         revenue: {
           monthlyRecurring: monthlyRevenue,
           yearlyRecurring: yearlyRevenue,
-          totalRecurring: monthlyRevenue + (yearlyRevenue / 12) // Normalize to monthly
+          totalRecurring: Math.round(totalMonthlyRecurring) // Monthly recurring revenue (normalized)
         }
       }
     });
