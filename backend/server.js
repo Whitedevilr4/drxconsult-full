@@ -94,6 +94,11 @@ app.use('/api/website', require('./routes/website'));
 app.use('/api/subscriptions', require('./routes/subscriptions'));
 app.use('/api/health-trackers', require('./routes/healthTrackers'));
 app.use('/api/health-report', require('./routes/healthReport'));
+app.use('/api/hospitals', require('./routes/hospitals'));
+app.use('/api/hospital-queries', require('./routes/hospitalQueries'));
+app.use('/api/hospital-chats', require('./routes/hospitalChats'));
+app.use('/api/hospital-bookings', require('./routes/hospitalBookings'));
+app.use('/api/customer-service-chat', require('./routes/customerServiceChat'));
 
 app.get('/', (req, res) => {
   res.json({
