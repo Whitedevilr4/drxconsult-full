@@ -102,6 +102,23 @@ router.get('/payment-stats', auth, isPharmacist, async (req, res) => {
   }
 });
 
+// Get pharmacist profile (pharmacist only) - MUST come before /:id route
+router.get('/profile', auth, isPharmacist, async (req, res) => {
+  try {
+    const pharmacist = await Pharmacist.findOne({ userId: req.user.userId })
+      .populate('userId', 'name email phone');
+    
+    if (!pharmacist) {
+      return res.status(404).json({ message: 'Pharmacist profile not found' });
+    }
+    
+    res.json(pharmacist);
+  } catch (err) {
+    console.error('Error fetching pharmacist profile:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 // Get pharmacist by ID
 router.get('/:id', async (req, res) => {
   try {
@@ -154,6 +171,29 @@ router.put('/slots', auth, isPharmacist, async (req, res) => {
     await pharmacist.save();
     res.json(pharmacist);
   } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Update pharmacist status (pharmacist only)
+router.patch('/status', auth, isPharmacist, async (req, res) => {
+  try {
+    const { status } = req.body;
+    
+    if (!['online', 'offline'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status. Must be online or offline' });
+    }
+    
+    const pharmacist = await Pharmacist.findOne({ userId: req.user.userId });
+    if (!pharmacist) {
+      return res.status(404).json({ message: 'Pharmacist profile not found' });
+    }
+
+    pharmacist.status = status;
+    await pharmacist.save();
+    res.json({ message: 'Status updated successfully', status: pharmacist.status });
+  } catch (err) {
+    console.error('Error updating pharmacist status:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
