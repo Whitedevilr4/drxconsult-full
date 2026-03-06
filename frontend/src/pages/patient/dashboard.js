@@ -451,11 +451,11 @@ export default function PatientDashboard() {
   return (
     <Layout>
       <div className="bg-gray-50 min-h-screen">
-        <div className="container mx-auto px-4 py-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-6">Patient Dashboard</h1>
+        <div className="container mx-auto px-4 py-4 md:py-8">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4 md:mb-6">Patient Dashboard</h1>
           
           {/* Subscription Status */}
-          <div className="mb-6">
+          <div className="mb-4 md:mb-6">
             <SubscriptionStatus />
           </div>
           
@@ -475,22 +475,39 @@ export default function PatientDashboard() {
         )}
 
         {/* Tab Navigation */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-2xl font-bold text-gray-900">Patient Dashboard</h1>
+        <div className="mb-4 md:mb-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2">
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900">Patient Dashboard</h1>
             {socket.isConnected ? (
-              <span className="flex items-center text-sm bg-green-100 text-green-800 px-3 py-1.5 rounded-full font-medium">
+              <span className="flex items-center text-xs sm:text-sm bg-green-100 text-green-800 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full font-medium">
                 <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
                 Real-time Connected
               </span>
             ) : (
-              <span className="flex items-center text-sm bg-red-100 text-red-800 px-3 py-1.5 rounded-full font-medium">
+              <span className="flex items-center text-xs sm:text-sm bg-red-100 text-red-800 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full font-medium">
                 <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
                 Disconnected
               </span>
             )}
           </div>
-          <nav className="flex space-x-8">
+          
+          {/* Mobile Dropdown Navigation */}
+          <div className="md:hidden mb-4">
+            <select
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              <option value="bookings">My Bookings</option>
+              <option value="complaints">My Complaints</option>
+              <option value="medical">Test Results</option>
+              <option value="medical-forms">Medical Forms</option>
+              <option value="hospital-queries">Hospital Queries</option>
+            </select>
+          </div>
+
+          {/* Desktop Tab Navigation */}
+          <nav className="hidden md:flex space-x-8">
             <button
               onClick={() => setActiveTab('bookings')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
