@@ -120,7 +120,7 @@ router.get('/download', auth, async (req, res) => {
       cognitive: cognitiveTracker.status === 'fulfilled' ? cognitiveTracker.value : null
     };
 
-    console.log('Generating health report for user:', user.name);
+    console.log('Generating health report');
     console.log('Available data:', Object.keys(healthData).filter(key => healthData[key] && key !== 'user'));
     
     // Try PDF generation first, fallback to HTML if it fails
