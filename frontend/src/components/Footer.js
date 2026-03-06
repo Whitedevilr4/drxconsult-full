@@ -56,7 +56,7 @@ export default function Footer() {
   return (
     <footer className="bg-gray-800 text-white mt-auto">
       <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
           {/* About */}
           <div>
             <div className="flex items-center mb-4">
@@ -85,7 +85,7 @@ export default function Footer() {
                 )}
                 {websiteSettings.socialMedia.twitter && (
                   <a href={websiteSettings.socialMedia.twitter} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white">
-                    🇽
+                    🐦
                   </a>
                 )}
                 {websiteSettings.socialMedia.instagram && (
@@ -122,6 +122,18 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/login" className="text-gray-400 hover:text-white transition">
+                  Login
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Legal Pages */}
+          <div>
+            <h3 className="text-lg font-semibold mb-4">Legal</h3>
+            <ul className="space-y-2 text-sm">
+              <li>
                 <Link href="/privacy-policy" className="text-gray-400 hover:text-white transition">
                   Privacy Policy
                 </Link>
@@ -132,8 +144,13 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/login" className="text-gray-400 hover:text-white transition">
-                  Login
+                <Link href="/refund-policy" className="text-gray-400 hover:text-white transition">
+                  Refund Policy
+                </Link>
+              </li>
+              <li>
+                <Link href="/disclaimer" className="text-gray-400 hover:text-white transition">
+                  Disclaimer
                 </Link>
               </li>
             </ul>
