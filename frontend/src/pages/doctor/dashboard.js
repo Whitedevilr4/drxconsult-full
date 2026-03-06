@@ -33,7 +33,10 @@ export default function DoctorDashboard() {
   const [lastPaymentUpdate, setLastPaymentUpdate] = useState(new Date())
   const [addingMeetLink, setAddingMeetLink] = useState(null)
   const [meetLinkInput, setMeetLinkInput] = useState('')
+  const [dateFilter, setDateFilter] = useState('all') // 'today', 'last7days', 'last30days', 'all'
   const [mounted, setMounted] = useState(false)
+  const [isOnline, setIsOnline] = useState(false)
+  const [updatingStatus, setUpdatingStatus] = useState(false)
 
   useEffect(() => {
     setMounted(true)
@@ -95,6 +98,15 @@ export default function DoctorDashboard() {
       })
       
       const completedBookings = res.data.filter(b => b.status === 'completed')
+      
+      // Fetch doctor profile to get online status
+      const profileRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/doctors/profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      
+      if (profileRes.data && profileRes.data.status) {
+        setIsOnline(profileRes.data.status === 'online')
+      }
       
       // Calculate payment stats from bookings
       const totalEarned = completedBookings.reduce((sum, b) => {
@@ -310,6 +322,30 @@ export default function DoctorDashboard() {
     }
   }
 
+  const toggleOnlineStatus = async () => {
+    try {
+      setUpdatingStatus(true)
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+      if (!token) return
+      
+      const newStatus = isOnline ? 'offline' : 'online'
+      
+      await axios.patch(
+        `${process.env.NEXT_PUBLIC_API_URL}/doctors/status`,
+        { status: newStatus },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      
+      setIsOnline(!isOnline)
+      toast.success(`You are now ${newStatus}!`)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to update status')
+    } finally {
+      setUpdatingStatus(false)
+    }
+  }
+
   const handleCancelBooking = async (bookingId) => {
     if (!window.confirm('Are you sure you want to cancel this booking?')) return
     
@@ -387,17 +423,72 @@ export default function DoctorDashboard() {
   }, [bookings])
 
   const filteredBookings = bookings.filter(booking => {
-    if (activeTab === 'all') return true
-    if (activeTab === 'treated') return booking.treatmentStatus === 'treated'
-    if (activeTab === 'untreated') return booking.treatmentStatus === 'untreated'
-    if (activeTab === 'upcoming') return booking.status === 'confirmed' && new Date(booking.slotDate) > new Date()
-    if (activeTab === 'completed') return booking.status === 'completed'
-    if (activeTab === 'cancelled') return booking.status === 'cancelled'
-    return true
+    // Status filter
+    let statusMatch = true
+    if (activeTab === 'all') statusMatch = true
+    else if (activeTab === 'treated') statusMatch = booking.treatmentStatus === 'treated'
+    else if (activeTab === 'untreated') statusMatch = booking.treatmentStatus === 'untreated'
+    else if (activeTab === 'upcoming') statusMatch = booking.status === 'confirmed' && new Date(booking.slotDate) > new Date()
+    else if (activeTab === 'completed') statusMatch = booking.status === 'completed'
+    else if (activeTab === 'cancelled') statusMatch = booking.status === 'cancelled'
+    
+    // Date filter
+    let dateMatch = true
+    if (dateFilter !== 'all') {
+      const bookingDate = new Date(booking.slotDate)
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      
+      if (dateFilter === 'today') {
+        const tomorrow = new Date(today)
+        tomorrow.setDate(tomorrow.getDate() + 1)
+        dateMatch = bookingDate >= today && bookingDate < tomorrow
+      } else if (dateFilter === 'last7days') {
+        const sevenDaysAgo = new Date(today)
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+        dateMatch = bookingDate >= sevenDaysAgo
+      } else if (dateFilter === 'last30days') {
+        const thirtyDaysAgo = new Date(today)
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+        dateMatch = bookingDate >= thirtyDaysAgo
+      }
+    }
+    
+    return statusMatch && dateMatch
   })
 
   return (
     <Layout>
+      {/* Online Toggle Button - Fixed Position */}
+      {!accessDenied && (
+        <div className="fixed top-20 right-4 z-50">
+          <button
+            onClick={toggleOnlineStatus}
+            disabled={updatingStatus}
+            className={`flex items-center space-x-2 px-6 py-3 rounded-full shadow-lg font-semibold transition-all duration-300 ${
+              isOnline
+                ? 'bg-green-500 hover:bg-green-600 text-white'
+                : 'bg-gray-400 hover:bg-gray-500 text-white'
+            } ${updatingStatus ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
+          >
+            {isOnline ? (
+              <>
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+                </span>
+                <span>Online</span>
+              </>
+            ) : (
+              <>
+                <span className="h-3 w-3 rounded-full bg-white"></span>
+                <span>Go Online</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* Access Denied Screen */}
       {accessDenied && (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -450,12 +541,14 @@ export default function DoctorDashboard() {
 
       {/* Normal Dashboard Content */}
       {!accessDenied && (
-        <div className="bg-gray-50 min-h-screen">
-          <div className="container mx-auto px-4 py-8">
-            <h1 className="text-3xl font-bold text-gray-800 mb-6">Doctor Dashboard</h1>
+        <div className={`bg-gray-50 min-h-screen transition-all duration-300 ${!isOnline ? 'blur-sm pointer-events-none select-none' : ''}`}>
+          <div className="container mx-auto px-4 py-4 sm:py-8">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-3">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Doctor Dashboard</h1>
+            </div>
 
             {/* Stats Cards - Optimized */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 mb-4 sm:mb-6">
               <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-4 rounded-lg shadow-lg text-white">
                 <p className="text-blue-100 text-xs font-medium">Total Patients</p>
                 <p className="text-3xl font-bold mt-1">{stats.total}</p>
@@ -559,7 +652,28 @@ export default function DoctorDashboard() {
             {/* Tabs */}
             <div className="bg-white rounded-lg shadow mb-6">
               <div className="border-b border-gray-200">
-                <nav className="flex -mb-px overflow-x-auto scrollbar-hide">
+                {/* Mobile Tab Selector */}
+                <div className="md:hidden px-4 py-3">
+                  <select
+                    value={activeTab}
+                    onChange={(e) => setActiveTab(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  >
+                    <option value="all">All Bookings ({stats.total})</option>
+                    <option value="untreated">Untreated ({stats.untreated})</option>
+                    <option value="treated">Treated ({stats.treated})</option>
+                    <option value="upcoming">📅 Upcoming ({stats.upcoming})</option>
+                    <option value="completed">✓ Completed ({stats.completed})</option>
+                    <option value="cancelled">❌ Cancelled ({stats.cancelled})</option>
+                    <option value="slots">📅 Manage Slots</option>
+                    <option value="payments">💰 Payments</option>
+                    <option value="reviews">⭐ Reviews</option>
+                    <option value="medical-forms">📋 Medical Forms</option>
+                  </select>
+                </div>
+
+                {/* Desktop Tab Navigation */}
+                <nav className="hidden md:flex -mb-px overflow-x-auto scrollbar-hide">
                   <button
                     onClick={() => setActiveTab('all')}
                     className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
@@ -834,6 +948,60 @@ export default function DoctorDashboard() {
             {/* Medical Forms Tab */}
             {activeTab === 'medical-forms' && (
               <MedicalFormsTabContent />
+            )}
+
+            {/* Date Filter - Only show for booking tabs */}
+            {activeTab !== 'slots' && activeTab !== 'payments' && activeTab !== 'reviews' && activeTab !== 'medical-forms' && (
+              <div className="bg-white rounded-lg shadow p-4 mb-6">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium text-gray-700">Filter by Date:</span>
+                  <button
+                    onClick={() => setDateFilter('today')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      dateFilter === 'today'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Today
+                  </button>
+                  <button
+                    onClick={() => setDateFilter('last7days')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      dateFilter === 'last7days'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Last 7 Days
+                  </button>
+                  <button
+                    onClick={() => setDateFilter('last30days')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      dateFilter === 'last30days'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Last 30 Days
+                  </button>
+                  <button
+                    onClick={() => setDateFilter('all')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      dateFilter === 'all'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    All Time
+                  </button>
+                  {dateFilter !== 'all' && (
+                    <span className="text-sm text-gray-500 ml-2">
+                      ({filteredBookings.length} consultations)
+                    </span>
+                  )}
+                </div>
+              </div>
             )}
 
             {/* Bookings List */}
