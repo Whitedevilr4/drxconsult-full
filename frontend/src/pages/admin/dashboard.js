@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import axios from 'axios'
 import Layout from '@/components/Layout'
@@ -7,6 +7,7 @@ import ImageUploader from '@/components/EnhancedUploader'
 import ComplaintList from '@/components/ComplaintList'
 import ComplaintDetail from '@/components/ComplaintDetail'
 import { toast } from 'react-toastify'
+import { io } from 'socket.io-client'
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -14,6 +15,8 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([])
   const [pharmacists, setPharmacists] = useState([])
   const [doctors, setDoctors] = useState([])
+  const [nutritionists, setNutritionists] = useState([])
+  const [hospitals, setHospitals] = useState([])
   const [patients, setPatients] = useState([])
   const [loading, setLoading] = useState(true)
   const [accessDenied, setAccessDenied] = useState(false)
@@ -49,7 +52,7 @@ export default function AdminDashboard() {
 
   const fetchData = async (token) => {
     try {
-      const [usersRes, pharmacistsRes, doctorsRes, patientsRes] = await Promise.all([
+      const requests = [
         axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/users`, {
           headers: { Authorization: `Bearer ${token}` }
         }),
@@ -62,12 +65,38 @@ export default function AdminDashboard() {
         axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/patients`, {
           headers: { Authorization: `Bearer ${token}` }
         })
-      ])
+      ]
+
+      // Try to fetch nutritionists and hospitals, but don't fail if they don't exist
+      try {
+        requests.push(
+          axios.get(`${process.env.NEXT_PUBLIC_API_URL}/nutritionists`, {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+        )
+      } catch (err) {
+        console.log('Nutritionists endpoint not available')
+      }
+
+      try {
+        requests.push(
+          axios.get(`${process.env.NEXT_PUBLIC_API_URL}/hospitals`, {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+        )
+      } catch (err) {
+        console.log('Hospitals endpoint not available')
+      }
+
+      const results = await Promise.allSettled(requests)
       
-      setUsers(usersRes.data)
-      setPharmacists(pharmacistsRes.data)
-      setDoctors(doctorsRes.data)
-      setPatients(patientsRes.data)
+      setUsers(results[0].status === 'fulfilled' ? results[0].value.data : [])
+      setPharmacists(results[1].status === 'fulfilled' ? results[1].value.data : [])
+      setDoctors(results[2].status === 'fulfilled' ? results[2].value.data : [])
+      setPatients(results[3].status === 'fulfilled' ? results[3].value.data : [])
+      setNutritionists(results[4]?.status === 'fulfilled' ? results[4].value.data : [])
+      setHospitals(results[5]?.status === 'fulfilled' ? results[5].value.data : [])
+      
       setLoading(false)
     } catch (err) {
       console.error(err)
@@ -216,12 +245,15 @@ export default function AdminDashboard() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="overview">Overview</option>
+                  <option value="hospital-bookings">🏥 Hospital Bookings</option>
                   <option value="add-pharmacist">Add Pharmacist</option>
                   <option value="add-doctor">Add Doctor</option>
                   <option value="add-nutritionist">Add Nutritionist</option>
+                  <option value="add-hospital">Add Hospital</option>
                   <option value="manage-pharmacists">Manage Pharmacists</option>
                   <option value="manage-doctors">Manage Doctors</option>
                   <option value="manage-nutritionists">Manage Nutritionists</option>
+                  <option value="manage-hospitals">Manage Hospitals</option>
                   <option value="upload-results">Upload Test Results</option>
                   <option value="analytics">📊 Analytics</option>
                   <option value="payments">💰 Pharmacist Payments</option>
@@ -229,6 +261,7 @@ export default function AdminDashboard() {
                   <option value="nutritionist-payments">💰 Nutritionist Payments</option>
                   <option value="reviews">⭐ Reviews</option>
                   <option value="complaints">📝 Complaints</option>
+                  <option value="live-chat">💬 Live Chat</option>
                   <option value="website">🌐 Website</option>
                   <option value="users">👥 User Management</option>
                   <option value="subscriptions">💳 Subscriptions</option>
@@ -247,6 +280,16 @@ export default function AdminDashboard() {
                   }`}
                 >
                   Overview
+                </button>
+                <button
+                  onClick={() => setActiveTab('hospital-bookings')}
+                  className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
+                    activeTab === 'hospital-bookings'
+                      ? 'border-b-2 border-blue-600 text-blue-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  🏥 Hospital Bookings
                 </button>
                 <button
                   onClick={() => setActiveTab('add-pharmacist')}
@@ -279,6 +322,16 @@ export default function AdminDashboard() {
                   Add Nutritionist
                 </button>
                 <button
+                  onClick={() => setActiveTab('add-hospital')}
+                  className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
+                    activeTab === 'add-hospital'
+                      ? 'border-b-2 border-blue-600 text-blue-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Add Hospital
+                </button>
+                <button
                   onClick={() => setActiveTab('manage-pharmacists')}
                   className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
                     activeTab === 'manage-pharmacists'
@@ -307,6 +360,16 @@ export default function AdminDashboard() {
                   }`}
                 >
                   Manage Nutritionists
+                </button>
+                <button
+                  onClick={() => setActiveTab('manage-hospitals')}
+                  className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
+                    activeTab === 'manage-hospitals'
+                      ? 'border-b-2 border-blue-600 text-blue-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Manage Hospitals
                 </button>
                 <button
                   onClick={() => setActiveTab('upload-results')}
@@ -389,6 +452,16 @@ export default function AdminDashboard() {
                   📝 Complaints
                 </button>
                 <button
+                  onClick={() => setActiveTab('live-chat')}
+                  className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
+                    activeTab === 'live-chat'
+                      ? 'border-b-2 border-purple-600 text-purple-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  💬 Live Chat
+                </button>
+                <button
                   onClick={() => setActiveTab('website')}
                   className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
                     activeTab === 'website'
@@ -432,13 +505,16 @@ export default function AdminDashboard() {
             </div>
 
             <div className="p-6">
-              {activeTab === 'overview' && <OverviewTab users={users} pharmacists={pharmacists} patients={patients} />}
+              {activeTab === 'overview' && <OverviewTab users={users} pharmacists={pharmacists} doctors={doctors} nutritionists={nutritionists} hospitals={hospitals} patients={patients} />}
+              {activeTab === 'hospital-bookings' && <HospitalBookingsTab />}
               {activeTab === 'add-pharmacist' && <AddPharmacistTab onSuccess={() => fetchData(localStorage.getItem('token'))} />}
               {activeTab === 'add-doctor' && <AddDoctorTab onSuccess={() => fetchData(localStorage.getItem('token'))} />}
               {activeTab === 'add-nutritionist' && <AddNutritionistTab onSuccess={() => fetchData(localStorage.getItem('token'))} />}
+              {activeTab === 'add-hospital' && <AddHospitalTab onHospitalAdded={() => fetchData(localStorage.getItem('token'))} />}
               {activeTab === 'manage-pharmacists' && <ManageUsersTab users={users} pharmacists={pharmacists} onUpdate={() => fetchData(localStorage.getItem('token'))} />}
               {activeTab === 'manage-doctors' && <ManageDoctorsTab onUpdate={() => fetchData(localStorage.getItem('token'))} />}
               {activeTab === 'manage-nutritionists' && <ManageNutritionistsTab onUpdate={() => fetchData(localStorage.getItem('token'))} />}
+              {activeTab === 'manage-hospitals' && <ManageHospitalsTab onUpdate={() => fetchData(localStorage.getItem('token'))} />}
               {activeTab === 'upload-results' && <UploadResultsTab patients={patients} />}
 
               {activeTab === 'analytics' && <AnalyticsTab />}
@@ -448,6 +524,7 @@ export default function AdminDashboard() {
               {activeTab === 'reviews' && <ReviewsTab pharmacists={pharmacists} doctors={doctors} />}
               {activeTab === 'manage' && <ManageUsersTab users={users} pharmacists={pharmacists} onUpdate={() => fetchData(localStorage.getItem('token'))} />}
               {activeTab === 'complaints' && <ComplaintsTab complaints={complaints} loading={complaintsLoading} onComplaintClick={handleComplaintClick} onRefresh={() => fetchComplaints(localStorage.getItem('token'))} />}
+              {activeTab === 'live-chat' && <LiveChatTab />}
               {activeTab === 'website' && <WebsiteTab />}
               {activeTab === 'users' && <UserManagementTab />}
               {activeTab === 'subscriptions' && <SubscriptionManagementTab />}
@@ -472,17 +549,498 @@ export default function AdminDashboard() {
 }
 
 // Overview Tab Component
-function OverviewTab({ users, pharmacists, patients }) {
+function OverviewTab({ users, pharmacists, doctors, nutritionists, hospitals, patients }) {
+  const stats = [
+    {
+      title: 'Total Doctors',
+      count: doctors?.length || 0,
+      icon: '🩺',
+      color: 'from-green-500 to-teal-500',
+      bgColor: 'from-green-50 to-teal-50'
+    },
+    {
+      title: 'Total Pharmacists',
+      count: pharmacists?.length || 0,
+      icon: '💊',
+      color: 'from-blue-500 to-indigo-500',
+      bgColor: 'from-blue-50 to-indigo-50'
+    },
+    {
+      title: 'Total Nutritionists',
+      count: nutritionists?.length || 0,
+      icon: '🥗',
+      color: 'from-emerald-500 to-lime-500',
+      bgColor: 'from-emerald-50 to-lime-50'
+    },
+    {
+      title: 'Total Hospitals',
+      count: hospitals?.length || 0,
+      icon: '🏥',
+      color: 'from-red-500 to-pink-500',
+      bgColor: 'from-red-50 to-pink-50'
+    },
+    {
+      title: 'Total Patients',
+      count: patients?.length || 0,
+      icon: '👥',
+      color: 'from-purple-500 to-pink-500',
+      bgColor: 'from-purple-50 to-pink-50'
+    },
+    {
+      title: 'Total Users',
+      count: users?.length || 0,
+      icon: '👤',
+      color: 'from-gray-500 to-gray-600',
+      bgColor: 'from-gray-50 to-gray-100'
+    }
+  ]
+
   return (
     <div>
-      <h2 className="text-xl font-bold mb-4">System Overview</h2>
-      <div className="space-y-4">
-        <div className="bg-gray-50 p-4 rounded">
-          <h3 className="font-semibold mb-2">Recent Activity</h3>
-          <p className="text-gray-600">Total registered users: {users.length}</p>
-          <p className="text-gray-600">Active pharmacists: {pharmacists.length}</p>
-          <p className="text-gray-600">Registered patients: {patients.length}</p>
+      <h2 className="text-2xl font-bold mb-6 text-gray-800">System Overview</h2>
+      
+      {/* Statistics Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        {stats.map((stat, index) => (
+          <div
+            key={index}
+            className="relative overflow-hidden rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+          >
+            <div className={`absolute inset-0 bg-gradient-to-br ${stat.bgColor} opacity-90`}></div>
+            <div className="relative p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 mb-1">{stat.title}</p>
+                  <p className="text-4xl font-bold text-gray-800">{stat.count}</p>
+                </div>
+                <div className={`w-16 h-16 bg-gradient-to-br ${stat.color} rounded-full flex items-center justify-center text-3xl shadow-lg`}>
+                  {stat.icon}
+                </div>
+              </div>
+              <div className="mt-4 flex items-center text-sm text-gray-600">
+                <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span>Active in system</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Quick Actions */}
+      <div className="bg-white rounded-xl shadow-md p-6">
+        <h3 className="text-lg font-bold mb-4 text-gray-800">Quick Actions</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <button className="p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors text-center">
+            <div className="text-2xl mb-2">➕</div>
+            <div className="text-sm font-medium text-gray-700">Add Doctor</div>
+          </button>
+          <button className="p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors text-center">
+            <div className="text-2xl mb-2">➕</div>
+            <div className="text-sm font-medium text-gray-700">Add Pharmacist</div>
+          </button>
+          <button className="p-4 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors text-center">
+            <div className="text-2xl mb-2">➕</div>
+            <div className="text-sm font-medium text-gray-700">Add Nutritionist</div>
+          </button>
+          <button className="p-4 bg-red-50 hover:bg-red-100 rounded-lg transition-colors text-center">
+            <div className="text-2xl mb-2">➕</div>
+            <div className="text-sm font-medium text-gray-700">Add Hospital</div>
+          </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// Hospital Bookings Tab Component
+function HospitalBookingsTab() {
+  const [bookings, setBookings] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [filterStatus, setFilterStatus] = useState('all')
+  const [filterBookingType, setFilterBookingType] = useState('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortBy, setSortBy] = useState('newest')
+
+  useEffect(() => {
+    fetchBookings()
+  }, [])
+
+  const fetchBookings = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const token = localStorage.getItem('token')
+      const res = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/hospital-bookings/admin/all`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      setBookings(res.data)
+    } catch (err) {
+      console.error('Error fetching hospital bookings:', err)
+      setError(err.response?.data?.message || 'Failed to load hospital bookings')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Filter and sort bookings
+  const filteredBookings = bookings
+    .filter(booking => {
+      // Status filter
+      if (filterStatus !== 'all' && booking.status !== filterStatus) return false
+      
+      // Booking type filter
+      if (filterBookingType !== 'all' && booking.bookingType !== filterBookingType) return false
+      
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase()
+        const patientName = booking.userId?.name?.toLowerCase() || ''
+        const hospitalName = booking.hospitalId?.hospitalName?.toLowerCase() || ''
+        const bookingId = booking._id?.toLowerCase() || ''
+        
+        if (!patientName.includes(query) && !hospitalName.includes(query) && !bookingId.includes(query)) {
+          return false
+        }
+      }
+      
+      return true
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'newest':
+          return new Date(b.createdAt) - new Date(a.createdAt)
+        case 'oldest':
+          return new Date(a.createdAt) - new Date(b.createdAt)
+        case 'amount-high':
+          return b.paymentAmount - a.paymentAmount
+        case 'amount-low':
+          return a.paymentAmount - b.paymentAmount
+        default:
+          return 0
+      }
+    })
+
+  // Calculate statistics
+  const stats = {
+    total: bookings.length,
+    bed: bookings.filter(b => b.bookingType === 'bed').length,
+    ambulance: bookings.filter(b => b.bookingType === 'ambulance').length,
+    completed: bookings.filter(b => b.status === 'completed').length,
+    inProgress: bookings.filter(b => b.status === 'in_progress').length,
+    pendingPayment: bookings.filter(b => b.status === 'pending_payment').length,
+    cancelled: bookings.filter(b => b.status === 'cancelled').length,
+    totalRevenue: bookings
+      .filter(b => b.paymentStatus === 'completed')
+      .reduce((sum, b) => sum + b.paymentAmount, 0),
+    patientArrived: bookings.filter(b => b.patientArrivalStatus === 'arrived').length,
+    ambulanceIssued: bookings.filter(b => b.bookingType === 'ambulance' && b.status !== 'cancelled').length
+  }
+
+  const getStatusBadge = (status) => {
+    const badges = {
+      pending_payment: 'bg-yellow-100 text-yellow-800',
+      confirmed: 'bg-blue-100 text-blue-800',
+      in_progress: 'bg-purple-100 text-purple-800',
+      completed: 'bg-green-100 text-green-800',
+      cancelled: 'bg-red-100 text-red-800',
+      expired: 'bg-gray-100 text-gray-800'
+    }
+    return badges[status] || 'bg-gray-100 text-gray-800'
+  }
+
+  const getPaymentStatusBadge = (status) => {
+    const badges = {
+      pending: 'bg-yellow-100 text-yellow-800',
+      initiated: 'bg-blue-100 text-blue-800',
+      completed: 'bg-green-100 text-green-800',
+      failed: 'bg-red-100 text-red-800',
+      refunded: 'bg-orange-100 text-orange-800'
+    }
+    return badges[status] || 'bg-gray-100 text-gray-800'
+  }
+
+  const exportToCSV = () => {
+    const headers = ['Booking ID', 'Patient Name', 'Hospital Name', 'Type', 'Status', 'Payment Status', 'Amount', 'Patient Arrived', 'Ambulance', 'Date']
+    const rows = filteredBookings.map(b => [
+      b._id,
+      b.userId?.name || 'N/A',
+      b.hospitalId?.hospitalName || 'N/A',
+      b.bookingType,
+      b.status,
+      b.paymentStatus,
+      b.paymentAmount,
+      b.patientArrivalStatus || 'N/A',
+      b.bookingType === 'ambulance' ? 'Yes' : 'No',
+      new Date(b.createdAt).toLocaleDateString()
+    ])
+    
+    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `hospital-bookings-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+  }
+
+  if (loading) {
+    return (
+      <div className="text-center py-12">
+        <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+        <p className="mt-4 text-gray-600">Loading hospital bookings...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+        <div className="flex items-center mb-4">
+          <svg className="w-6 h-6 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <h3 className="text-lg font-semibold text-red-800">Error Loading Data</h3>
+        </div>
+        <p className="text-red-700 mb-4">{error}</p>
+        <button
+          onClick={fetchBookings}
+          className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-800">🏥 Hospital Bookings Management</h2>
+        <button
+          onClick={exportToCSV}
+          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center"
+        >
+          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Export CSV
+        </button>
+      </div>
+
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg shadow">
+          <p className="text-sm text-blue-600 font-medium">Total Bookings</p>
+          <p className="text-3xl font-bold text-blue-700">{stats.total}</p>
+        </div>
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg shadow">
+          <p className="text-sm text-purple-600 font-medium">Bed Bookings</p>
+          <p className="text-3xl font-bold text-purple-700">{stats.bed}</p>
+        </div>
+        <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg shadow">
+          <p className="text-sm text-orange-600 font-medium">Ambulances</p>
+          <p className="text-3xl font-bold text-orange-700">{stats.ambulance}</p>
+        </div>
+        <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg shadow">
+          <p className="text-sm text-green-600 font-medium">Completed</p>
+          <p className="text-3xl font-bold text-green-700">{stats.completed}</p>
+        </div>
+        <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-lg shadow">
+          <p className="text-sm text-yellow-600 font-medium">In Progress</p>
+          <p className="text-3xl font-bold text-yellow-700">{stats.inProgress}</p>
+        </div>
+        <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 rounded-lg shadow">
+          <p className="text-sm text-emerald-600 font-medium">Total Revenue</p>
+          <p className="text-2xl font-bold text-emerald-700">₹{stats.totalRevenue}</p>
+        </div>
+      </div>
+
+      {/* Additional Stats Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white border-2 border-teal-200 p-4 rounded-lg">
+          <p className="text-sm text-teal-600 font-medium">Patients Arrived</p>
+          <p className="text-2xl font-bold text-teal-700">{stats.patientArrived}</p>
+        </div>
+        <div className="bg-white border-2 border-indigo-200 p-4 rounded-lg">
+          <p className="text-sm text-indigo-600 font-medium">Ambulances Issued</p>
+          <p className="text-2xl font-bold text-indigo-700">{stats.ambulanceIssued}</p>
+        </div>
+        <div className="bg-white border-2 border-red-200 p-4 rounded-lg">
+          <p className="text-sm text-red-600 font-medium">Cancelled</p>
+          <p className="text-2xl font-bold text-red-700">{stats.cancelled}</p>
+        </div>
+        <div className="bg-white border-2 border-yellow-200 p-4 rounded-lg">
+          <p className="text-sm text-yellow-600 font-medium">Pending Payment</p>
+          <p className="text-2xl font-bold text-yellow-700">{stats.pendingPayment}</p>
+        </div>
+      </div>
+
+      {/* Filters and Search */}
+      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
+            <input
+              type="text"
+              placeholder="Patient, Hospital, or ID..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+            >
+              <option value="all">All Status</option>
+              <option value="pending_payment">Pending Payment</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Booking Type</label>
+            <select
+              value={filterBookingType}
+              onChange={(e) => setFilterBookingType(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+            >
+              <option value="all">All Types</option>
+              <option value="bed">Bed Booking</option>
+              <option value="ambulance">Ambulance</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+            >
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+              <option value="amount-high">Amount: High to Low</option>
+              <option value="amount-low">Amount: Low to High</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Bookings Table */}
+      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b-2 border-gray-200">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Booking ID</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Patient</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Hospital</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Type</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Payment</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Amount</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Patient Arrived</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Ambulance</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Date</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {filteredBookings.length === 0 ? (
+                <tr>
+                  <td colSpan="10" className="px-4 py-8 text-center text-gray-500">
+                    No bookings found matching your filters
+                  </td>
+                </tr>
+              ) : (
+                filteredBookings.map((booking) => (
+                  <tr key={booking._id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 text-sm">
+                      <code className="bg-gray-100 px-2 py-1 rounded text-xs">{booking._id.slice(-8)}</code>
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <div>
+                        <p className="font-medium text-gray-900">{booking.userId?.name || 'N/A'}</p>
+                        <p className="text-xs text-gray-500">{booking.userId?.phoneNumber || 'No phone'}</p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <div>
+                        <p className="font-medium text-gray-900">{booking.hospitalId?.hospitalName || 'N/A'}</p>
+                        <p className="text-xs text-gray-500">{booking.hospitalId?.contactNumber || 'No contact'}</p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        booking.bookingType === 'bed' ? 'bg-purple-100 text-purple-800' : 'bg-orange-100 text-orange-800'
+                      }`}>
+                        {booking.bookingType === 'bed' ? '🛏️ Bed' : '🚑 Ambulance'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(booking.status)}`}>
+                        {booking.status.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPaymentStatusBadge(booking.paymentStatus)}`}>
+                        {booking.paymentStatus}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm font-semibold text-green-600">
+                      ₹{booking.paymentAmount}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {booking.bookingType === 'bed' ? (
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          booking.patientArrivalStatus === 'arrived' ? 'bg-green-100 text-green-800' :
+                          booking.patientArrivalStatus === 'not_arrived' ? 'bg-red-100 text-red-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {booking.patientArrivalStatus === 'arrived' ? '✓ Arrived' :
+                           booking.patientArrivalStatus === 'not_arrived' ? '✗ Not Arrived' :
+                           '⏳ Pending'}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-xs">N/A</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {booking.bookingType === 'ambulance' ? (
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          booking.status === 'cancelled' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                        }`}>
+                          {booking.status === 'cancelled' ? '✗ Cancelled' : '✓ Issued'}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-xs">N/A</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      <div>
+                        <p>{new Date(booking.createdAt).toLocaleDateString()}</p>
+                        <p className="text-xs text-gray-400">{new Date(booking.createdAt).toLocaleTimeString()}</p>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Results Summary */}
+      <div className="mt-4 text-sm text-gray-600 text-center">
+        Showing {filteredBookings.length} of {bookings.length} total bookings
       </div>
     </div>
   )
@@ -780,22 +1338,22 @@ function ManageUsersTab({ users, pharmacists, onUpdate }) {
   const [editingPharmacist, setEditingPharmacist] = useState(null)
   const [editForm, setEditForm] = useState({})
 
-  const handleToggleStatus = async (pharmacistId, currentStatus) => {
+  const handleToggleStatus = async (pharmacistId, currentAdminDisabled) => {
     try {
       const token = localStorage.getItem('token')
-      const newStatus = currentStatus === 'online' ? 'offline' : 'online'
+      const newAdminDisabled = !currentAdminDisabled
       
       await axios.patch(
         `${process.env.NEXT_PUBLIC_API_URL}/admin/pharmacists/${pharmacistId}/status`,
-        { status: newStatus },
+        { adminDisabled: newAdminDisabled },
         { headers: { Authorization: `Bearer ${token}` } }
       )
       
       onUpdate()
-      toast.success('Status updated successfully')
+      toast.success(`Pharmacist bookings ${newAdminDisabled ? 'disabled' : 'enabled'} successfully`)
     } catch (err) {
       console.error(err)
-      toast.error('Failed to update status')
+      toast.error('Failed to update booking status')
     }
   }
 
@@ -916,14 +1474,14 @@ function ManageUsersTab({ users, pharmacists, onUpdate }) {
                   </div>
                   <div className="flex items-center space-x-2">
                     <button
-                      onClick={() => handleToggleStatus(pharmacist._id, pharmacist.status)}
+                      onClick={() => handleToggleStatus(pharmacist._id, pharmacist.adminDisabled)}
                       className={`px-3 py-1 rounded text-sm font-medium ${
-                        pharmacist.status === 'online'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-gray-100 text-gray-700'
+                        pharmacist.adminDisabled
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-green-100 text-green-700'
                       }`}
                     >
-                      {pharmacist.status === 'online' ? '🟢 Online' : '⚫ Offline'}
+                      {pharmacist.adminDisabled ? '🔴 Bookings Disabled' : '🟢 Bookings Enabled'}
                     </button>
                   </div>
                 </div>
@@ -954,6 +1512,9 @@ function ManageUsersTab({ users, pharmacists, onUpdate }) {
 function AnalyticsTab() {
   const [analytics, setAnalytics] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [professionalType, setProfessionalType] = useState('all') // 'all', 'pharmacist', 'doctor', 'nutritionist'
+  const [dateRange, setDateRange] = useState('all') // 'all', 'today', 'week', 'month', 'year'
+  const [selectedProfessional, setSelectedProfessional] = useState('all')
 
   useEffect(() => {
     fetchAnalytics()
@@ -974,6 +1535,104 @@ function AnalyticsTab() {
     }
   }
 
+  const filterByDateRange = (bookings) => {
+    if (!bookings || dateRange === 'all') return bookings
+
+    const now = new Date()
+    const filtered = bookings.filter(booking => {
+      const bookingDate = new Date(booking.slotDate || booking.createdAt)
+      
+      switch (dateRange) {
+        case 'today':
+          return bookingDate.toDateString() === now.toDateString()
+        case 'week':
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          return bookingDate >= weekAgo
+        case 'month':
+          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+          return bookingDate >= monthAgo
+        case 'year':
+          const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+          return bookingDate >= yearAgo
+        default:
+          return true
+      }
+    })
+    return filtered
+  }
+
+  const getFilteredPerformance = () => {
+    if (!analytics) return []
+
+    let allPerformance = []
+
+    // Add pharmacist performance
+    if (analytics.pharmacistPerformance) {
+      allPerformance = allPerformance.concat(
+        analytics.pharmacistPerformance.map(p => ({ ...p, type: 'pharmacist' }))
+      )
+    }
+
+    // Add doctor performance
+    if (analytics.doctorPerformance) {
+      allPerformance = allPerformance.concat(
+        analytics.doctorPerformance.map(p => ({ ...p, type: 'doctor' }))
+      )
+    }
+
+    // Add nutritionist performance
+    if (analytics.nutritionistPerformance) {
+      allPerformance = allPerformance.concat(
+        analytics.nutritionistPerformance.map(p => ({ ...p, type: 'nutritionist' }))
+      )
+    }
+
+    // Filter by professional type
+    if (professionalType !== 'all') {
+      allPerformance = allPerformance.filter(p => p.type === professionalType)
+    }
+
+    // Filter by specific professional
+    if (selectedProfessional !== 'all') {
+      allPerformance = allPerformance.filter(p => p.name === selectedProfessional)
+    }
+
+    return allPerformance
+  }
+
+  const getFilteredBookings = () => {
+    if (!analytics || !analytics.recentBookings) return []
+    
+    let bookings = [...analytics.recentBookings]
+    
+    // Filter by date range
+    bookings = filterByDateRange(bookings)
+    
+    // Filter by professional type
+    if (professionalType !== 'all') {
+      bookings = bookings.filter(b => {
+        if (professionalType === 'pharmacist') return b.pharmacistId
+        if (professionalType === 'doctor') return b.doctorId
+        if (professionalType === 'nutritionist') return b.nutritionistId
+        return true
+      })
+    }
+
+    return bookings
+  }
+
+  const calculateFilteredStats = () => {
+    const filteredBookings = getFilteredBookings()
+    
+    return {
+      total: filteredBookings.length,
+      completed: filteredBookings.filter(b => b.status === 'completed').length,
+      active: filteredBookings.filter(b => b.status === 'confirmed').length,
+      cancelled: filteredBookings.filter(b => b.status === 'cancelled').length,
+      treated: filteredBookings.filter(b => b.treatmentCompleted).length
+    }
+  }
+
   if (loading) {
     return (
       <div className="text-center py-8">
@@ -987,91 +1646,240 @@ function AnalyticsTab() {
     return <div className="text-center text-gray-600">Failed to load analytics</div>
   }
 
+  const filteredPerformance = getFilteredPerformance()
+  const filteredBookings = getFilteredBookings()
+  const filteredStats = calculateFilteredStats()
+
   return (
     <div>
-      <h2 className="text-xl font-bold mb-6">System Analytics</h2>
+      <h2 className="text-2xl font-bold mb-6">📊 System Analytics</h2>
 
-      {/* Overview Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <p className="text-blue-600 text-sm font-medium">Total Bookings</p>
-          <p className="text-3xl font-bold text-blue-700">{analytics.overview.totalBookings}</p>
-        </div>
-        <div className="bg-green-50 p-4 rounded-lg">
-          <p className="text-green-600 text-sm font-medium">Completed</p>
-          <p className="text-3xl font-bold text-green-700">{analytics.overview.completedBookings}</p>
-        </div>
-        <div className="bg-purple-50 p-4 rounded-lg">
-          <p className="text-purple-600 text-sm font-medium">Active</p>
-          <p className="text-3xl font-bold text-purple-700">{analytics.overview.activeBookings}</p>
-        </div>
-        <div className="bg-red-50 p-4 rounded-lg">
-          <p className="text-red-600 text-sm font-medium">Cancelled</p>
-          <p className="text-3xl font-bold text-red-700">{analytics.overview.cancelledBookings}</p>
-        </div>
-        <div className="bg-yellow-50 p-4 rounded-lg">
-          <p className="text-yellow-600 text-sm font-medium">Treated Patients</p>
-          <p className="text-3xl font-bold text-yellow-700">{analytics.overview.treatedPatients}</p>
+      {/* Filter Controls */}
+      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+        <h3 className="text-lg font-semibold mb-4">Filters</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Professional Type</label>
+            <select
+              value={professionalType}
+              onChange={(e) => {
+                setProfessionalType(e.target.value)
+                setSelectedProfessional('all')
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Professionals</option>
+              <option value="pharmacist">💊 Pharmacists</option>
+              <option value="doctor">🩺 Doctors</option>
+              <option value="nutritionist">🥗 Nutritionists</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+            <select
+              value={dateRange}
+              onChange={(e) => setDateRange(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Time</option>
+              <option value="today">Today</option>
+              <option value="week">Last 7 Days</option>
+              <option value="month">Last 30 Days</option>
+              <option value="year">Last Year</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Specific Professional</label>
+            <select
+              value={selectedProfessional}
+              onChange={(e) => setSelectedProfessional(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All</option>
+              {filteredPerformance.map((p, idx) => (
+                <option key={idx} value={p.name}>
+                  {p.name} ({p.type === 'pharmacist' ? '💊' : p.type === 'doctor' ? '🩺' : '🥗'})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
-      {/* Pharmacist Performance */}
+      {/* Overview Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-lg shadow-lg">
+          <p className="text-blue-600 text-sm font-medium">Total Bookings</p>
+          <p className="text-4xl font-bold text-blue-700 mt-2">{filteredStats.total}</p>
+          <p className="text-xs text-blue-500 mt-1">
+            {dateRange === 'all' ? 'All time' : dateRange === 'today' ? 'Today' : `Last ${dateRange}`}
+          </p>
+        </div>
+        <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-lg shadow-lg">
+          <p className="text-green-600 text-sm font-medium">Completed</p>
+          <p className="text-4xl font-bold text-green-700 mt-2">{filteredStats.completed}</p>
+          <p className="text-xs text-green-500 mt-1">
+            {filteredStats.total > 0 ? Math.round((filteredStats.completed / filteredStats.total) * 100) : 0}% completion rate
+          </p>
+        </div>
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-lg shadow-lg">
+          <p className="text-purple-600 text-sm font-medium">Active</p>
+          <p className="text-4xl font-bold text-purple-700 mt-2">{filteredStats.active}</p>
+          <p className="text-xs text-purple-500 mt-1">Currently ongoing</p>
+        </div>
+        <div className="bg-gradient-to-br from-red-50 to-red-100 p-6 rounded-lg shadow-lg">
+          <p className="text-red-600 text-sm font-medium">Cancelled</p>
+          <p className="text-4xl font-bold text-red-700 mt-2">{filteredStats.cancelled}</p>
+          <p className="text-xs text-red-500 mt-1">
+            {filteredStats.total > 0 ? Math.round((filteredStats.cancelled / filteredStats.total) * 100) : 0}% cancellation rate
+          </p>
+        </div>
+        <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 p-6 rounded-lg shadow-lg">
+          <p className="text-yellow-600 text-sm font-medium">Treated Patients</p>
+          <p className="text-4xl font-bold text-yellow-700 mt-2">{filteredStats.treated}</p>
+          <p className="text-xs text-yellow-500 mt-1">Treatment completed</p>
+        </div>
+      </div>
+
+      {/* Professional Performance */}
       <div className="mb-8">
-        <h3 className="text-lg font-bold mb-4">Pharmacist Performance</h3>
-        <div className="bg-white border rounded-lg overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Pharmacist</th>
-                <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Total Bookings</th>
-                <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Completed</th>
-                <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Cancelled</th>
-                <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Treated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {analytics.pharmacistPerformance.map((pharmacist, index) => (
-                <tr key={index} className="border-t">
-                  <td className="px-4 py-3 text-sm font-medium">{pharmacist.name}</td>
-                  <td className="px-4 py-3 text-center text-sm">{pharmacist.totalBookings}</td>
-                  <td className="px-4 py-3 text-center text-sm text-green-600">{pharmacist.completed}</td>
-                  <td className="px-4 py-3 text-center text-sm text-red-600">{pharmacist.cancelled}</td>
-                  <td className="px-4 py-3 text-center text-sm text-blue-600">{pharmacist.treated}</td>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-bold">Professional Performance</h3>
+          <span className="text-sm text-gray-600">
+            Showing {filteredPerformance.length} {professionalType === 'all' ? 'professionals' : `${professionalType}s`}
+          </span>
+        </div>
+        <div className="bg-white border rounded-lg overflow-hidden shadow-lg">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Professional</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Type</th>
+                  <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Total</th>
+                  <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Completed</th>
+                  <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Cancelled</th>
+                  <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Treated</th>
+                  <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Success Rate</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredPerformance.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                      No performance data available for selected filters
+                    </td>
+                  </tr>
+                ) : (
+                  filteredPerformance.map((professional, index) => {
+                    const successRate = professional.totalBookings > 0 
+                      ? Math.round((professional.completed / professional.totalBookings) * 100) 
+                      : 0
+                    
+                    return (
+                      <tr key={index} className="border-t hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{professional.name}</td>
+                        <td className="px-4 py-3 text-sm">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            professional.type === 'doctor' ? 'bg-red-100 text-red-700' :
+                            professional.type === 'nutritionist' ? 'bg-emerald-100 text-emerald-700' :
+                            'bg-orange-100 text-orange-700'
+                          }`}>
+                            {professional.type === 'doctor' ? '🩺 Doctor' : 
+                             professional.type === 'nutritionist' ? '🥗 Nutritionist' : 
+                             '💊 Pharmacist'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center text-sm font-semibold">{professional.totalBookings}</td>
+                        <td className="px-4 py-3 text-center text-sm text-green-600 font-semibold">{professional.completed}</td>
+                        <td className="px-4 py-3 text-center text-sm text-red-600 font-semibold">{professional.cancelled}</td>
+                        <td className="px-4 py-3 text-center text-sm text-blue-600 font-semibold">{professional.treated}</td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex items-center justify-center">
+                            <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                              <div 
+                                className={`h-2 rounded-full ${
+                                  successRate >= 80 ? 'bg-green-500' :
+                                  successRate >= 60 ? 'bg-yellow-500' :
+                                  'bg-red-500'
+                                }`}
+                                style={{ width: `${successRate}%` }}
+                              ></div>
+                            </div>
+                            <span className="text-sm font-semibold">{successRate}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
       {/* Recent Bookings */}
       <div>
-        <h3 className="text-lg font-bold mb-4">Recent Bookings</h3>
-        <div className="space-y-3">
-          {analytics.recentBookings.map((booking) => (
-            <div key={booking._id} className="bg-white border rounded-lg p-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-medium">{booking.patientId?.name}</p>
-                  <p className="text-sm text-gray-600">
-                    Pharmacist: {booking.pharmacistId?.userId?.name}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {new Date(booking.slotDate).toLocaleDateString()} at {booking.slotTime}
-                  </p>
-                </div>
-                <span className={`text-xs px-3 py-1 rounded-full font-medium ${
-                  booking.status === 'completed' ? 'bg-green-100 text-green-700' :
-                  booking.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
-                  booking.status === 'cancelled' ? 'bg-red-100 text-red-700' :
-                  'bg-gray-100 text-gray-700'
-                }`}>
-                  {booking.status}
-                </span>
-              </div>
-            </div>
-          ))}
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-bold">Recent Bookings</h3>
+          <span className="text-sm text-gray-600">
+            Showing {filteredBookings.slice(0, 10).length} of {filteredBookings.length} bookings
+          </span>
         </div>
+        <div className="space-y-3">
+          {filteredBookings.length === 0 ? (
+            <div className="bg-white border rounded-lg p-8 text-center">
+              <p className="text-gray-500">No bookings found for selected filters</p>
+            </div>
+          ) : (
+            filteredBookings.slice(0, 10).map((booking) => {
+              const professionalName = booking.pharmacistId?.userId?.name || 
+                                      booking.doctorId?.userId?.name || 
+                                      booking.nutritionistId?.userId?.name || 
+                                      'Unknown'
+              const professionalTypeIcon = booking.pharmacistId ? '💊' : 
+                                          booking.doctorId ? '🩺' : 
+                                          booking.nutritionistId ? '🥗' : '👤'
+              
+              return (
+                <div key={booking._id} className="bg-white border rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center mb-1">
+                        <span className="text-lg mr-2">{professionalTypeIcon}</span>
+                        <p className="font-semibold text-gray-900">{booking.patientId?.name}</p>
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        Professional: {professionalName}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {new Date(booking.slotDate || booking.createdAt).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })} {booking.slotTime ? `at ${booking.slotTime}` : ''}
+                      </p>
+                    </div>
+                    <span className={`text-xs px-3 py-1 rounded-full font-medium whitespace-nowrap ${
+                      booking.status === 'completed' ? 'bg-green-100 text-green-700' :
+                      booking.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
+                      booking.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}>
+                      {booking.status}
+                    </span>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+        {filteredBookings.length > 10 && (
+          <p className="text-sm text-gray-500 text-center mt-4">
+            + {filteredBookings.length - 10} more bookings
+          </p>
+        )}
       </div>
     </div>
   )
@@ -1147,6 +1955,27 @@ function PaymentsTab() {
     }
   }
 
+  const exportToCSV = () => {
+    const headers = ['Pharmacist Name', 'Total Earned', 'Total Paid', 'Outstanding', 'Completed Bookings', 'Unpaid Bookings']
+    const rows = payments.map(p => [
+      p.name,
+      p.totalEarned,
+      p.totalPaid,
+      p.outstanding,
+      p.completedBookings,
+      p.unpaidBookings.length
+    ])
+    
+    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `pharmacist-payments-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    window.URL.revokeObjectURL(url)
+  }
+
   if (loading) {
     return (
       <div className="text-center py-8">
@@ -1158,7 +1987,18 @@ function PaymentsTab() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-6">💰 Payment Management</h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-800">💰 Pharmacist Payment Management</h2>
+        <button
+          onClick={exportToCSV}
+          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center"
+        >
+          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Export CSV
+        </button>
+      </div>
       
       {error && (
         <div className="bg-red-100 text-red-700 p-4 rounded mb-4">
@@ -1326,11 +2166,31 @@ function ReviewsTab({ pharmacists, doctors }) {
   const [allReviews, setAllReviews] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedProfessional, setSelectedProfessional] = useState('all')
-  const [professionalType, setProfessionalType] = useState('all') // 'all', 'pharmacist', 'doctor'
+  const [professionalType, setProfessionalType] = useState('all') // 'all', 'pharmacist', 'doctor', 'nutritionist'
+  const [nutritionists, setNutritionists] = useState([])
 
   useEffect(() => {
-    fetchAllReviews()
-  }, [pharmacists, doctors])
+    fetchNutritionists()
+  }, [])
+
+  useEffect(() => {
+    if (nutritionists.length > 0 || pharmacists.length > 0 || doctors.length > 0) {
+      fetchAllReviews()
+    }
+  }, [pharmacists, doctors, nutritionists])
+
+  const fetchNutritionists = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/nutritionists`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setNutritionists(res.data || [])
+    } catch (err) {
+      console.error('Error fetching nutritionists:', err)
+      setNutritionists([])
+    }
+  }
 
   const fetchAllReviews = async () => {
     try {
@@ -1374,12 +2234,33 @@ function ReviewsTab({ pharmacists, doctors }) {
         }
       })
 
-      const [pharmacistResults, doctorResults] = await Promise.all([
+      // Fetch nutritionist reviews
+      const nutritionistReviewsPromises = nutritionists.map(async (nutritionist) => {
+        try {
+          const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/bookings/reviews/${nutritionist._id}?type=nutritionist`)
+          return {
+            professional: nutritionist,
+            type: 'nutritionist',
+            ...res.data
+          }
+        } catch (err) {
+          return {
+            professional: nutritionist,
+            type: 'nutritionist',
+            reviews: [],
+            totalReviews: 0,
+            averageRating: 0
+          }
+        }
+      })
+
+      const [pharmacistResults, doctorResults, nutritionistResults] = await Promise.all([
         Promise.all(pharmacistReviewsPromises),
-        Promise.all(doctorReviewsPromises)
+        Promise.all(doctorReviewsPromises),
+        Promise.all(nutritionistReviewsPromises)
       ])
 
-      const allResults = [...pharmacistResults, ...doctorResults]
+      const allResults = [...pharmacistResults, ...doctorResults, ...nutritionistResults]
       setAllReviews(allResults)
       setLoading(false)
     } catch (err) {
@@ -1427,6 +2308,7 @@ function ReviewsTab({ pharmacists, doctors }) {
             <option value="all">All Professionals</option>
             <option value="pharmacist">Pharmacists Only</option>
             <option value="doctor">Doctors Only</option>
+            <option value="nutritionist">Nutritionists Only</option>
           </select>
         </div>
         <div>
@@ -1439,7 +2321,7 @@ function ReviewsTab({ pharmacists, doctors }) {
             <option value="all">All</option>
             {filteredReviews.map(r => (
               <option key={r.professional._id} value={r.professional._id}>
-                {r.professional.userId?.name || r.professional.name} ({r.type === 'pharmacist' ? '💊' : '🩺'})
+                {r.professional.userId?.name || r.professional.name} ({r.type === 'pharmacist' ? '💊' : r.type === 'doctor' ? '🩺' : '🥗'})
               </option>
             ))}
           </select>
@@ -1496,6 +2378,8 @@ function ReviewsTab({ pharmacists, doctors }) {
               <div className={`p-4 text-white ${
                 item.type === 'doctor' 
                   ? 'bg-gradient-to-r from-red-500 to-pink-500' 
+                  : item.type === 'nutritionist'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
                   : 'bg-gradient-to-r from-orange-500 to-yellow-500'
               }`}>
                 <div className="flex justify-between items-center">
@@ -1504,7 +2388,7 @@ function ReviewsTab({ pharmacists, doctors }) {
                       {item.type === 'doctor' ? 'Dr. ' : ''}{item.professional.userId?.name}
                     </h3>
                     <p className="text-sm opacity-90">
-                      {item.type === 'doctor' ? '🩺 Doctor' : '💊 Pharmacist'} • {item.professional.specialization || item.professional.designation}
+                      {item.type === 'doctor' ? '🩺 Doctor' : item.type === 'nutritionist' ? '🥗 Nutritionist' : '💊 Pharmacist'} • {item.professional.specialization || item.professional.designation}
                     </p>
                   </div>
                   <div className="text-right">
@@ -1533,7 +2417,7 @@ function ReviewsTab({ pharmacists, doctors }) {
                   <div className="space-y-3">
                     {item.reviews.slice(0, 5).map((review) => (
                       <div key={review._id} className={`border-l-4 pl-4 py-2 bg-gray-50 rounded ${
-                        item.type === 'doctor' ? 'border-red-400' : 'border-orange-400'
+                        item.type === 'doctor' ? 'border-red-400' : item.type === 'nutritionist' ? 'border-emerald-400' : 'border-orange-400'
                       }`}>
                         <div className="flex justify-between items-start mb-2">
                           <div>
@@ -1803,7 +2687,16 @@ function WebsiteTab() {
         updates,
         { headers: { Authorization: `Bearer ${token}` } }
       )
-      setWebsiteSettings(res.data.settings)
+      // Update state with the returned settings
+      const updatedSettings = res.data.settings || res.data
+      setWebsiteSettings(updatedSettings)
+      
+      // Log for debugging
+      console.log('Updated settings:', updatedSettings)
+      if (updatedSettings.professionalTiles?.tiles) {
+        console.log('Professional tiles count:', updatedSettings.professionalTiles.tiles.length)
+      }
+      
       toast.success('Settings updated successfully')
     } catch (err) {
       console.error('Error updating settings:', err)
@@ -1963,10 +2856,10 @@ function WebsiteTab() {
 
       {/* Sub Tabs */}
       <div className="border-b border-gray-200 mb-6">
-        <nav className="flex -mb-px">
+        <nav className="flex -mb-px overflow-x-auto">
           <button
             onClick={() => setActiveSubTab('settings')}
-            className={`py-2 px-4 font-medium text-sm ${
+            className={`py-2 px-4 font-medium text-sm whitespace-nowrap ${
               activeSubTab === 'settings'
                 ? 'border-b-2 border-purple-600 text-purple-600'
                 : 'text-gray-500 hover:text-gray-700'
@@ -1976,7 +2869,7 @@ function WebsiteTab() {
           </button>
           <button
             onClick={() => setActiveSubTab('hero')}
-            className={`py-2 px-4 font-medium text-sm ${
+            className={`py-2 px-4 font-medium text-sm whitespace-nowrap ${
               activeSubTab === 'hero'
                 ? 'border-b-2 border-purple-600 text-purple-600'
                 : 'text-gray-500 hover:text-gray-700'
@@ -1985,8 +2878,28 @@ function WebsiteTab() {
             🎯 Hero Section
           </button>
           <button
+            onClick={() => setActiveSubTab('slides')}
+            className={`py-2 px-4 font-medium text-sm whitespace-nowrap ${
+              activeSubTab === 'slides'
+                ? 'border-b-2 border-purple-600 text-purple-600'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            🎬 Slides ({websiteSettings?.heroSection?.slides?.length || 0})
+          </button>
+          <button
+            onClick={() => setActiveSubTab('tiles')}
+            className={`py-2 px-4 font-medium text-sm whitespace-nowrap ${
+              activeSubTab === 'tiles'
+                ? 'border-b-2 border-purple-600 text-purple-600'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            🏥 Professional Tiles ({websiteSettings?.professionalTiles?.tiles?.length || 0})
+          </button>
+          <button
             onClick={() => setActiveSubTab('faqs')}
-            className={`py-2 px-4 font-medium text-sm ${
+            className={`py-2 px-4 font-medium text-sm whitespace-nowrap ${
               activeSubTab === 'faqs'
                 ? 'border-b-2 border-purple-600 text-purple-600'
                 : 'text-gray-500 hover:text-gray-700'
@@ -1996,7 +2909,7 @@ function WebsiteTab() {
           </button>
           <button
             onClick={() => setActiveSubTab('services')}
-            className={`py-2 px-4 font-medium text-sm ${
+            className={`py-2 px-4 font-medium text-sm whitespace-nowrap ${
               activeSubTab === 'services'
                 ? 'border-b-2 border-purple-600 text-purple-600'
                 : 'text-gray-500 hover:text-gray-700'
@@ -2006,7 +2919,7 @@ function WebsiteTab() {
           </button>
           <button
             onClick={() => setActiveSubTab('legal')}
-            className={`py-2 px-4 font-medium text-sm ${
+            className={`py-2 px-4 font-medium text-sm whitespace-nowrap ${
               activeSubTab === 'legal'
                 ? 'border-b-2 border-purple-600 text-purple-600'
                 : 'text-gray-500 hover:text-gray-700'
@@ -2170,14 +3083,763 @@ function WebsiteTab() {
                 className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
             </div>
+
+            {/* Hero Background Image Upload */}
+            <div className="border-t pt-4">
+              <label className="block text-sm font-medium mb-2">Hero Background Image</label>
+              <p className="text-xs text-gray-500 mb-3">Upload a background image for the hero section (recommended: 1920x1080px)</p>
+              <ImageUploader
+                currentImage={websiteSettings.heroSection?.backgroundImage}
+                onUploadSuccess={(result) => {
+                  const url = typeof result === 'string' ? result : result.url
+                  setWebsiteSettings({
+                    ...websiteSettings,
+                    heroSection: {...websiteSettings.heroSection, backgroundImage: url}
+                  })
+                  toast.success('Background image uploaded successfully')
+                }}
+                label="Upload Hero Background"
+                accept="image/*"
+              />
+              {websiteSettings.heroSection?.backgroundImage && (
+                <div className="mt-3">
+                  <img 
+                    src={websiteSettings.heroSection.backgroundImage} 
+                    alt="Hero Background Preview" 
+                    className="w-full h-48 object-cover rounded-lg border"
+                  />
+                  <button
+                    onClick={() => {
+                      setWebsiteSettings({
+                        ...websiteSettings,
+                        heroSection: {...websiteSettings.heroSection, backgroundImage: ''}
+                      })
+                    }}
+                    className="mt-2 text-red-600 text-sm hover:text-red-700"
+                  >
+                    Remove Background Image
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Hero Text Background Image Upload */}
+            <div className="border-t pt-4">
+              <label className="block text-sm font-medium mb-2">Hero Text Background Image</label>
+              <p className="text-xs text-gray-500 mb-3">Upload a background image for the hero text area (optional, for overlay effect)</p>
+              <ImageUploader
+                currentImage={websiteSettings.heroSection?.textBackgroundImage}
+                onUploadSuccess={(result) => {
+                  const url = typeof result === 'string' ? result : result.url
+                  setWebsiteSettings({
+                    ...websiteSettings,
+                    heroSection: {...websiteSettings.heroSection, textBackgroundImage: url}
+                  })
+                  toast.success('Text background image uploaded successfully')
+                }}
+                label="Upload Text Background"
+                accept="image/*"
+              />
+              {websiteSettings.heroSection?.textBackgroundImage && (
+                <div className="mt-3">
+                  <img 
+                    src={websiteSettings.heroSection.textBackgroundImage} 
+                    alt="Text Background Preview" 
+                    className="w-full h-32 object-cover rounded-lg border"
+                  />
+                  <button
+                    onClick={() => {
+                      setWebsiteSettings({
+                        ...websiteSettings,
+                        heroSection: {...websiteSettings.heroSection, textBackgroundImage: ''}
+                      })
+                    }}
+                    className="mt-2 text-red-600 text-sm hover:text-red-700"
+                  >
+                    Remove Text Background Image
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
           <button
             onClick={() => updateWebsiteSettings({heroSection: websiteSettings.heroSection})}
             disabled={saving}
-            className="mt-4 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 disabled:opacity-50"
+            className="mt-6 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 disabled:opacity-50"
           >
             {saving ? 'Saving...' : 'Save Hero Section'}
           </button>
+        </div>
+      )}
+
+      {/* Slides Management */}
+      {activeSubTab === 'slides' && websiteSettings && (
+        <div className="space-y-6">
+          <div className="bg-white p-6 rounded-lg shadow">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Manage Hero Slides</h3>
+              <button
+                onClick={() => {
+                  const newSlides = [...(websiteSettings.heroSection?.slides || []), {
+                    title: '',
+                    subtitle: '',
+                    description: '',
+                    icon: '🩺',
+                    features: [],
+                    quote: '',
+                    isMainSlide: false,
+                    order: (websiteSettings.heroSection?.slides?.length || 0)
+                  }]
+                  setWebsiteSettings({
+                    ...websiteSettings,
+                    heroSection: {...websiteSettings.heroSection, slides: newSlides}
+                  })
+                }}
+                className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 text-sm"
+              >
+                + Add Slide
+              </button>
+            </div>
+            
+            <p className="text-sm text-gray-600 mb-4">
+              Manage the 5 slides that appear in the hero section. The first slide is typically the main slide with features.
+            </p>
+
+            {/* Slides List */}
+            <div className="space-y-4">
+              {(websiteSettings.heroSection?.slides || []).map((slide, index) => (
+                <div key={index} className="border rounded-lg p-4 bg-gray-50">
+                  <div className="flex justify-between items-start mb-3">
+                    <h4 className="font-semibold text-gray-700">Slide {index + 1}</h4>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => {
+                          const newSlides = [...websiteSettings.heroSection.slides]
+                          if (index > 0) {
+                            [newSlides[index], newSlides[index - 1]] = [newSlides[index - 1], newSlides[index]]
+                            setWebsiteSettings({
+                              ...websiteSettings,
+                              heroSection: {...websiteSettings.heroSection, slides: newSlides}
+                            })
+                          }
+                        }}
+                        disabled={index === 0}
+                        className="text-gray-600 hover:text-gray-800 disabled:opacity-30"
+                        title="Move Up"
+                      >
+                        ⬆️
+                      </button>
+                      <button
+                        onClick={() => {
+                          const newSlides = [...websiteSettings.heroSection.slides]
+                          if (index < newSlides.length - 1) {
+                            [newSlides[index], newSlides[index + 1]] = [newSlides[index + 1], newSlides[index]]
+                            setWebsiteSettings({
+                              ...websiteSettings,
+                              heroSection: {...websiteSettings.heroSection, slides: newSlides}
+                            })
+                          }
+                        }}
+                        disabled={index === websiteSettings.heroSection.slides.length - 1}
+                        className="text-gray-600 hover:text-gray-800 disabled:opacity-30"
+                        title="Move Down"
+                      >
+                        ⬇️
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (window.confirm('Are you sure you want to delete this slide?')) {
+                            const newSlides = websiteSettings.heroSection.slides.filter((_, i) => i !== index)
+                            setWebsiteSettings({
+                              ...websiteSettings,
+                              heroSection: {...websiteSettings.heroSection, slides: newSlides}
+                            })
+                          }
+                        }}
+                        className="text-red-600 hover:text-red-800"
+                        title="Delete"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Title</label>
+                      <input
+                        type="text"
+                        value={slide.title || ''}
+                        onChange={(e) => {
+                          const newSlides = [...websiteSettings.heroSection.slides]
+                          newSlides[index].title = e.target.value
+                          setWebsiteSettings({
+                            ...websiteSettings,
+                            heroSection: {...websiteSettings.heroSection, slides: newSlides}
+                          })
+                        }}
+                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                        placeholder="Slide title"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Icon/Emoji</label>
+                      <input
+                        type="text"
+                        value={slide.icon || ''}
+                        onChange={(e) => {
+                          const newSlides = [...websiteSettings.heroSection.slides]
+                          newSlides[index].icon = e.target.value
+                          setWebsiteSettings({
+                            ...websiteSettings,
+                            heroSection: {...websiteSettings.heroSection, slides: newSlides}
+                          })
+                        }}
+                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                        placeholder="🩺"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium mb-1">Subtitle</label>
+                      <input
+                        type="text"
+                        value={slide.subtitle || ''}
+                        onChange={(e) => {
+                          const newSlides = [...websiteSettings.heroSection.slides]
+                          newSlides[index].subtitle = e.target.value
+                          setWebsiteSettings({
+                            ...websiteSettings,
+                            heroSection: {...websiteSettings.heroSection, slides: newSlides}
+                          })
+                        }}
+                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                        placeholder="Slide subtitle"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium mb-1">Description</label>
+                      <textarea
+                        value={slide.description || ''}
+                        onChange={(e) => {
+                          const newSlides = [...websiteSettings.heroSection.slides]
+                          newSlides[index].description = e.target.value
+                          setWebsiteSettings({
+                            ...websiteSettings,
+                            heroSection: {...websiteSettings.heroSection, slides: newSlides}
+                          })
+                        }}
+                        rows={2}
+                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                        placeholder="Slide description"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium mb-1">Quote (optional)</label>
+                      <input
+                        type="text"
+                        value={slide.quote || ''}
+                        onChange={(e) => {
+                          const newSlides = [...websiteSettings.heroSection.slides]
+                          newSlides[index].quote = e.target.value
+                          setWebsiteSettings({
+                            ...websiteSettings,
+                            heroSection: {...websiteSettings.heroSection, slides: newSlides}
+                          })
+                        }}
+                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                        placeholder="Inspirational quote for this slide"
+                      />
+                    </div>
+
+                    {/* Slide Image Upload */}
+                    <div className="md:col-span-2 border-t pt-3 mt-2">
+                      <label className="block text-sm font-medium mb-2">Slide Image (Optional)</label>
+                      <p className="text-xs text-gray-500 mb-2">Upload an image for this slide. It will be displayed in the hero section.</p>
+                      <ImageUploader
+                        currentImage={slide.slideImage}
+                        onUploadSuccess={(result) => {
+                          const url = typeof result === 'string' ? result : result.url
+                          const newSlides = [...websiteSettings.heroSection.slides]
+                          newSlides[index].slideImage = url
+                          setWebsiteSettings({
+                            ...websiteSettings,
+                            heroSection: {...websiteSettings.heroSection, slides: newSlides}
+                          })
+                          toast.success('Slide image uploaded successfully')
+                        }}
+                        label="Upload Slide Image"
+                        accept="image/*"
+                      />
+                      {slide.slideImage && (
+                        <div className="mt-2">
+                          <img 
+                            src={slide.slideImage} 
+                            alt="Slide Preview" 
+                            className="w-full h-48 object-cover rounded-lg border"
+                          />
+                          <button
+                            onClick={() => {
+                              const newSlides = [...websiteSettings.heroSection.slides]
+                              newSlides[index].slideImage = ''
+                              setWebsiteSettings({
+                                ...websiteSettings,
+                                heroSection: {...websiteSettings.heroSection, slides: newSlides}
+                              })
+                            }}
+                            className="mt-1 text-red-600 text-sm hover:text-red-700"
+                          >
+                            Remove Image
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={slide.isMainSlide || false}
+                          onChange={(e) => {
+                            const newSlides = [...websiteSettings.heroSection.slides]
+                            // Uncheck all other slides if this is being checked
+                            if (e.target.checked) {
+                              newSlides.forEach((s, i) => {
+                                s.isMainSlide = i === index
+                              })
+                            } else {
+                              newSlides[index].isMainSlide = false
+                            }
+                            setWebsiteSettings({
+                              ...websiteSettings,
+                              heroSection: {...websiteSettings.heroSection, slides: newSlides}
+                            })
+                          }}
+                          className="rounded"
+                        />
+                        <span className="text-sm font-medium">Main Slide (with features and CTA button)</span>
+                      </label>
+                    </div>
+
+                    {/* Features for main slide */}
+                    {slide.isMainSlide && (
+                      <div className="md:col-span-2 border-t pt-3 mt-2">
+                        <label className="block text-sm font-medium mb-2">Features (for main slide)</label>
+                        <div className="space-y-2">
+                          {(slide.features || []).map((feature, fIndex) => (
+                            <div key={fIndex} className="flex space-x-2">
+                              <input
+                                type="text"
+                                value={feature.text || ''}
+                                onChange={(e) => {
+                                  const newSlides = [...websiteSettings.heroSection.slides]
+                                  newSlides[index].features[fIndex].text = e.target.value
+                                  setWebsiteSettings({
+                                    ...websiteSettings,
+                                    heroSection: {...websiteSettings.heroSection, slides: newSlides}
+                                  })
+                                }}
+                                className="flex-1 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                                placeholder="Feature text"
+                              />
+                              <button
+                                onClick={() => {
+                                  const newSlides = [...websiteSettings.heroSection.slides]
+                                  newSlides[index].features = newSlides[index].features.filter((_, i) => i !== fIndex)
+                                  setWebsiteSettings({
+                                    ...websiteSettings,
+                                    heroSection: {...websiteSettings.heroSection, slides: newSlides}
+                                  })
+                                }}
+                                className="px-3 py-2 bg-red-100 text-red-600 rounded hover:bg-red-200 text-sm"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            onClick={() => {
+                              const newSlides = [...websiteSettings.heroSection.slides]
+                              if (!newSlides[index].features) newSlides[index].features = []
+                              newSlides[index].features.push({ text: '', icon: '✓' })
+                              setWebsiteSettings({
+                                ...websiteSettings,
+                                heroSection: {...websiteSettings.heroSection, slides: newSlides}
+                              })
+                            }}
+                            className="px-3 py-2 bg-purple-100 text-purple-600 rounded hover:bg-purple-200 text-sm"
+                          >
+                            + Add Feature
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {websiteSettings.heroSection?.slides?.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  No slides yet. Click "Add Slide" to create your first slide.
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => updateWebsiteSettings({heroSection: websiteSettings.heroSection})}
+              disabled={saving}
+              className="mt-6 bg-purple-600 text-white px-6 py-2 rounded hover:bg-purple-700 disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : 'Save All Slides'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Professional Tiles Management */}
+      {activeSubTab === 'tiles' && websiteSettings && (
+        <div className="space-y-6">
+          {/* Section Settings */}
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="text-lg font-semibold mb-4">Section Settings</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Section Title</label>
+                <input
+                  type="text"
+                  value={websiteSettings.professionalTiles?.sectionTitle || 'Our Healthcare Professionals'}
+                  onChange={(e) => setWebsiteSettings({
+                    ...websiteSettings,
+                    professionalTiles: {
+                      ...websiteSettings.professionalTiles,
+                      sectionTitle: e.target.value
+                    }
+                  })}
+                  className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Section Description</label>
+                <textarea
+                  value={websiteSettings.professionalTiles?.sectionDescription || ''}
+                  onChange={(e) => setWebsiteSettings({
+                    ...websiteSettings,
+                    professionalTiles: {
+                      ...websiteSettings.professionalTiles,
+                      sectionDescription: e.target.value
+                    }
+                  })}
+                  rows={2}
+                  className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Tiles Management */}
+          <div className="bg-white p-6 rounded-lg shadow">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Manage Professional Tiles</h3>
+              <button
+                onClick={() => {
+                  const newTiles = [...(websiteSettings.professionalTiles?.tiles || []), {
+                    title: '',
+                    description: '',
+                    buttonText: 'Consult Now',
+                    navigationUrl: '',
+                    backgroundImage: '',
+                    gradientFrom: 'blue-600',
+                    gradientTo: 'indigo-600',
+                    icon: 'medical',
+                    order: (websiteSettings.professionalTiles?.tiles?.length || 0),
+                    isActive: true
+                  }]
+                  setWebsiteSettings({
+                    ...websiteSettings,
+                    professionalTiles: {
+                      ...websiteSettings.professionalTiles,
+                      tiles: newTiles
+                    }
+                  })
+                }}
+                className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 text-sm"
+              >
+                + Add Tile
+              </button>
+            </div>
+
+            {/* Tiles List */}
+            <div className="space-y-4">
+              {(websiteSettings.professionalTiles?.tiles || []).map((tile, index) => (
+                <div key={index} className="border rounded-lg p-4 bg-gray-50">
+                  <div className="flex justify-between items-start mb-3">
+                    <h4 className="font-semibold text-gray-700">Tile {index + 1}</h4>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => {
+                          const newTiles = [...websiteSettings.professionalTiles.tiles]
+                          if (index > 0) {
+                            [newTiles[index], newTiles[index - 1]] = [newTiles[index - 1], newTiles[index]]
+                            setWebsiteSettings({
+                              ...websiteSettings,
+                              professionalTiles: {...websiteSettings.professionalTiles, tiles: newTiles}
+                            })
+                          }
+                        }}
+                        disabled={index === 0}
+                        className="text-gray-600 hover:text-gray-800 disabled:opacity-30"
+                        title="Move Up"
+                      >
+                        ⬆️
+                      </button>
+                      <button
+                        onClick={() => {
+                          const newTiles = [...websiteSettings.professionalTiles.tiles]
+                          if (index < newTiles.length - 1) {
+                            [newTiles[index], newTiles[index + 1]] = [newTiles[index + 1], newTiles[index]]
+                            setWebsiteSettings({
+                              ...websiteSettings,
+                              professionalTiles: {...websiteSettings.professionalTiles, tiles: newTiles}
+                            })
+                          }
+                        }}
+                        disabled={index === websiteSettings.professionalTiles.tiles.length - 1}
+                        className="text-gray-600 hover:text-gray-800 disabled:opacity-30"
+                        title="Move Down"
+                      >
+                        ⬇️
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (window.confirm('Are you sure you want to delete this tile?')) {
+                            const newTiles = websiteSettings.professionalTiles.tiles.filter((_, i) => i !== index)
+                            setWebsiteSettings({
+                              ...websiteSettings,
+                              professionalTiles: {...websiteSettings.professionalTiles, tiles: newTiles}
+                            })
+                          }
+                        }}
+                        className="text-red-600 hover:text-red-800"
+                        title="Delete"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Title</label>
+                      <input
+                        type="text"
+                        value={tile.title || ''}
+                        onChange={(e) => {
+                          const newTiles = [...websiteSettings.professionalTiles.tiles]
+                          newTiles[index].title = e.target.value
+                          setWebsiteSettings({
+                            ...websiteSettings,
+                            professionalTiles: {...websiteSettings.professionalTiles, tiles: newTiles}
+                          })
+                        }}
+                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                        placeholder="e.g., Doctors"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Button Text</label>
+                      <input
+                        type="text"
+                        value={tile.buttonText || ''}
+                        onChange={(e) => {
+                          const newTiles = [...websiteSettings.professionalTiles.tiles]
+                          newTiles[index].buttonText = e.target.value
+                          setWebsiteSettings({
+                            ...websiteSettings,
+                            professionalTiles: {...websiteSettings.professionalTiles, tiles: newTiles}
+                          })
+                        }}
+                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                        placeholder="e.g., Consult Doctors"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium mb-1">Description</label>
+                      <textarea
+                        value={tile.description || ''}
+                        onChange={(e) => {
+                          const newTiles = [...websiteSettings.professionalTiles.tiles]
+                          newTiles[index].description = e.target.value
+                          setWebsiteSettings({
+                            ...websiteSettings,
+                            professionalTiles: {...websiteSettings.professionalTiles, tiles: newTiles}
+                          })
+                        }}
+                        rows={2}
+                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                        placeholder="Brief description of the service"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Navigation URL</label>
+                      <input
+                        type="text"
+                        value={tile.navigationUrl || ''}
+                        onChange={(e) => {
+                          const newTiles = [...websiteSettings.professionalTiles.tiles]
+                          newTiles[index].navigationUrl = e.target.value
+                          setWebsiteSettings({
+                            ...websiteSettings,
+                            professionalTiles: {...websiteSettings.professionalTiles, tiles: newTiles}
+                          })
+                        }}
+                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                        placeholder="/doctors or /pharmacists"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Icon Type</label>
+                      <select
+                        value={tile.icon || 'medical'}
+                        onChange={(e) => {
+                          const newTiles = [...websiteSettings.professionalTiles.tiles]
+                          newTiles[index].icon = e.target.value
+                          setWebsiteSettings({
+                            ...websiteSettings,
+                            professionalTiles: {...websiteSettings.professionalTiles, tiles: newTiles}
+                          })
+                        }}
+                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                      >
+                        <option value="medical">Medical/Doctor</option>
+                        <option value="pharmacy">Pharmacy</option>
+                        <option value="nutrition">Nutrition/Book</option>
+                        <option value="location">Location/Hospital</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Gradient From</label>
+                      <input
+                        type="text"
+                        value={tile.gradientFrom || ''}
+                        onChange={(e) => {
+                          const newTiles = [...websiteSettings.professionalTiles.tiles]
+                          newTiles[index].gradientFrom = e.target.value
+                          setWebsiteSettings({
+                            ...websiteSettings,
+                            professionalTiles: {...websiteSettings.professionalTiles, tiles: newTiles}
+                          })
+                        }}
+                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                        placeholder="e.g., blue-600"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Gradient To</label>
+                      <input
+                        type="text"
+                        value={tile.gradientTo || ''}
+                        onChange={(e) => {
+                          const newTiles = [...websiteSettings.professionalTiles.tiles]
+                          newTiles[index].gradientTo = e.target.value
+                          setWebsiteSettings({
+                            ...websiteSettings,
+                            professionalTiles: {...websiteSettings.professionalTiles, tiles: newTiles}
+                          })
+                        }}
+                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                        placeholder="e.g., indigo-600"
+                      />
+                    </div>
+
+                    {/* Background Image Upload */}
+                    <div className="md:col-span-2 border-t pt-3 mt-2">
+                      <label className="block text-sm font-medium mb-2">Background Image (Optional)</label>
+                      <p className="text-xs text-gray-500 mb-2">Upload a background image for this tile. If provided, it will overlay the gradient.</p>
+                      <ImageUploader
+                        currentImage={tile.backgroundImage}
+                        onUploadSuccess={(result) => {
+                          const url = typeof result === 'string' ? result : result.url
+                          const newTiles = [...websiteSettings.professionalTiles.tiles]
+                          newTiles[index].backgroundImage = url
+                          setWebsiteSettings({
+                            ...websiteSettings,
+                            professionalTiles: {...websiteSettings.professionalTiles, tiles: newTiles}
+                          })
+                          toast.success('Tile background image uploaded successfully')
+                        }}
+                        label="Upload Background"
+                        accept="image/*"
+                      />
+                      {tile.backgroundImage && (
+                        <div className="mt-2">
+                          <img 
+                            src={tile.backgroundImage} 
+                            alt="Tile Background Preview" 
+                            className="w-full h-32 object-cover rounded-lg border"
+                          />
+                          <button
+                            onClick={() => {
+                              const newTiles = [...websiteSettings.professionalTiles.tiles]
+                              newTiles[index].backgroundImage = ''
+                              setWebsiteSettings({
+                                ...websiteSettings,
+                                professionalTiles: {...websiteSettings.professionalTiles, tiles: newTiles}
+                              })
+                            }}
+                            className="mt-1 text-red-600 text-sm hover:text-red-700"
+                          >
+                            Remove Image
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={tile.isActive !== false}
+                          onChange={(e) => {
+                            const newTiles = [...websiteSettings.professionalTiles.tiles]
+                            newTiles[index].isActive = e.target.checked
+                            setWebsiteSettings({
+                              ...websiteSettings,
+                              professionalTiles: {...websiteSettings.professionalTiles, tiles: newTiles}
+                            })
+                          }}
+                          className="rounded"
+                        />
+                        <span className="text-sm font-medium">Active (show on homepage)</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {(websiteSettings.professionalTiles?.tiles?.length === 0 || !websiteSettings.professionalTiles?.tiles) && (
+                <div className="text-center py-8 text-gray-500">
+                  No tiles yet. Click "Add Tile" to create your first professional tile.
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => updateWebsiteSettings({professionalTiles: websiteSettings.professionalTiles})}
+              disabled={saving}
+              className="mt-6 bg-purple-600 text-white px-6 py-2 rounded hover:bg-purple-700 disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : 'Save Professional Tiles'}
+            </button>
+          </div>
         </div>
       )}
 
@@ -3742,22 +5404,22 @@ function ManageDoctorsTab({ onUpdate }) {
     }
   }
 
-  const handleToggleStatus = async (doctorId, currentStatus) => {
+  const handleToggleStatus = async (doctorId, currentAdminDisabled) => {
     try {
       const token = localStorage.getItem('token')
-      const newStatus = currentStatus === 'online' ? 'offline' : 'online'
+      const newAdminDisabled = !currentAdminDisabled
       
       await axios.patch(
         `${process.env.NEXT_PUBLIC_API_URL}/admin/doctors/${doctorId}/status`,
-        { status: newStatus },
+        { adminDisabled: newAdminDisabled },
         { headers: { Authorization: `Bearer ${token}` } }
       )
       
       fetchDoctors()
-      toast.success('Status updated successfully')
+      toast.success(`Doctor bookings ${newAdminDisabled ? 'disabled' : 'enabled'} successfully`)
     } catch (err) {
       console.error(err)
-      toast.error('Failed to update status')
+      toast.error('Failed to update booking status')
     }
   }
 
@@ -3923,14 +5585,14 @@ function ManageDoctorsTab({ onUpdate }) {
                   </div>
                   <div className="flex items-center space-x-2">
                     <button
-                      onClick={() => handleToggleStatus(doctor._id, doctor.status)}
+                      onClick={() => handleToggleStatus(doctor._id, doctor.adminDisabled)}
                       className={`px-3 py-1 rounded text-sm font-medium ${
-                        doctor.status === 'online'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-gray-100 text-gray-700'
+                        doctor.adminDisabled
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-green-100 text-green-700'
                       }`}
                     >
-                      {doctor.status === 'online' ? '🟢 Online' : '⚫ Offline'}
+                      {doctor.adminDisabled ? '🔴 Bookings Disabled' : '🟢 Bookings Enabled'}
                     </button>
                   </div>
                 </div>
@@ -4033,6 +5695,27 @@ function DoctorPaymentsTab() {
     }
   }
 
+  const exportToCSV = () => {
+    const headers = ['Doctor Name', 'Total Earned', 'Total Paid', 'Outstanding', 'Completed Consultations', 'Unpaid Bookings']
+    const rows = payments.map(p => [
+      p.name,
+      p.totalEarned,
+      p.totalPaid,
+      p.outstanding,
+      p.completedBookings,
+      p.unpaidBookings.length
+    ])
+    
+    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `doctor-payments-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    window.URL.revokeObjectURL(url)
+  }
+
   if (loading) {
     return (
       <div className="text-center py-8">
@@ -4044,7 +5727,18 @@ function DoctorPaymentsTab() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-6">💰 Doctor Payment Management</h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-800">💰 Doctor Payment Management</h2>
+        <button
+          onClick={exportToCSV}
+          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center"
+        >
+          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Export CSV
+        </button>
+      </div>
       
       {error && (
         <div className="bg-red-100 text-red-700 p-4 rounded mb-4">
@@ -4390,16 +6084,16 @@ function ManageNutritionistsTab({ onUpdate }) {
     }
   }
 
-  const handleToggleStatus = async (nutritionistId, currentStatus) => {
+  const handleToggleStatus = async (nutritionistId, currentAdminDisabled) => {
     try {
       const token = localStorage.getItem('token')
-      const newStatus = currentStatus === 'online' ? 'offline' : 'online'
-      await axios.patch(`${process.env.NEXT_PUBLIC_API_URL}/admin/nutritionists/${nutritionistId}/status`, { status: newStatus }, { headers: { Authorization: `Bearer ${token}` } })
+      const newAdminDisabled = !currentAdminDisabled
+      await axios.patch(`${process.env.NEXT_PUBLIC_API_URL}/admin/nutritionists/${nutritionistId}/status`, { adminDisabled: newAdminDisabled }, { headers: { Authorization: `Bearer ${token}` } })
       fetchNutritionists()
-      toast.success('Status updated successfully')
+      toast.success(`Nutritionist bookings ${newAdminDisabled ? 'disabled' : 'enabled'} successfully`)
     } catch (err) {
       console.error(err)
-      toast.error('Failed to update status')
+      toast.error('Failed to update booking status')
     }
   }
 
@@ -4492,7 +6186,7 @@ function ManageNutritionistsTab({ onUpdate }) {
                       {nutritionist.description && <p className="text-sm text-gray-500 mt-1">{nutritionist.description}</p>}
                     </div>
                   </div>
-                  <button onClick={() => handleToggleStatus(nutritionist._id, nutritionist.status)} className={`px-3 py-1 rounded text-sm font-medium ${nutritionist.status === 'online' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>{nutritionist.status === 'online' ? '🟢 Online' : '⚫ Offline'}</button>
+                  <button onClick={() => handleToggleStatus(nutritionist._id, nutritionist.adminDisabled)} className={`px-3 py-1 rounded text-sm font-medium ${nutritionist.adminDisabled ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{nutritionist.adminDisabled ? '🔴 Bookings Disabled' : '🟢 Bookings Enabled'}</button>
                 </div>
                 <div className="flex space-x-2 mt-3">
                   <button onClick={() => handleEdit(nutritionist)} className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700">Edit</button>
@@ -4554,11 +6248,43 @@ function NutritionistPaymentsTab() {
     }
   }
 
+  const exportToCSV = () => {
+    const headers = ['Nutritionist Name', 'Total Earned', 'Total Paid', 'Outstanding', 'Completed Consultations', 'Unpaid Bookings']
+    const rows = payments.map(p => [
+      p.name,
+      p.totalEarned,
+      p.totalPaid,
+      p.outstanding,
+      p.completedBookings,
+      p.unpaidBookings.length
+    ])
+    
+    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `nutritionist-payments-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    window.URL.revokeObjectURL(url)
+  }
+
   if (loading) return (<div className="text-center py-8"><div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div><p className="mt-2 text-gray-600">Loading...</p></div>)
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-6">💰 Nutritionist Payment Management</h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-800">💰 Nutritionist Payment Management</h2>
+        <button
+          onClick={exportToCSV}
+          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center"
+        >
+          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Export CSV
+        </button>
+      </div>
       {error && <div className="bg-red-100 text-red-700 p-4 rounded mb-4"><p>{error}</p><button onClick={fetchNutritionistPayments} className="mt-2 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Retry</button></div>}
       {message && <div className="bg-green-100 text-green-700 p-4 rounded mb-4">{message}</div>}
       <div className="bg-gradient-to-r from-green-50 to-teal-50 p-6 rounded-lg shadow-lg mb-8">
@@ -5091,4 +6817,903 @@ function MedicalFormsTab() {
       )}
     </div>
   )
+}
+
+
+// Manage Hospitals Tab Component
+function ManageHospitalsTab({ onUpdate }) {
+  const [hospitals, setHospitals] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [editingHospital, setEditingHospital] = useState(null)
+  const [editForm, setEditForm] = useState({})
+
+  useEffect(() => {
+    fetchHospitals()
+  }, [])
+
+  const fetchHospitals = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/hospitals`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setHospitals(res.data)
+      setLoading(false)
+    } catch (err) {
+      console.error('Error fetching hospitals:', err)
+      setLoading(false)
+    }
+  }
+
+  const handleVerifyToggle = async (hospitalId, currentStatus) => {
+    try {
+      const token = localStorage.getItem('token')
+      await axios.patch(
+        `${process.env.NEXT_PUBLIC_API_URL}/admin/hospitals/${hospitalId}/verify`,
+        { isVerified: !currentStatus },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      fetchHospitals()
+      toast.success('Hospital verification status updated')
+    } catch (err) {
+      console.error('Error updating verification:', err)
+      toast.error('Failed to update verification status')
+    }
+  }
+
+  const handleEdit = (hospital) => {
+    setEditingHospital(hospital._id)
+    setEditForm({
+      hospitalName: hospital.hospitalName,
+      address: hospital.address,
+      city: hospital.city,
+      state: hospital.state,
+      pincode: hospital.pincode,
+      contactNumber: hospital.contactNumber,
+      emergencyNumber: hospital.emergencyNumber || '',
+      totalBeds: hospital.totalBeds,
+      availableBeds: hospital.availableBeds,
+      icuBeds: hospital.icuBeds,
+      availableIcuBeds: hospital.availableIcuBeds
+    })
+  }
+
+  const handleUpdate = async (hospitalId) => {
+    try {
+      const token = localStorage.getItem('token')
+      await axios.put(
+        `${process.env.NEXT_PUBLIC_API_URL}/admin/hospitals/${hospitalId}`,
+        editForm,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      setEditingHospital(null)
+      fetchHospitals()
+      toast.success('Hospital updated successfully')
+    } catch (err) {
+      console.error('Error updating hospital:', err)
+      toast.error('Failed to update hospital')
+    }
+  }
+
+  const handleDelete = async (hospitalId) => {
+    if (!confirm('Are you sure you want to delete this hospital?')) return
+
+    try {
+      const token = localStorage.getItem('token')
+      await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/admin/hospitals/${hospitalId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      fetchHospitals()
+      toast.success('Hospital deleted successfully')
+    } catch (err) {
+      console.error('Error deleting hospital:', err)
+      toast.error('Failed to delete hospital')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <p className="mt-2 text-gray-600">Loading hospitals...</p>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <h2 className="text-xl font-bold mb-4">Manage Hospitals</h2>
+      <div className="space-y-6">
+        {hospitals.map(hospital => (
+          <div key={hospital._id} className="bg-white border rounded-lg p-4">
+            {editingHospital === hospital._id ? (
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  value={editForm.hospitalName}
+                  onChange={(e) => setEditForm({ ...editForm, hospitalName: e.target.value })}
+                  className="w-full px-3 py-2 border rounded"
+                  placeholder="Hospital Name"
+                />
+                <input
+                  type="text"
+                  value={editForm.address}
+                  onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                  className="w-full px-3 py-2 border rounded"
+                  placeholder="Address"
+                />
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    type="text"
+                    value={editForm.city}
+                    onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                    className="px-3 py-2 border rounded"
+                    placeholder="City"
+                  />
+                  <input
+                    type="text"
+                    value={editForm.state}
+                    onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}
+                    className="px-3 py-2 border rounded"
+                    placeholder="State"
+                  />
+                  <input
+                    type="text"
+                    value={editForm.pincode}
+                    onChange={(e) => setEditForm({ ...editForm, pincode: e.target.value })}
+                    className="px-3 py-2 border rounded"
+                    placeholder="Pincode"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={editForm.contactNumber}
+                    onChange={(e) => setEditForm({ ...editForm, contactNumber: e.target.value })}
+                    className="px-3 py-2 border rounded"
+                    placeholder="Contact Number"
+                  />
+                  <input
+                    type="text"
+                    value={editForm.emergencyNumber}
+                    onChange={(e) => setEditForm({ ...editForm, emergencyNumber: e.target.value })}
+                    className="px-3 py-2 border rounded"
+                    placeholder="Emergency Number"
+                  />
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  <input
+                    type="number"
+                    value={editForm.totalBeds}
+                    onChange={(e) => setEditForm({ ...editForm, totalBeds: parseInt(e.target.value) })}
+                    className="px-3 py-2 border rounded"
+                    placeholder="Total Beds"
+                  />
+                  <input
+                    type="number"
+                    value={editForm.availableBeds}
+                    onChange={(e) => setEditForm({ ...editForm, availableBeds: parseInt(e.target.value) })}
+                    className="px-3 py-2 border rounded"
+                    placeholder="Available Beds"
+                  />
+                  <input
+                    type="number"
+                    value={editForm.icuBeds}
+                    onChange={(e) => setEditForm({ ...editForm, icuBeds: parseInt(e.target.value) })}
+                    className="px-3 py-2 border rounded"
+                    placeholder="ICU Beds"
+                  />
+                  <input
+                    type="number"
+                    value={editForm.availableIcuBeds}
+                    onChange={(e) => setEditForm({ ...editForm, availableIcuBeds: parseInt(e.target.value) })}
+                    className="px-3 py-2 border rounded"
+                    placeholder="Available ICU"
+                  />
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleUpdate(hospital._id)}
+                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setEditingHospital(null)}
+                    className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <h3 className="font-semibold text-lg">{hospital.hospitalName}</h3>
+                    <p className="text-sm text-gray-600">{hospital.registrationNumber}</p>
+                    <p className="text-sm text-gray-600">{hospital.address}, {hospital.city}, {hospital.state} - {hospital.pincode}</p>
+                    <p className="text-sm text-gray-600">📞 {hospital.contactNumber}</p>
+                    {hospital.emergencyNumber && (
+                      <p className="text-sm text-gray-600">🚨 {hospital.emergencyNumber}</p>
+                    )}
+                    <p className="text-sm text-gray-600">📧 {hospital.email}</p>
+                  </div>
+                  <span className={`px-3 py-1 rounded-full text-xs ${
+                    hospital.isVerified ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {hospital.isVerified ? '✓ Verified' : 'Pending Verification'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 my-3 text-sm">
+                  <div className="bg-green-50 p-2 rounded">
+                    <span className="text-gray-600">Beds:</span>
+                    <span className="font-semibold ml-1">{hospital.availableBeds}/{hospital.totalBeds}</span>
+                  </div>
+                  <div className="bg-red-50 p-2 rounded">
+                    <span className="text-gray-600">ICU:</span>
+                    <span className="font-semibold ml-1">{hospital.availableIcuBeds}/{hospital.icuBeds}</span>
+                  </div>
+                  <div className="bg-blue-50 p-2 rounded">
+                    <span className="text-gray-600">Status:</span>
+                    <span className="font-semibold ml-1">{hospital.isActive ? 'Active' : 'Inactive'}</span>
+                  </div>
+                  <div className="bg-purple-50 p-2 rounded">
+                    <span className="text-gray-600">User:</span>
+                    <span className="font-semibold ml-1">{hospital.userId?.name}</span>
+                  </div>
+                </div>
+                <div className="flex space-x-2 mt-3">
+                  <button
+                    onClick={() => handleEdit(hospital)}
+                    className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleVerifyToggle(hospital._id, hospital.isVerified)}
+                    className={`px-3 py-1 rounded text-sm ${
+                      hospital.isVerified
+                        ? 'bg-yellow-600 text-white hover:bg-yellow-700'
+                        : 'bg-green-600 text-white hover:bg-green-700'
+                    }`}
+                  >
+                    {hospital.isVerified ? 'Unverify' : 'Verify'}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(hospital._id)}
+                    className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+        {hospitals.length === 0 && (
+          <div className="text-center py-8">
+            <p className="text-gray-500">No hospitals found.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+
+// Add Hospital Tab Component
+function AddHospitalTab({ onHospitalAdded }) {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    phone: '',
+    hospitalName: '',
+    registrationNumber: '',
+    address: '',
+    city: '',
+    state: '',
+    pincode: '',
+    latitude: '',
+    longitude: '',
+    contactNumber: '',
+    emergencyNumber: '',
+    totalBeds: '',
+    availableBeds: '',
+    icuBeds: '',
+    availableIcuBeds: '',
+    specializations: '',
+    facilities: ''
+  });
+
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [detectingLocation, setDetectingLocation] = useState(false);
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const detectLocation = () => {
+    setDetectingLocation(true);
+    setMessage('Detecting location...');
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setFormData({
+            ...formData,
+            latitude: position.coords.latitude.toString(),
+            longitude: position.coords.longitude.toString()
+          });
+          setMessage('Location detected successfully!');
+          setDetectingLocation(false);
+        },
+        (error) => {
+          setError('Failed to detect location. Please enter manually.');
+          setDetectingLocation(false);
+        }
+      );
+    } else {
+      setError('Geolocation is not supported by this browser.');
+      setDetectingLocation(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage('');
+    setError('');
+
+    try {
+      const token = localStorage.getItem('token');
+      
+      const hospitalData = {
+        ...formData,
+        latitude: formData.latitude ? parseFloat(formData.latitude) : null,
+        longitude: formData.longitude ? parseFloat(formData.longitude) : null,
+        totalBeds: parseInt(formData.totalBeds) || 0,
+        availableBeds: parseInt(formData.availableBeds) || 0,
+        icuBeds: parseInt(formData.icuBeds) || 0,
+        availableIcuBeds: parseInt(formData.availableIcuBeds) || 0,
+        specializations: formData.specializations 
+          ? formData.specializations.split(',').map(s => s.trim()).filter(s => s)
+          : [],
+        facilities: formData.facilities 
+          ? formData.facilities.split(',').map(f => f.trim()).filter(f => f)
+          : []
+      };
+
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/admin/hospitals`,
+        hospitalData,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      toast.success(`Hospital created successfully! Login - Email: ${response.data.credentials.email}`);
+      
+      setFormData({
+        name: '',
+        email: '',
+        password: '',
+        phone: '',
+        hospitalName: '',
+        registrationNumber: '',
+        address: '',
+        city: '',
+        state: '',
+        pincode: '',
+        latitude: '',
+        longitude: '',
+        contactNumber: '',
+        emergencyNumber: '',
+        totalBeds: '',
+        availableBeds: '',
+        icuBeds: '',
+        availableIcuBeds: '',
+        specializations: '',
+        facilities: ''
+      });
+
+      if (onHospitalAdded) {
+        onHospitalAdded();
+      }
+    } catch (err) {
+      console.error('Error creating hospital:', err);
+      toast.error(err.response?.data?.message || 'Failed to create hospital');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      <h2 className="text-2xl font-bold mb-6">Add New Hospital</h2>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-4">User Account Details</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Contact Person Name *</label>
+              <input type="text" name="name" value={formData.name} onChange={handleChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+              <input type="email" name="email" value={formData.email} onChange={handleChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Password *</label>
+              <input type="password" name="password" value={formData.password} onChange={handleChange} required minLength="6" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+              <input type="tel" name="phone" value={formData.phone} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-4">Hospital Details</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Hospital Name *</label>
+              <input type="text" name="hospitalName" value={formData.hospitalName} onChange={handleChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Registration Number *</label>
+              <input type="text" name="registrationNumber" value={formData.registrationNumber} onChange={handleChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Address *</label>
+              <textarea name="address" value={formData.address} onChange={handleChange} required rows="2" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">City *</label>
+              <input type="text" name="city" value={formData.city} onChange={handleChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">State *</label>
+              <input type="text" name="state" value={formData.state} onChange={handleChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Pincode *</label>
+              <input type="text" name="pincode" value={formData.pincode} onChange={handleChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Contact Number *</label>
+              <input type="tel" name="contactNumber" value={formData.contactNumber} onChange={handleChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Emergency Number</label>
+              <input type="tel" name="emergencyNumber" value={formData.emergencyNumber} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-lg shadow">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold">GPS Location</h3>
+            <button type="button" onClick={detectLocation} disabled={detectingLocation} className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:bg-gray-400">
+              {detectingLocation ? 'Detecting...' : '📍 Detect Location'}
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Latitude</label>
+              <input type="number" step="any" name="latitude" value={formData.latitude} onChange={handleChange} placeholder="e.g., 28.7041" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Longitude</label>
+              <input type="number" step="any" name="longitude" value={formData.longitude} onChange={handleChange} placeholder="e.g., 77.1025" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 mt-2">GPS coordinates for location-based query matching (50km radius)</p>
+        </div>
+
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-4">Bed Capacity</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Total Beds</label>
+              <input type="number" name="totalBeds" value={formData.totalBeds} onChange={handleChange} min="0" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Available Beds</label>
+              <input type="number" name="availableBeds" value={formData.availableBeds} onChange={handleChange} min="0" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">ICU Beds</label>
+              <input type="number" name="icuBeds" value={formData.icuBeds} onChange={handleChange} min="0" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Available ICU</label>
+              <input type="number" name="availableIcuBeds" value={formData.availableIcuBeds} onChange={handleChange} min="0" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-4">Additional Information</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Specializations (comma-separated)</label>
+              <input type="text" name="specializations" value={formData.specializations} onChange={handleChange} placeholder="e.g., Cardiology, Neurology, Orthopedics" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Facilities (comma-separated)</label>
+              <input type="text" name="facilities" value={formData.facilities} onChange={handleChange} placeholder="e.g., Emergency, ICU, Pharmacy, Laboratory" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end space-x-4">
+          <button type="button" onClick={() => { if (confirm('Reset form?')) { setFormData({ name: '', email: '', password: '', phone: '', hospitalName: '', registrationNumber: '', address: '', city: '', state: '', pincode: '', latitude: '', longitude: '', contactNumber: '', emergencyNumber: '', totalBeds: '', availableBeds: '', icuBeds: '', availableIcuBeds: '', specializations: '', facilities: '' }); } }} className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+            Reset
+          </button>
+          <button type="submit" disabled={loading} className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400">
+            {loading ? 'Creating...' : 'Create Hospital'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+
+// Live Chat Tab Component
+function LiveChatTab() {
+  const [chats, setChats] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedChat, setSelectedChat] = useState(null);
+  const [newMessage, setNewMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const socketRef = useRef(null);
+  const messagesEndRef = useRef(null);
+
+  const SOCKET_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace('/api', '');
+
+  useEffect(() => {
+    fetchChats();
+    connectSocket();
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (selectedChat && selectedChat.messages) {
+      scrollToBottom();
+    }
+  }, [selectedChat]);
+
+  const scrollToBottom = () => {
+    if (messagesEndRef.current) {
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'end'
+        });
+      });
+    }
+  };
+
+  const connectSocket = () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    socketRef.current = io(SOCKET_URL, {
+      auth: { token },
+      transports: ['websocket', 'polling']
+    });
+
+    socketRef.current.on('connect', () => {
+      console.log('✅ Admin CS Socket connected');
+    });
+
+    socketRef.current.on('customer-service-message', (data) => {
+      console.log('📨 New CS message notification:', data);
+      fetchChats(); // Refresh chat list
+      
+      // If viewing this chat, update it
+      if (selectedChat && selectedChat.sessionId === data.sessionId) {
+        fetchChatDetails(data.sessionId);
+      }
+    });
+
+    socketRef.current.on('new-cs-message', (message) => {
+      console.log('📨 New CS message in current chat:', message);
+      if (selectedChat) {
+        setSelectedChat(prev => ({
+          ...prev,
+          messages: [...prev.messages, message]
+        }));
+      }
+    });
+  };
+
+  const fetchChats = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/customer-service-chat/admin/chats`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setChats(res.data);
+    } catch (error) {
+      console.error('Error fetching chats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchChatDetails = async (sessionId) => {
+    try {
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/customer-service-chat/session/${sessionId}`);
+      setSelectedChat(res.data);
+      
+      // Join socket room
+      if (socketRef.current) {
+        socketRef.current.emit('join-cs-session', sessionId);
+      }
+      
+      // Mark messages as read
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/customer-service-chat/session/${sessionId}/read`,
+        { sender: 'admin' }
+      );
+    } catch (error) {
+      console.error('Error fetching chat details:', error);
+    }
+  };
+
+  const handleAssignChat = async (sessionId) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/customer-service-chat/admin/chats/${sessionId}/assign`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      fetchChats();
+      fetchChatDetails(sessionId);
+    } catch (error) {
+      console.error('Error assigning chat:', error);
+      alert('Failed to assign chat');
+    }
+  };
+
+  const handleCloseChat = async (sessionId) => {
+    if (!confirm('Are you sure you want to close this chat?')) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/customer-service-chat/admin/chats/${sessionId}/close`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      fetchChats();
+      setSelectedChat(null);
+    } catch (error) {
+      console.error('Error closing chat:', error);
+      alert('Failed to close chat');
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!newMessage.trim() || sending || !selectedChat) return;
+
+    setSending(true);
+    const messageText = newMessage;
+    setNewMessage('');
+
+    try {
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/customer-service-chat/session/${selectedChat.sessionId}/message`,
+        { message: messageText, sender: 'admin' }
+      );
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setNewMessage(messageText);
+      alert('Failed to send message');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  const getUnreadCount = (chat) => {
+    return chat.messages.filter(m => m.sender === 'user' && !m.isRead).length;
+  };
+
+  return (
+    <div className="h-[calc(100vh-300px)]">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">Live Chat Management</h2>
+        <button
+          onClick={fetchChats}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          🔄 Refresh
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-full">
+        {/* Chat List */}
+        <div className="lg:col-span-1 bg-white rounded-lg shadow overflow-hidden">
+          <div className="bg-gray-50 p-4 border-b">
+            <h3 className="font-semibold">Active Chats ({chats.length})</h3>
+          </div>
+          <div className="overflow-y-auto h-[calc(100%-60px)]">
+            {loading ? (
+              <div className="text-center py-8">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            ) : chats.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>No active chats</p>
+              </div>
+            ) : (
+              chats.map((chat) => (
+                <div
+                  key={chat._id}
+                  onClick={() => fetchChatDetails(chat.sessionId)}
+                  className={`p-4 border-b cursor-pointer hover:bg-gray-50 ${
+                    selectedChat?.sessionId === chat.sessionId ? 'bg-blue-50' : ''
+                  }`}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className="font-semibold">{chat.userName}</p>
+                      {chat.userEmail && (
+                        <p className="text-xs text-gray-500">{chat.userEmail}</p>
+                      )}
+                    </div>
+                    {getUnreadCount(chat) > 0 && (
+                      <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
+                        {getUnreadCount(chat)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-xs px-2 py-1 rounded ${
+                      chat.status === 'waiting' ? 'bg-yellow-100 text-yellow-800' :
+                      chat.status === 'active' ? 'bg-green-100 text-green-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {chat.status}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      {new Date(chat.lastMessageAt).toLocaleTimeString()}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Chat Window */}
+        <div className="lg:col-span-2 bg-white rounded-lg shadow flex flex-col">
+          {selectedChat ? (
+            <>
+              {/* Chat Header */}
+              <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-4 rounded-t-lg">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="font-bold text-lg">{selectedChat.userName}</h3>
+                    {selectedChat.userEmail && (
+                      <p className="text-sm text-purple-100">{selectedChat.userEmail}</p>
+                    )}
+                  </div>
+                  <div className="flex space-x-2">
+                    {selectedChat.status === 'waiting' && (
+                      <button
+                        onClick={() => handleAssignChat(selectedChat.sessionId)}
+                        className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600"
+                      >
+                        Assign to Me
+                      </button>
+                    )}
+                    {selectedChat.status !== 'closed' && (
+                      <button
+                        onClick={() => handleCloseChat(selectedChat.sessionId)}
+                        className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600"
+                      >
+                        Close Chat
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+                {selectedChat.messages.length === 0 ? (
+                  <div className="text-center text-gray-500 py-8">
+                    <p>No messages yet</p>
+                  </div>
+                ) : (
+                  selectedChat.messages.map((msg, index) => (
+                    <div
+                      key={index}
+                      className={`flex ${msg.sender === 'admin' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-[75%] px-4 py-2 rounded-lg ${
+                          msg.sender === 'admin'
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-white text-gray-900 border border-gray-200'
+                        }`}
+                      >
+                        <p className="text-sm">{msg.message}</p>
+                        <p className={`text-xs mt-1 ${msg.sender === 'admin' ? 'text-purple-100' : 'text-gray-500'}`}>
+                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Input */}
+              {selectedChat.status !== 'closed' ? (
+                <div className="p-4 border-t border-gray-200 bg-white rounded-b-lg">
+                  <div className="flex space-x-2">
+                    <input
+                      type="text"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      placeholder="Type your message..."
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      disabled={sending}
+                    />
+                    <button
+                      onClick={sendMessage}
+                      disabled={sending || !newMessage.trim()}
+                      className="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700 disabled:bg-gray-400"
+                    >
+                      Send
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 border-t border-gray-200 bg-red-50 rounded-b-lg text-center">
+                  <p className="text-sm text-red-700">This chat has been closed</p>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-gray-500">
+              <div className="text-center">
+                <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                <p>Select a chat to start messaging</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
