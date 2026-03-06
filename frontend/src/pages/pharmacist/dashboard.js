@@ -32,6 +32,15 @@ export default function PharmacistDashboard() {
   const [lastPaymentUpdate, setLastPaymentUpdate] = useState(new Date())
   const [addingMeetLink, setAddingMeetLink] = useState(null)
   const [meetLinkInput, setMeetLinkInput] = useState('')
+  const [dateFilter, setDateFilter] = useState('all') // 'today', 'last7days', 'last30days', 'all'
+  const [mounted, setMounted] = useState(false)
+  const [isOnline, setIsOnline] = useState(false)
+  const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [accessDenied, setAccessDenied] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const dummyBookings = [
     {
@@ -115,6 +124,19 @@ export default function PharmacistDashboard() {
       })
       
       const completedBookings = res.data.filter(b => b.status === 'completed')
+      
+      // Fetch pharmacist profile to get online status
+      try {
+        const profileRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/pharmacists/profile`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        
+        if (profileRes.data && profileRes.data.status) {
+          setIsOnline(profileRes.data.status === 'online')
+        }
+      } catch (err) {
+        console.error('Error fetching pharmacist profile:', err)
+      }
       
       // Calculate payment stats from bookings
       const totalEarned = completedBookings.reduce((sum, b) => {
@@ -323,6 +345,30 @@ export default function PharmacistDashboard() {
     }
   }
 
+  const toggleOnlineStatus = async () => {
+    try {
+      setUpdatingStatus(true)
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+      if (!token) return
+      
+      const newStatus = isOnline ? 'offline' : 'online'
+      
+      await axios.patch(
+        `${process.env.NEXT_PUBLIC_API_URL}/pharmacists/status`,
+        { status: newStatus },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      
+      setIsOnline(!isOnline)
+      toast.success(`You are now ${newStatus}!`)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to update status')
+    } finally {
+      setUpdatingStatus(false)
+    }
+  }
+
   const handleCancelBooking = async (bookingId) => {
     if (!window.confirm('Are you sure you want to cancel this booking?')) return
     
@@ -405,18 +451,73 @@ export default function PharmacistDashboard() {
   }, [bookings])
 
   const filteredBookings = bookings.filter(booking => {
-    if (activeTab === 'all') return true
-    if (activeTab === 'treated') return booking.treatmentStatus === 'treated'
-    if (activeTab === 'untreated') return booking.treatmentStatus === 'untreated'
-    if (activeTab === 'upcoming') return booking.status === 'confirmed' && new Date(booking.slotDate) > new Date()
-    if (activeTab === 'completed') return booking.status === 'completed'
-    if (activeTab === 'cancelled') return booking.status === 'cancelled'
-    return true
+    // Status filter
+    let statusMatch = true
+    if (activeTab === 'all') statusMatch = true
+    else if (activeTab === 'treated') statusMatch = booking.treatmentStatus === 'treated'
+    else if (activeTab === 'untreated') statusMatch = booking.treatmentStatus === 'untreated'
+    else if (activeTab === 'upcoming') statusMatch = booking.status === 'confirmed' && new Date(booking.slotDate) > new Date()
+    else if (activeTab === 'completed') statusMatch = booking.status === 'completed'
+    else if (activeTab === 'cancelled') statusMatch = booking.status === 'cancelled'
+    
+    // Date filter
+    let dateMatch = true
+    if (dateFilter !== 'all') {
+      const bookingDate = new Date(booking.slotDate)
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      
+      if (dateFilter === 'today') {
+        const tomorrow = new Date(today)
+        tomorrow.setDate(tomorrow.getDate() + 1)
+        dateMatch = bookingDate >= today && bookingDate < tomorrow
+      } else if (dateFilter === 'last7days') {
+        const sevenDaysAgo = new Date(today)
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+        dateMatch = bookingDate >= sevenDaysAgo
+      } else if (dateFilter === 'last30days') {
+        const thirtyDaysAgo = new Date(today)
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+        dateMatch = bookingDate >= thirtyDaysAgo
+      }
+    }
+    
+    return statusMatch && dateMatch
   })
 
   return (
     <Layout>
-      <div className="bg-gray-50 min-h-screen">
+      {/* Online Toggle Button - Fixed Position */}
+      {!accessDenied && (
+        <div className="fixed top-20 right-4 z-50">
+          <button
+            onClick={toggleOnlineStatus}
+            disabled={updatingStatus}
+            className={`flex items-center space-x-2 px-6 py-3 rounded-full shadow-lg font-semibold transition-all duration-300 ${
+              isOnline
+                ? 'bg-green-500 hover:bg-green-600 text-white'
+                : 'bg-gray-400 hover:bg-gray-500 text-white'
+            } ${updatingStatus ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
+          >
+            {isOnline ? (
+              <>
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+                </span>
+                <span>Online</span>
+              </>
+            ) : (
+              <>
+                <span className="h-3 w-3 rounded-full bg-white"></span>
+                <span>Go Online</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
+      <div className={`bg-gray-50 min-h-screen transition-all duration-300 ${!isOnline ? 'blur-sm pointer-events-none select-none' : ''}`}>
         <div className="container mx-auto px-4 py-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-6">Pharmacist Dashboard</h1>
 
@@ -462,8 +563,8 @@ export default function PharmacistDashboard() {
                 <h2 className="text-xl font-bold text-gray-800 flex items-center">
                   <span className="mr-2">💰</span> Payment Overview
                 </h2>
-                <p className="text-xs text-gray-500 mt-1">
-                  Last updated: {lastPaymentUpdate.toLocaleTimeString()}
+                <p className="text-xs text-gray-500 mt-1" suppressHydrationWarning>
+                  Last updated: {mounted ? lastPaymentUpdate.toLocaleTimeString() : 'Loading...'}
                 </p>
               </div>
               <button
@@ -589,7 +690,28 @@ export default function PharmacistDashboard() {
           {/* Tabs */}
           <div className="bg-white rounded-lg shadow mb-6">
             <div className="border-b border-gray-200">
-              <nav className="flex -mb-px">
+              {/* Mobile Tab Selector */}
+              <div className="md:hidden px-4 py-3">
+                <select
+                  value={activeTab}
+                  onChange={(e) => setActiveTab(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                >
+                  <option value="all">All Bookings ({stats.total})</option>
+                  <option value="untreated">Untreated ({stats.untreated})</option>
+                  <option value="treated">Treated ({stats.treated})</option>
+                  <option value="upcoming">📅 Upcoming ({stats.upcoming})</option>
+                  <option value="completed">✓ Completed ({stats.completed})</option>
+                  <option value="cancelled">❌ Cancelled ({stats.cancelled})</option>
+                  <option value="slots">📅 Manage Slots</option>
+                  <option value="payments">💰 Payments</option>
+                  <option value="reviews">⭐ Reviews</option>
+                  <option value="medical-forms">📋 Medical Forms</option>
+                </select>
+              </div>
+
+              {/* Desktop Tab Navigation */}
+              <nav className="hidden md:flex -mb-px">
                 <button
                   onClick={() => setActiveTab('all')}
                   className={`py-4 px-6 font-medium text-sm ${
@@ -968,9 +1090,63 @@ export default function PharmacistDashboard() {
             <MedicalFormsTabContent />
           )}
 
+          {/* Date Filter - Only show for booking tabs */}
+          {activeTab !== 'slots' && activeTab !== 'payments' && activeTab !== 'reviews' && activeTab !== 'medical-forms' && (
+            <div className="bg-white rounded-lg shadow p-4 mb-6">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-medium text-gray-700">Filter by Date:</span>
+                <button
+                  onClick={() => setDateFilter('today')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    dateFilter === 'today'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Today
+                </button>
+                <button
+                  onClick={() => setDateFilter('last7days')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    dateFilter === 'last7days'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Last 7 Days
+                </button>
+                <button
+                  onClick={() => setDateFilter('last30days')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    dateFilter === 'last30days'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Last 30 Days
+                </button>
+                <button
+                  onClick={() => setDateFilter('all')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    dateFilter === 'all'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  All Time
+                </button>
+                {dateFilter !== 'all' && (
+                  <span className="text-sm text-gray-500 ml-2">
+                    ({filteredBookings.length} bookings)
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Bookings List */}
-          {activeTab !== 'slots' && <h2 className="text-2xl font-bold mb-4">Sessions</h2>}
-          {activeTab !== 'slots' && loading ? (
+          {activeTab !== 'slots' && activeTab !== 'payments' && activeTab !== 'reviews' && activeTab !== 'medical-forms' && <h2 className="text-2xl font-bold mb-4">Sessions</h2>}
+          {activeTab !== 'slots' && activeTab !== 'payments' && activeTab !== 'reviews' && activeTab !== 'medical-forms' && loading ? (
             <div className="text-center py-8">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
