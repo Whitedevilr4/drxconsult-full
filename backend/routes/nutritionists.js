@@ -117,6 +117,23 @@ router.get('/payment-stats', auth, async (req, res) => {
   }
 });
 
+// Get nutritionist profile - MUST come before /:id route
+router.get('/profile', auth, async (req, res) => {
+  try {
+    const nutritionist = await Nutritionist.findOne({ userId: req.user.userId })
+      .populate('userId', 'name email phone');
+    
+    if (!nutritionist) {
+      return res.status(404).json({ message: 'Nutritionist profile not found' });
+    }
+    
+    res.json(nutritionist);
+  } catch (error) {
+    console.error('Error fetching nutritionist profile:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Update nutritionist slots - MUST come before /:id route
 router.put('/slots', auth, async (req, res) => {
   try {
@@ -136,6 +153,32 @@ router.put('/slots', auth, async (req, res) => {
     res.json({ message: 'Slots updated successfully', slots: nutritionist.availableSlots });
   } catch (error) {
     console.error('Error updating nutritionist slots:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Update nutritionist status - MUST come before /:id route
+router.patch('/status', auth, async (req, res) => {
+  try {
+    const { status } = req.body;
+    
+    if (!['online', 'offline'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status. Must be online or offline' });
+    }
+    
+    // Find nutritionist by user ID
+    const nutritionist = await Nutritionist.findOne({ userId: req.user.userId });
+    
+    if (!nutritionist) {
+      return res.status(404).json({ message: 'Nutritionist profile not found' });
+    }
+
+    nutritionist.status = status;
+    await nutritionist.save();
+
+    res.json({ message: 'Status updated successfully', status: nutritionist.status });
+  } catch (error) {
+    console.error('Error updating nutritionist status:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
