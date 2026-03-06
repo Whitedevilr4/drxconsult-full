@@ -7,6 +7,7 @@ const { auth, isPharmacist } = require('../middleware/auth');
 const { createMeetLink } = require('../utils/googleMeet');
 const { cleanupExpiredSlotsForPharmacist, cleanupExpiredSlotsForDoctor } = require('../utils/slotCleanup');
 const { notifyBookingConfirmed, notifyMeetingLinkAdded, notifyTestResultUploaded, notifyReviewSubmitted } = require('../utils/notificationHelper');
+const { notifyBookingCreated, notifyBookingConfirmedToPatient } = require('../utils/socketManager');
 const { 
   sendBookingConfirmationEmail, 
   sendPharmacistBookingNotification, 
@@ -369,6 +370,32 @@ router.post('/', auth, async (req, res) => {
       patientName: patient?.name || 'Patient',
       pharmacistName: professionalUser?.name || professionalType
     });
+    
+    // Send Socket.IO real-time notifications
+    const io = req.app.get('io');
+    if (io) {
+      // Notify professional
+      if (professionalUser) {
+        notifyBookingCreated(io, professionalUser._id.toString(), {
+          bookingId: booking._id,
+          patientName: patient?.name || 'Patient',
+          slotDate: booking.slotDate,
+          slotTime: booking.slotTime,
+          serviceType: booking.serviceType,
+          providerType: booking.providerType
+        });
+      }
+      
+      // Notify patient
+      notifyBookingConfirmedToPatient(io, req.user.userId, {
+        bookingId: booking._id,
+        professionalName: professionalUser?.name || professionalType,
+        slotDate: booking.slotDate,
+        slotTime: booking.slotTime,
+        serviceType: booking.serviceType,
+        providerType: booking.providerType
+      });
+    }
     
     // Send email notifications with service type info
     if (patient?.email) {
