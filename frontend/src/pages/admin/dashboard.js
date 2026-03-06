@@ -4885,19 +4885,35 @@ function SubscriptionManagementTab() {
                 </div>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-600">Family & Chronic Care</span>
+                <span className="text-gray-600">Chronic Care</span>
                 <div className="flex items-center space-x-2">
                   <div className="w-32 bg-gray-200 rounded-full h-2">
                     <div 
                       className="bg-blue-500 h-2 rounded-full" 
                       style={{ 
                         width: `${analytics.activeSubscriptions > 0 
-                          ? (analytics.planBreakdown.family / analytics.activeSubscriptions) * 100 
+                          ? (analytics.planBreakdown.chronic / analytics.activeSubscriptions) * 100 
                           : 0}%` 
                       }}
                     ></div>
                   </div>
-                  <span className="font-semibold">{analytics.planBreakdown.family}</span>
+                  <span className="font-semibold">{analytics.planBreakdown.chronic}</span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Fat to Fit</span>
+                <div className="flex items-center space-x-2">
+                  <div className="w-32 bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-purple-500 h-2 rounded-full" 
+                      style={{ 
+                        width: `${analytics.activeSubscriptions > 0 
+                          ? (analytics.planBreakdown.fatToFit / analytics.activeSubscriptions) * 100 
+                          : 0}%` 
+                      }}
+                    ></div>
+                  </div>
+                  <span className="font-semibold">{analytics.planBreakdown.fatToFit}</span>
                 </div>
               </div>
             </div>
@@ -4979,7 +4995,8 @@ function SubscriptionManagementTab() {
             >
               <option value="all">All Plans</option>
               <option value="essential">Essential Care</option>
-              <option value="family">Family & Chronic Care</option>
+              <option value="chronic">Chronic Care</option>
+              <option value="fatToFit">Fat to Fit</option>
             </select>
           </div>
           <div className="flex items-end">
@@ -5041,6 +5058,9 @@ function SubscriptionManagementTab() {
                     <div>Sessions: {subscription.sessionsUsed}/{subscription.sessionsLimit}</div>
                     {subscription.doctorConsultationsLimit > 0 && (
                       <div>Doctor: {subscription.doctorConsultationsUsed}/{subscription.doctorConsultationsLimit}</div>
+                    )}
+                    {subscription.nutritionistConsultationsLimit > 0 && (
+                      <div>Nutritionist: {subscription.nutritionistConsultationsUsed}/{subscription.nutritionistConsultationsLimit}</div>
                     )}
                     <div>Started: {new Date(subscription.startDate).toLocaleDateString()}</div>
                     <div>Next: {new Date(subscription.nextBillingDate).toLocaleDateString()}</div>
@@ -5122,6 +5142,11 @@ function SubscriptionManagementTab() {
                     {subscription.doctorConsultationsLimit > 0 && (
                       <div className="text-xs text-gray-500">
                         Doctor: {subscription.doctorConsultationsUsed}/{subscription.doctorConsultationsLimit}
+                      </div>
+                    )}
+                    {subscription.nutritionistConsultationsLimit > 0 && (
+                      <div className="text-xs text-gray-500">
+                        Nutritionist: {subscription.nutritionistConsultationsUsed}/{subscription.nutritionistConsultationsLimit}
                       </div>
                     )}
                   </td>
