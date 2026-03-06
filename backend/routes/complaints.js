@@ -370,6 +370,17 @@ router.put('/admin/:id/status', [
     // Notify user about status update
     await notifyComplaintUpdated(complaint);
 
+    // Emit Socket.IO event for real-time update
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user:${complaint.userId._id}`).emit('complaint-updated', {
+        complaintId: complaint._id,
+        type: 'status_change',
+        status: status,
+        complaint: complaint
+      });
+    }
+
     res.json({
       message: 'Complaint status updated successfully',
       complaint
@@ -416,6 +427,16 @@ router.post('/admin/:id/respond', [
     // Notify user about admin response
     await notifyComplaintUpdated(complaint);
 
+    // Emit Socket.IO event for real-time update
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user:${complaint.userId._id}`).emit('complaint-updated', {
+        complaintId: complaint._id,
+        type: 'admin_response',
+        complaint: complaint
+      });
+    }
+
     res.json({
       message: 'Response added successfully',
       complaint
@@ -448,6 +469,18 @@ router.post('/admin/:id/note', [
 
     complaint.updatedAt = new Date();
     await complaint.save();
+
+    // Populate for response
+    await complaint.populate('internalNotes.addedBy', 'name');
+
+    // Emit Socket.IO event to other admins for real-time update
+    const io = req.app.get('io');
+    if (io) {
+      io.to('admins').emit('complaint-note-added', {
+        complaintId: complaint._id,
+        note: complaint.internalNotes[complaint.internalNotes.length - 1]
+      });
+    }
 
     res.json({
       message: 'Internal note added successfully',
