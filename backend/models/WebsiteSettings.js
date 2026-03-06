@@ -39,6 +39,10 @@ const websiteSettingsSchema = new mongoose.Schema({
       type: String,
       default: ''
     },
+    textBackgroundImage: {
+      type: String,
+      default: ''
+    },
     ctaText: {
       type: String,
       default: 'Book Consultation'
@@ -46,6 +50,98 @@ const websiteSettingsSchema = new mongoose.Schema({
     features: [{
       icon: String,
       text: String
+    }],
+    slides: [{
+      title: {
+        type: String,
+        default: ''
+      },
+      subtitle: {
+        type: String,
+        default: ''
+      },
+      description: {
+        type: String,
+        default: ''
+      },
+      icon: {
+        type: String,
+        default: '🩺'
+      },
+      slideImage: {
+        type: String,
+        default: ''
+      },
+      features: [{
+        text: String,
+        icon: String
+      }],
+      quote: {
+        type: String,
+        default: ''
+      },
+      isMainSlide: {
+        type: Boolean,
+        default: false
+      },
+      order: {
+        type: Number,
+        default: 0
+      }
+    }]
+  },
+
+  // Professional Tiles Section
+  professionalTiles: {
+    sectionTitle: {
+      type: String,
+      default: 'Our Healthcare Professionals'
+    },
+    sectionDescription: {
+      type: String,
+      default: 'Connect with certified doctors, pharmacists, and dietitians for comprehensive healthcare guidance'
+    },
+    tiles: [{
+      title: {
+        type: String,
+        required: true
+      },
+      description: {
+        type: String,
+        required: true
+      },
+      buttonText: {
+        type: String,
+        default: 'Consult Now'
+      },
+      navigationUrl: {
+        type: String,
+        required: true
+      },
+      backgroundImage: {
+        type: String,
+        default: ''
+      },
+      gradientFrom: {
+        type: String,
+        default: 'blue-600'
+      },
+      gradientTo: {
+        type: String,
+        default: 'indigo-600'
+      },
+      icon: {
+        type: String,
+        default: 'medical'
+      },
+      order: {
+        type: Number,
+        default: 0
+      },
+      isActive: {
+        type: Boolean,
+        default: true
+      }
     }]
   },
 
