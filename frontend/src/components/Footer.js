@@ -210,7 +210,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-gray-700 mt-8 pt-6 text-center text-sm text-gray-400">
-          <p>&copy; {new Date().getFullYear()} {websiteSettings?.websiteName || 'Patient Counselling Platform'}. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} {websiteSettings?.websiteName || 'DrX Consult'}. All rights reserved.</p>
         </div>
       </div>
     </footer>
