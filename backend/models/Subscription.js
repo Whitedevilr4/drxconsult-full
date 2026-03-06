@@ -4,7 +4,7 @@ const subscriptionSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   planType: { 
     type: String, 
-    enum: ['essential', 'family'], 
+    enum: ['essential', 'family', 'chronic', 'fatToFit'], 
     required: true 
   },
   planName: { type: String, required: true },
@@ -17,10 +17,12 @@ const subscriptionSchema = new mongoose.Schema({
   currency: { type: String, default: 'INR' },
   
   // Plan limits and usage
-  sessionsLimit: { type: Number, required: true }, // Monthly sessions allowed
-  sessionsUsed: { type: Number, default: 0 }, // Sessions used this month
-  doctorConsultationsLimit: { type: Number, default: 0 }, // For family plan
-  doctorConsultationsUsed: { type: Number, default: 0 },
+  sessionsLimit: { type: Number, required: true }, // Monthly pharmacist sessions allowed
+  sessionsUsed: { type: Number, default: 0 }, // Pharmacist sessions used this month
+  doctorConsultationsLimit: { type: Number, default: 0 }, // Doctor consultations allowed
+  doctorConsultationsUsed: { type: Number, default: 0 }, // Doctor consultations used
+  nutritionistConsultationsLimit: { type: Number, default: 0 }, // Nutritionist consultations allowed
+  nutritionistConsultationsUsed: { type: Number, default: 0 }, // Nutritionist consultations used
   familyMembersLimit: { type: Number, default: 1 }, // 1 for essential, 4 for family
   
   // Subscription status
@@ -72,6 +74,7 @@ subscriptionSchema.methods.resetMonthlyUsage = function() {
   if (now.getMonth() !== lastReset.getMonth() || now.getFullYear() !== lastReset.getFullYear()) {
     this.sessionsUsed = 0;
     this.doctorConsultationsUsed = 0;
+    this.nutritionistConsultationsUsed = 0;
     this.lastResetDate = now;
     return this.save();
   }
@@ -88,6 +91,12 @@ subscriptionSchema.methods.canBookDoctorConsultation = function() {
   return this.status === 'active' && 
          this.planType === 'family' && 
          this.doctorConsultationsUsed < this.doctorConsultationsLimit;
+};
+
+// Check if user can book nutritionist consultation
+subscriptionSchema.methods.canBookNutritionistConsultation = function() {
+  return this.status === 'active' && 
+         this.nutritionistConsultationsUsed < this.nutritionistConsultationsLimit;
 };
 
 // Use a session
@@ -108,6 +117,16 @@ subscriptionSchema.methods.useDoctorConsultation = function() {
     return this.save();
   }
   throw new Error('Doctor consultation limit exceeded or not available in plan');
+};
+
+// Use a nutritionist consultation
+subscriptionSchema.methods.useNutritionistConsultation = function() {
+  if (this.canBookNutritionistConsultation()) {
+    this.nutritionistConsultationsUsed += 1;
+    this.updatedAt = new Date();
+    return this.save();
+  }
+  throw new Error('Nutritionist consultation limit exceeded or not available in plan');
 };
 
 module.exports = mongoose.model('Subscription', subscriptionSchema);
