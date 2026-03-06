@@ -31,6 +31,10 @@ const doctorSchema = new mongoose.Schema({
     enum: ['online', 'offline', 'busy'],
     default: 'offline'
   },
+  adminDisabled: {
+    type: Boolean,
+    default: false
+  },
   consultationFee: {
     type: Number,
     default: 500
