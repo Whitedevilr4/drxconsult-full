@@ -66,7 +66,7 @@ router.put('/settings', [
       const updateFields = [
         'websiteName', 'websiteDescription', 'logo', 'favicon',
         'heroSection', 'contactInfo', 'socialMedia', 'seo', 
-        'footerText', 'maintenanceMode'
+        'footerText', 'maintenanceMode', 'professionalTiles'
       ];
 
       updateFields.forEach(field => {
