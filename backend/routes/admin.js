@@ -400,18 +400,19 @@ router.put('/pharmacists/:id', auth, isAdmin, async (req, res) => {
 // Toggle pharmacist status (admin only)
 router.patch('/pharmacists/:id/status', auth, isAdmin, async (req, res) => {
   try {
-    const { status } = req.body;
+    const { status, adminDisabled } = req.body;
     
     const pharmacist = await Pharmacist.findById(req.params.id);
     if (!pharmacist) {
       return res.status(404).json({ message: 'Pharmacist not found' });
     }
 
-    pharmacist.status = status;
+    if (status !== undefined) pharmacist.status = status;
+    if (adminDisabled !== undefined) pharmacist.adminDisabled = adminDisabled;
     await pharmacist.save();
 
     res.json({
-      message: `Pharmacist status updated to ${status}`,
+      message: `Pharmacist status updated successfully`,
       pharmacist
     });
   } catch (err) {
@@ -827,11 +828,16 @@ router.put('/doctors/:id', auth, isAdmin, async (req, res) => {
 router.patch('/doctors/:id/status', auth, isAdmin, async (req, res) => {
   try {
     const Doctor = require('../models/Doctor');
-    const { status } = req.body;
+    const { status, adminDisabled } = req.body;
+    
+    const updateData = {};
+    if (status !== undefined) updateData.status = status;
+    if (adminDisabled !== undefined) updateData.adminDisabled = adminDisabled;
+    updateData.updatedAt = Date.now();
     
     const doctor = await Doctor.findByIdAndUpdate(
       req.params.id,
-      { status, updatedAt: Date.now() },
+      updateData,
       { new: true }
     );
 
@@ -839,7 +845,7 @@ router.patch('/doctors/:id/status', auth, isAdmin, async (req, res) => {
       return res.status(404).json({ message: 'Doctor not found' });
     }
 
-    res.json({ message: 'Doctor status updated successfully' });
+    res.json({ message: 'Doctor status updated successfully', doctor });
   } catch (err) {
     console.error('Error updating doctor status:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -1150,11 +1156,16 @@ router.put('/nutritionists/:id', auth, isAdmin, async (req, res) => {
 router.patch('/nutritionists/:id/status', auth, isAdmin, async (req, res) => {
   try {
     const Nutritionist = require('../models/Nutritionist');
-    const { status } = req.body;
+    const { status, adminDisabled } = req.body;
+    
+    const updateData = {};
+    if (status !== undefined) updateData.status = status;
+    if (adminDisabled !== undefined) updateData.adminDisabled = adminDisabled;
+    updateData.updatedAt = Date.now();
     
     const nutritionist = await Nutritionist.findByIdAndUpdate(
       req.params.id,
-      { status, updatedAt: Date.now() },
+      updateData,
       { new: true }
     );
 
@@ -1162,7 +1173,7 @@ router.patch('/nutritionists/:id/status', auth, isAdmin, async (req, res) => {
       return res.status(404).json({ message: 'Nutritionist not found' });
     }
 
-    res.json({ message: 'Nutritionist status updated successfully' });
+    res.json({ message: 'Nutritionist status updated successfully', nutritionist });
   } catch (err) {
     console.error('Error updating nutritionist status:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -1329,6 +1340,224 @@ router.post('/mark-nutritionist-payment-done', auth, isAdmin, async (req, res) =
     });
   } catch (err) {
     console.error('Error marking nutritionist payments as done:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Hospital Management Routes
+
+// Get all hospitals (admin only)
+router.get('/hospitals', auth, isAdmin, async (req, res) => {
+  try {
+    const Hospital = require('../models/Hospital');
+    const hospitals = await Hospital.find()
+      .populate('userId', 'name email phone')
+      .sort({ createdAt: -1 });
+    res.json(hospitals);
+  } catch (err) {
+    console.error('Error fetching hospitals:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Create new hospital (admin only)
+router.post('/hospitals', [
+  auth,
+  isAdmin,
+  body('name').notEmpty().withMessage('Name is required'),
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('hospitalName').notEmpty().withMessage('Hospital name is required'),
+  body('registrationNumber').notEmpty().withMessage('Registration number is required'),
+  body('address').notEmpty().withMessage('Address is required'),
+  body('city').notEmpty().withMessage('City is required'),
+  body('state').notEmpty().withMessage('State is required'),
+  body('pincode').notEmpty().withMessage('Pincode is required'),
+  body('contactNumber').notEmpty().withMessage('Contact number is required')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { 
+      name, 
+      email, 
+      password, 
+      phone,
+      hospitalName,
+      registrationNumber,
+      address,
+      city,
+      state,
+      pincode,
+      latitude,
+      longitude,
+      contactNumber,
+      emergencyNumber,
+      totalBeds,
+      availableBeds,
+      icuBeds,
+      availableIcuBeds,
+      specializations,
+      facilities
+    } = req.body;
+
+    // Check if user already exists
+    let user = await User.findOne({ email });
+    if (user) {
+      return res.status(400).json({ message: 'User already exists with this email' });
+    }
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create user
+    user = new User({
+      name,
+      email,
+      password: hashedPassword,
+      phone: phone || '',
+      role: 'hospital'
+    });
+    await user.save();
+
+    // Create hospital profile
+    const Hospital = require('../models/Hospital');
+    const hospital = new Hospital({
+      userId: user._id,
+      hospitalName,
+      registrationNumber,
+      address,
+      city,
+      state,
+      pincode,
+      latitude: latitude || null,
+      longitude: longitude || null,
+      contactNumber,
+      emergencyNumber: emergencyNumber || '',
+      email,
+      totalBeds: totalBeds || 0,
+      availableBeds: availableBeds || 0,
+      icuBeds: icuBeds || 0,
+      availableIcuBeds: availableIcuBeds || 0,
+      specializations: specializations || [],
+      facilities: facilities || [],
+      isVerified: true
+    });
+    await hospital.save();
+
+    res.status(201).json({
+      message: 'Hospital created successfully',
+      hospital,
+      credentials: { email, password }
+    });
+  } catch (err) {
+    console.error('Error creating hospital:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Update user role (admin only)
+router.put('/users/:id/role', [
+  auth,
+  isAdmin,
+  body('role').isIn(['patient', 'pharmacist', 'doctor', 'nutritionist', 'hospital', 'admin']).withMessage('Invalid role')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { role } = req.body;
+    const userId = req.params.id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Don't allow changing admin role
+    if (user.role === 'admin' && role !== 'admin') {
+      return res.status(403).json({ message: 'Cannot change admin role' });
+    }
+
+    user.role = role;
+    await user.save();
+
+    res.json({
+      message: 'User role updated successfully',
+      user: { id: user._id, name: user.name, email: user.email, role: user.role }
+    });
+  } catch (err) {
+    console.error('Error updating user role:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Update hospital (admin only)
+router.put('/hospitals/:id', auth, isAdmin, async (req, res) => {
+  try {
+    const Hospital = require('../models/Hospital');
+    const hospital = await Hospital.findById(req.params.id);
+    
+    if (!hospital) {
+      return res.status(404).json({ message: 'Hospital not found' });
+    }
+
+    Object.assign(hospital, req.body);
+    await hospital.save();
+
+    res.json({ message: 'Hospital updated successfully', hospital });
+  } catch (err) {
+    console.error('Error updating hospital:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Toggle hospital verification (admin only)
+router.patch('/hospitals/:id/verify', auth, isAdmin, async (req, res) => {
+  try {
+    const Hospital = require('../models/Hospital');
+    const { isVerified } = req.body;
+    
+    const hospital = await Hospital.findById(req.params.id);
+    if (!hospital) {
+      return res.status(404).json({ message: 'Hospital not found' });
+    }
+
+    hospital.isVerified = isVerified;
+    await hospital.save();
+
+    res.json({ message: `Hospital ${isVerified ? 'verified' : 'unverified'} successfully` });
+  } catch (err) {
+    console.error('Error updating hospital verification:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Delete hospital (admin only)
+router.delete('/hospitals/:id', auth, isAdmin, async (req, res) => {
+  try {
+    const Hospital = require('../models/Hospital');
+    const hospital = await Hospital.findById(req.params.id);
+    
+    if (!hospital) {
+      return res.status(404).json({ message: 'Hospital not found' });
+    }
+
+    // Delete user account
+    await User.findByIdAndDelete(hospital.userId);
+    
+    // Delete hospital profile
+    await Hospital.findByIdAndDelete(req.params.id);
+
+    res.json({ message: 'Hospital deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting hospital:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
