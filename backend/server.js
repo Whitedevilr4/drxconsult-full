@@ -138,6 +138,10 @@ app.use('*', (req, res) => {
 // Server start (STRUCTURE KEPT)
 // =====================
 const PORT = process.env.PORT || 5000;
+// Initialize Socket.IO
+const { initializeSocket } = require('./utils/socketManager');
+initializeSocket(io);
+
 app.listen(PORT, async () => {
   console.log(`🚀 Server running on port ${PORT}`);
 
