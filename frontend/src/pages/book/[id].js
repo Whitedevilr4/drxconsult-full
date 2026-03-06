@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import axios from 'axios'
 import Layout from '@/components/Layout'
 import PdfUploader from '@/components/EnhancedUploader'
+import PaymentDisclaimer from '@/components/PaymentDisclaimer'
 import { toast } from 'react-toastify'
 
 export default function BookProfessional() {
@@ -38,6 +39,11 @@ export default function BookProfessional() {
   })
   const [showPatientForm, setShowPatientForm] = useState(false)
   const [showPrescriptionUploader, setShowPrescriptionUploader] = useState(false)
+  const [showPaymentDisclaimer, setShowPaymentDisclaimer] = useState(false)
+  
+  // New state for improved UI
+  const [selectedDate, setSelectedDate] = useState(null)
+  const [selectedTimePeriod, setSelectedTimePeriod] = useState('morning') // 'morning', 'afternoon', or 'evening'
 
   // Pharmacist services (two options)
   const pharmacistServices = [
@@ -120,6 +126,13 @@ export default function BookProfessional() {
       const endpoint = profType === 'doctor' ? 'doctors' : profType === 'nutritionist' ? 'nutritionists' : 'pharmacists'
       const professionalRes = await axios.get(`${apiUrl}/${endpoint}/${id}`)
       
+      // Check if professional is admin-disabled
+      if (professionalRes.data && professionalRes.data.adminDisabled) {
+        toast.error('This professional is currently not accepting bookings.')
+        router.push(`/${endpoint}`)
+        return
+      }
+      
       // Fetch available slots with booking status - include type parameter
       const slotsRes = await axios.get(`${apiUrl}/bookings/available-slots/${id}?type=${profType}`)
       
@@ -177,8 +190,13 @@ export default function BookProfessional() {
       return
     }
     
-    // Proceed to booking
-    handleBooking()
+    // Show disclaimer before proceeding to payment
+    setShowPaymentDisclaimer(true)
+  }
+
+  const proceedWithBooking = async () => {
+    setShowPaymentDisclaimer(false)
+    await handleBooking()
   }
 
   const handlePrescriptionUpload = (data) => {
@@ -186,6 +204,81 @@ export default function BookProfessional() {
     setShowPrescriptionUploader(false)
     toast.success('Prescription uploaded successfully!')
   }
+
+  // Helper functions for new UI
+  const getUniqueDates = () => {
+    if (!professional?.availableSlots) return []
+    
+    const dates = professional.availableSlots
+      .filter(slot => !slot.isBooked)
+      .map(slot => new Date(slot.date).toDateString())
+    
+    return [...new Set(dates)].sort((a, b) => new Date(a) - new Date(b)).slice(0, 6)
+  }
+
+  const getDateLabel = (dateString) => {
+    const date = new Date(dateString)
+    const today = new Date()
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    
+    if (date.toDateString() === today.toDateString()) return 'Today'
+    if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow'
+    
+    return date.toLocaleDateString('en-US', { weekday: 'short' })
+  }
+
+  const getDateNumber = (dateString) => {
+    return new Date(dateString).getDate()
+  }
+
+  const getFilteredSlots = () => {
+    if (!professional?.availableSlots || !selectedDate) return []
+    
+    return professional.availableSlots
+      .filter(slot => {
+        if (slot.isBooked) return false
+        if (new Date(slot.date).toDateString() !== selectedDate) return false
+        
+        // Filter by time period
+        const timeStr = slot.startTime.toLowerCase()
+        let hour = parseInt(slot.startTime.split(':')[0])
+        const isPM = timeStr.includes('pm')
+        const isAM = timeStr.includes('am')
+        
+        // Convert to 24-hour format
+        let hour24 = hour
+        if (isPM && hour !== 12) {
+          hour24 = hour + 12
+        } else if (isAM && hour === 12) {
+          hour24 = 0
+        }
+        
+        // Filter based on selected time period
+        if (selectedTimePeriod === 'morning') {
+          return hour24 >= 6 && hour24 < 11 // 6 AM to 10:59 AM
+        } else if (selectedTimePeriod === 'afternoon') {
+          return hour24 >= 11 && hour24 < 18 // 11 AM to 5:59 PM
+        } else { // evening
+          return hour24 >= 18 || hour24 < 6 // 6 PM onwards and before 6 AM
+        }
+      })
+      .sort((a, b) => {
+        const timeA = a.startTime
+        const timeB = b.startTime
+        return timeA.localeCompare(timeB)
+      })
+  }
+
+  // Auto-select first available date
+  useEffect(() => {
+    if (professional?.availableSlots && !selectedDate) {
+      const dates = getUniqueDates()
+      if (dates.length > 0) {
+        setSelectedDate(dates[0])
+      }
+    }
+  }, [professional, selectedDate])
 
   const handleBooking = async () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
@@ -526,13 +619,9 @@ export default function BookProfessional() {
               </div>
             </div>
 
-            {/* Time Slots Selection */}
+            {/* Time Slots Selection - Modern UI */}
             <div className="mb-6">
-              <h3 className="text-lg font-semibold mb-3">Available Time Slots</h3>
-              
-              <div className="mb-3 text-sm text-gray-600">
-                {professional.availableSlots?.filter(slot => !slot.isBooked).length || 0} slots available
-              </div>
+              <h3 className="text-2xl font-bold mb-6">Select your preferred slot</h3>
               
               {professional.availableSlots?.filter(slot => !slot.isBooked).length === 0 ? (
                 <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
@@ -542,46 +631,95 @@ export default function BookProfessional() {
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {professional.availableSlots
-                    .filter(slot => !slot.isBooked)
-                    .sort((a, b) => new Date(a.date) - new Date(b.date))
-                    .map((slot, index) => (
-                      <button
-                        key={index}
-                        onClick={() => handleSlotSelection(slot)}
-                        disabled={slot.isBooked}
-                        className={`p-4 border rounded-lg text-left transition-all ${
-                          slot.isBooked 
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300' 
-                            : selectedSlot === slot 
-                              ? 'bg-blue-100 border-blue-600 shadow-md' 
-                              : 'hover:bg-gray-50 hover:border-blue-300 border-gray-200'
-                        }`}
-                      >
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <div className="font-medium text-gray-900">
-                              {new Date(slot.date).toLocaleDateString('en-US', { 
-                                weekday: 'short', 
-                                year: 'numeric', 
-                                month: 'short', 
-                                day: 'numeric' 
-                              })}
-                            </div>
-                            <div className="text-sm text-gray-600">
-                              {slot.startTime} - {slot.endTime}
-                            </div>
+                <>
+                  {/* Date Selector */}
+                  <div className="mb-6">
+                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                      {getUniqueDates().map((dateString, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setSelectedDate(dateString)}
+                          className={`flex-shrink-0 px-6 py-3 rounded-lg border-2 transition-all ${
+                            selectedDate === dateString
+                              ? 'bg-gray-800 text-white border-gray-800'
+                              : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                          }`}
+                        >
+                          <div className="text-center">
+                            <div className="text-sm font-medium">{getDateLabel(dateString)}</div>
+                            <div className="text-2xl font-bold mt-1">{getDateNumber(dateString)}</div>
                           </div>
-                          {selectedSlot === slot && (
-                            <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded">
-                              Selected
-                            </span>
-                          )}
-                        </div>
-                      </button>
-                    ))}
-                </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Time Period Filter */}
+                  <div className="mb-6 flex gap-3 flex-wrap">
+                    <button
+                      onClick={() => setSelectedTimePeriod('morning')}
+                      className={`flex items-center gap-2 px-6 py-3 rounded-full border-2 transition-all ${
+                        selectedTimePeriod === 'morning'
+                          ? 'bg-teal-50 text-teal-700 border-teal-500'
+                          : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
+                      </svg>
+                      <span className="font-medium">Morning</span>
+                    </button>
+                    <button
+                      onClick={() => setSelectedTimePeriod('afternoon')}
+                      className={`flex items-center gap-2 px-6 py-3 rounded-full border-2 transition-all ${
+                        selectedTimePeriod === 'afternoon'
+                          ? 'bg-teal-50 text-teal-700 border-teal-500'
+                          : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                      </svg>
+                      <span className="font-medium">Afternoon</span>
+                    </button>
+                    <button
+                      onClick={() => setSelectedTimePeriod('evening')}
+                      className={`flex items-center gap-2 px-6 py-3 rounded-full border-2 transition-all ${
+                        selectedTimePeriod === 'evening'
+                          ? 'bg-teal-50 text-teal-700 border-teal-500'
+                          : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+                      </svg>
+                      <span className="font-medium">Evening</span>
+                    </button>
+                  </div>
+
+                  {/* Time Slots */}
+                  <div className="flex flex-wrap gap-3">
+                    {getFilteredSlots().length === 0 ? (
+                      <div className="w-full text-center py-8 text-gray-500">
+                        No slots available for the selected time period
+                      </div>
+                    ) : (
+                      getFilteredSlots().map((slot, index) => (
+                        <button
+                          key={index}
+                          onClick={() => handleSlotSelection(slot)}
+                          className={`px-8 py-4 rounded-xl font-semibold transition-all ${
+                            selectedSlot === slot
+                              ? 'bg-teal-600 text-white shadow-lg scale-105'
+                              : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-teal-400 hover:shadow-md'
+                          }`}
+                        >
+                          {slot.startTime}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </>
               )}
             </div>
 
@@ -975,6 +1113,19 @@ export default function BookProfessional() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Payment Disclaimer Modal */}
+        {showPaymentDisclaimer && selectedService && (
+          <PaymentDisclaimer
+            onAccept={proceedWithBooking}
+            onCancel={() => {
+              setShowPaymentDisclaimer(false);
+              setLoading(false);
+            }}
+            amount={selectedService.price}
+            serviceName={selectedService.title}
+          />
         )}
       </div>
     </Layout>
