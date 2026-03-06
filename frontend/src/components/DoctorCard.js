@@ -56,10 +56,14 @@ export default function DoctorCard({ doctor }) {
               className="w-16 h-16 sm:w-24 sm:h-24 rounded-full object-cover border-4 border-white shadow-lg"
               onError={(e) => { e.target.src = defaultPhoto }}
             />
-            {/* Status indicator - green for online, gray for offline */}
-            <div className={`absolute bottom-0 right-0 w-4 h-4 sm:w-6 sm:h-6 rounded-full border-2 border-white ${
-              doctor.status === 'online' ? 'bg-green-500' : 'bg-gray-400'
-            }`}></div>
+            {/* Status indicator with blinking animation for online */}
+            {doctor.status === 'online' ? (
+              <div className="absolute bottom-0 right-0 w-4 h-4 sm:w-6 sm:h-6 rounded-full border-2 border-white bg-green-500">
+                <span className="absolute inset-0 rounded-full bg-green-500 animate-ping opacity-75"></span>
+              </div>
+            ) : (
+              <div className="absolute bottom-0 right-0 w-4 h-4 sm:w-6 sm:h-6 rounded-full border-2 border-white bg-gray-400"></div>
+            )}
           </div>
         </div>
       </div>
@@ -143,25 +147,25 @@ export default function DoctorCard({ doctor }) {
         </div>
 
         {/* Book button */}
-        {doctor.status === 'online' ? (
+        {doctor.adminDisabled ? (
+          <button
+            disabled
+            className="block w-full bg-gray-400 text-white font-semibold py-2 sm:py-3 px-4 sm:px-6 rounded-lg cursor-not-allowed text-sm sm:text-base"
+          >
+            Not Available
+          </button>
+        ) : (
           <Link 
             href={`/book/${doctor._id}?type=doctor`}
             className="block w-full bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold py-2 sm:py-3 px-4 sm:px-6 rounded-lg hover:from-red-700 hover:to-red-800 transition-all duration-300 shadow-md hover:shadow-lg text-sm sm:text-base"
           >
             Book Consultation
           </Link>
-        ) : (
-          <button
-            disabled
-            className="block w-full bg-gray-400 text-white font-semibold py-2 sm:py-3 px-4 sm:px-6 rounded-lg cursor-not-allowed text-sm sm:text-base"
-          >
-            Currently Offline
-          </button>
         )}
 
         {/* Additional info */}
         <p className="text-xs text-gray-500 mt-2 sm:mt-3">
-          {doctor.status === 'online' ? 'Available for online consultation' : 'Not available at the moment'}
+          {doctor.adminDisabled ? 'Not accepting bookings' : doctor.status === 'online' ? 'Available for online consultation' : 'Not available at the moment'}
         </p>
       </div>
     </div>
