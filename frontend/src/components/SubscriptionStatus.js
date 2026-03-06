@@ -81,7 +81,7 @@ export default function SubscriptionStatus() {
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-3">
         <div>
           <p className="text-sm text-gray-600">Sessions Used</p>
           <p className={`font-semibold text-${statusColor}-800`}>
@@ -93,6 +93,14 @@ export default function SubscriptionStatus() {
             <p className="text-sm text-gray-600">Doctor Consultations</p>
             <p className={`font-semibold text-${statusColor}-800`}>
               {subscription.doctorConsultationsUsed} / {subscription.doctorConsultationsLimit}
+            </p>
+          </div>
+        )}
+        {subscription.nutritionistConsultationsLimit > 0 && (
+          <div>
+            <p className="text-sm text-gray-600">Nutritionist Consultations</p>
+            <p className={`font-semibold text-${statusColor}-800`}>
+              {subscription.nutritionistConsultationsUsed} / {subscription.nutritionistConsultationsLimit}
             </p>
           </div>
         )}
