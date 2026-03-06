@@ -11,17 +11,19 @@ const router = express.Router();
 const SUBSCRIPTION_PLANS = {
   essential: {
     name: 'Essential Care',
-    description: 'Perfect for individuals, students, working adults with medicine doubts',
+    description: 'Perfect for individuals seeking basic healthcare consultations',
     monthly: {
-      price: 299,
-      sessionsLimit: 2,
-      doctorConsultationsLimit: 0,
+      price: 999,
+      sessionsLimit: 1, // 1 pharmacist
+      doctorConsultationsLimit: 1, // 1 doctor
+      nutritionistConsultationsLimit: 1, // 1 nutritionist
       familyMembersLimit: 1
     },
     yearly: {
-      price: 2999,
-      sessionsLimit: 2,
-      doctorConsultationsLimit: 0,
+      price: 9999,
+      sessionsLimit: 1,
+      doctorConsultationsLimit: 1,
+      nutritionistConsultationsLimit: 1,
       familyMembersLimit: 1
     },
     features: {
@@ -32,22 +34,25 @@ const SUBSCRIPTION_PLANS = {
       chronicCareGuidance: false,
       labReportExplanation: false,
       medicationReminders: false,
-      priorityBooking: false
+      priorityBooking: false,
+      dietChart: false
     }
   },
-  family: {
-    name: 'Family & Chronic Care',
-    description: 'Hero plan for families with chronic care needs',
+  chronic: {
+    name: 'Chronic Care',
+    description: 'Specialized care for Diabetes, PCOS, and BP management',
     monthly: {
-      price: 799,
-      sessionsLimit: 5,
-      doctorConsultationsLimit: 1,
+      price: 1799,
+      sessionsLimit: 3, // 3 pharmacist
+      doctorConsultationsLimit: 2, // 2 doctor
+      nutritionistConsultationsLimit: 2, // 2 dietitian with diet chart
       familyMembersLimit: 4
     },
     yearly: {
-      price: 7999,
-      sessionsLimit: 5,
-      doctorConsultationsLimit: 1,
+      price: 16999,
+      sessionsLimit: 3,
+      doctorConsultationsLimit: 2,
+      nutritionistConsultationsLimit: 2,
       familyMembersLimit: 4
     },
     features: {
@@ -58,7 +63,42 @@ const SUBSCRIPTION_PLANS = {
       chronicCareGuidance: true,
       labReportExplanation: true,
       medicationReminders: true,
-      priorityBooking: true
+      priorityBooking: true,
+      dietChart: true,
+      diabetesCare: true,
+      pcosCare: true,
+      bpCare: true
+    }
+  },
+  fatToFit: {
+    name: 'Fat to Fit',
+    description: 'Weight management with personalized diet plans',
+    monthly: {
+      price: 1299,
+      sessionsLimit: 0, // No pharmacist
+      doctorConsultationsLimit: 1, // 1 doctor
+      nutritionistConsultationsLimit: 2, // 2 dietitian
+      familyMembersLimit: 1
+    },
+    yearly: {
+      price: 12999,
+      sessionsLimit: 0,
+      doctorConsultationsLimit: 1,
+      nutritionistConsultationsLimit: 2,
+      familyMembersLimit: 1
+    },
+    features: {
+      prescriptionExplanation: false,
+      medicineGuidance: false,
+      whatsappSupport: true,
+      verifiedContent: true,
+      chronicCareGuidance: false,
+      labReportExplanation: false,
+      medicationReminders: false,
+      priorityBooking: true,
+      dietChart: true,
+      weightManagement: true,
+      personalizedDietPlan: true
     }
   }
 };
@@ -99,7 +139,7 @@ router.get('/current', auth, async (req, res) => {
 // Create new subscription
 router.post('/create', [
   auth,
-  body('planType').isIn(['essential', 'family']).withMessage('Invalid plan type'),
+  body('planType').isIn(['essential', 'chronic', 'fatToFit']).withMessage('Invalid plan type'),
   body('billingCycle').isIn(['monthly', 'yearly']).withMessage('Invalid billing cycle'),
   body('paymentId').optional().isString().withMessage('Payment ID must be a string'),
   body('orderId').optional().isString().withMessage('Order ID must be a string')
@@ -147,6 +187,7 @@ router.post('/create', [
       price: planConfig.price,
       sessionsLimit: planConfig.sessionsLimit,
       doctorConsultationsLimit: planConfig.doctorConsultationsLimit,
+      nutritionistConsultationsLimit: planConfig.nutritionistConsultationsLimit || 0,
       familyMembersLimit: planConfig.familyMembersLimit,
       startDate,
       endDate,
@@ -183,7 +224,7 @@ router.post('/create', [
 // Update subscription (upgrade/downgrade)
 router.put('/update', [
   auth,
-  body('planType').isIn(['essential', 'family']).withMessage('Invalid plan type'),
+  body('planType').isIn(['essential', 'chronic', 'fatToFit']).withMessage('Invalid plan type'),
   body('billingCycle').isIn(['monthly', 'yearly']).withMessage('Invalid billing cycle'),
   body('paymentId').optional().isString().withMessage('Payment ID must be a string'),
   body('orderId').optional().isString().withMessage('Order ID must be a string')
@@ -215,6 +256,7 @@ router.put('/update', [
     subscription.price = planConfig.price;
     subscription.sessionsLimit = planConfig.sessionsLimit;
     subscription.doctorConsultationsLimit = planConfig.doctorConsultationsLimit;
+    subscription.nutritionistConsultationsLimit = planConfig.nutritionistConsultationsLimit || 0;
     subscription.familyMembersLimit = planConfig.familyMembersLimit;
     subscription.features = planInfo.features;
     subscription.updatedAt = new Date();
@@ -274,20 +316,6 @@ router.get('/can-book-session', auth, async (req, res) => {
   try {
     const { professionalType } = req.query; // 'pharmacist', 'doctor', or 'nutritionist'
     
-    // Nutritionists are not covered by subscription - always charge normal price
-    if (professionalType === 'nutritionist') {
-      return res.json({ 
-        canBook: true,
-        canBookWithSubscription: false,
-        reason: 'Nutritionist consultations are not covered by subscription plans',
-        requiresSubscription: false,
-        bookingType: 'normal_price',
-        professionalType: 'nutritionist',
-        sessionsUsed: 0,
-        sessionsLimit: 0
-      });
-    }
-    
     const subscription = await Subscription.findOne({
       userId: req.user.userId,
       status: 'active'
@@ -310,18 +338,28 @@ router.get('/can-book-session', auth, async (req, res) => {
     let sessionsUsed = 0;
     let sessionsLimit = 0;
     
-    if (professionalType === 'doctor') {
-      // Doctor consultations are only available for family plan
+    if (professionalType === 'nutritionist') {
+      // Nutritionist consultations
+      canBookWithSubscription = subscription.canBookNutritionistConsultation();
+      reason = canBookWithSubscription ? null : 
+        subscription.nutritionistConsultationsLimit === 0 ? 'Nutritionist consultations not included in plan - will be charged normal price' :
+        'Nutritionist consultation limit exceeded - will be charged normal price';
+      sessionsUsed = subscription.nutritionistConsultationsUsed;
+      sessionsLimit = subscription.nutritionistConsultationsLimit;
+    } else if (professionalType === 'doctor') {
+      // Doctor consultations
       canBookWithSubscription = subscription.canBookDoctorConsultation();
       reason = canBookWithSubscription ? null : 
-        subscription.planType !== 'family' ? 'Doctor consultations require Family plan' :
+        subscription.doctorConsultationsLimit === 0 ? 'Doctor consultations not included in plan - will be charged normal price' :
         'Doctor consultation limit exceeded - will be charged normal price';
       sessionsUsed = subscription.doctorConsultationsUsed;
       sessionsLimit = subscription.doctorConsultationsLimit;
     } else {
       // Regular pharmacist sessions
       canBookWithSubscription = subscription.canBookSession();
-      reason = canBookWithSubscription ? null : 'Session limit exceeded - will be charged normal price';
+      reason = canBookWithSubscription ? null : 
+        subscription.sessionsLimit === 0 ? 'Pharmacist consultations not included in plan - will be charged normal price' :
+        'Session limit exceeded - will be charged normal price';
       sessionsUsed = subscription.sessionsUsed;
       sessionsLimit = subscription.sessionsLimit;
     }
@@ -350,17 +388,6 @@ router.post('/use-session', auth, async (req, res) => {
   try {
     const { bookingType, professionalType } = req.body; // 'subscription' or 'normal_price', 'pharmacist', 'doctor', or 'nutritionist'
     
-    // Nutritionists are never covered by subscription
-    if (professionalType === 'nutritionist') {
-      return res.json({
-        message: 'Nutritionist consultation booked at normal price (not covered by subscription)',
-        bookingType: 'normal_price',
-        professionalType: 'nutritionist',
-        sessionsUsed: 0,
-        sessionsLimit: 0
-      });
-    }
-    
     const subscription = await Subscription.findOne({
       userId: req.user.userId,
       status: 'active'
@@ -373,16 +400,43 @@ router.post('/use-session', auth, async (req, res) => {
         bookingType: 'normal_price',
         professionalType: professionalType || 'pharmacist',
         sessionsUsed: subscription ? 
-          (professionalType === 'doctor' ? subscription.doctorConsultationsUsed : subscription.sessionsUsed) : 0,
+          (professionalType === 'nutritionist' ? subscription.nutritionistConsultationsUsed :
+           professionalType === 'doctor' ? subscription.doctorConsultationsUsed : 
+           subscription.sessionsUsed) : 0,
         sessionsLimit: subscription ? 
-          (professionalType === 'doctor' ? subscription.doctorConsultationsLimit : subscription.sessionsLimit) : 0
+          (professionalType === 'nutritionist' ? subscription.nutritionistConsultationsLimit :
+           professionalType === 'doctor' ? subscription.doctorConsultationsLimit : 
+           subscription.sessionsLimit) : 0
       });
     }
 
     // If booking with subscription, try to use subscription session
     await subscription.resetMonthlyUsage();
     
-    if (professionalType === 'doctor') {
+    if (professionalType === 'nutritionist') {
+      // Use nutritionist consultation
+      if (subscription.canBookNutritionistConsultation()) {
+        await subscription.useNutritionistConsultation();
+        res.json({
+          message: 'Nutritionist consultation used from subscription',
+          bookingType: 'subscription',
+          professionalType: 'nutritionist',
+          sessionsUsed: subscription.nutritionistConsultationsUsed,
+          sessionsLimit: subscription.nutritionistConsultationsLimit
+        });
+      } else {
+        // Nutritionist consultation limit exceeded, book at normal price
+        res.json({
+          message: subscription.nutritionistConsultationsLimit === 0 ? 
+            'Nutritionist consultations not included in plan - booked at normal price' :
+            'Nutritionist consultation limit exceeded - booked at normal price',
+          bookingType: 'normal_price',
+          professionalType: 'nutritionist',
+          sessionsUsed: subscription.nutritionistConsultationsUsed,
+          sessionsLimit: subscription.nutritionistConsultationsLimit
+        });
+      }
+    } else if (professionalType === 'doctor') {
       // Use doctor consultation
       if (subscription.canBookDoctorConsultation()) {
         await subscription.useDoctorConsultation();
@@ -396,8 +450,8 @@ router.post('/use-session', auth, async (req, res) => {
       } else {
         // Doctor consultation limit exceeded, book at normal price
         res.json({
-          message: subscription.planType !== 'family' ? 
-            'Doctor consultations require Family plan - booked at normal price' :
+          message: subscription.doctorConsultationsLimit === 0 ? 
+            'Doctor consultations not included in plan - booked at normal price' :
             'Doctor consultation limit exceeded - booked at normal price',
           bookingType: 'normal_price',
           professionalType: 'doctor',
@@ -419,7 +473,9 @@ router.post('/use-session', auth, async (req, res) => {
       } else {
         // Subscription limit exceeded, book at normal price
         res.json({
-          message: 'Subscription limit exceeded - booked at normal price',
+          message: subscription.sessionsLimit === 0 ?
+            'Pharmacist consultations not included in plan - booked at normal price' :
+            'Subscription limit exceeded - booked at normal price',
           bookingType: 'normal_price',
           professionalType: 'pharmacist',
           sessionsUsed: subscription.sessionsUsed,
@@ -453,7 +509,8 @@ router.get('/admin/analytics', auth, isAdmin, async (req, res) => {
     const totalSubscriptions = await Subscription.countDocuments();
     const activeSubscriptions = await Subscription.countDocuments({ status: 'active' });
     const essentialSubscriptions = await Subscription.countDocuments({ planType: 'essential', status: 'active' });
-    const familySubscriptions = await Subscription.countDocuments({ planType: 'family', status: 'active' });
+    const chronicSubscriptions = await Subscription.countDocuments({ planType: 'chronic', status: 'active' });
+    const fatToFitSubscriptions = await Subscription.countDocuments({ planType: 'fatToFit', status: 'active' });
     const monthlySubscriptions = await Subscription.countDocuments({ billingCycle: 'monthly', status: 'active' });
     const yearlySubscriptions = await Subscription.countDocuments({ billingCycle: 'yearly', status: 'active' });
 
@@ -472,7 +529,8 @@ router.get('/admin/analytics', auth, isAdmin, async (req, res) => {
         activeSubscriptions,
         planBreakdown: {
           essential: essentialSubscriptions,
-          family: familySubscriptions
+          chronic: chronicSubscriptions,
+          fatToFit: fatToFitSubscriptions
         },
         billingBreakdown: {
           monthly: monthlySubscriptions,
