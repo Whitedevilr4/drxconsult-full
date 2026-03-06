@@ -6,8 +6,6 @@ const Doctor = require('../models/Doctor');
 // Create notification helper
 async function createNotification({ userId, type, title, message, bookingId, pharmacistId, doctorId, patientId }) {
   try {
-    console.log('Creating notification:', { userId, type, title, message });
-    
     const notification = new Notification({
       userId,
       type,
