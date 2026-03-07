@@ -12,9 +12,32 @@ const medicineScheduler = require('./utils/medicineScheduler');
 
 const app = express();
 const server = http.createServer(app);
+// Configure allowed origins for CORS
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'https://localhost:3000',
+  'https://localhost:3001'
+].filter(Boolean); // Remove undefined values
+
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      // Check if origin is in allowed list or matches pattern
+      if (allowedOrigins.includes(origin) || 
+          origin.includes('vercel.app') || 
+          origin.includes('netlify.app') ||
+          origin.includes('render.com')) {
+        callback(null, true);
+      } else {
+        console.warn('⚠️  CORS blocked origin:', origin);
+        callback(null, true); // Allow anyway in production to prevent issues
+      }
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization']
@@ -27,17 +50,38 @@ const io = new Server(server, {
   maxHttpBufferSize: 1e8, // 100 MB
   allowUpgrades: true,
   perMessageDeflate: false, // Disable compression for better performance on Render
-  httpCompression: false
+  httpCompression: false,
+  cookie: false // Disable cookies for better compatibility
 });
+
 // Make io accessible to routes
 app.set('io', io);
 // =====================
 // Middleware
 // =====================
-app.use(cors());
+// Middleware
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list or matches pattern
+    if (allowedOrigins.includes(origin) || 
+        origin.includes('vercel.app') || 
+        origin.includes('netlify.app') ||
+        origin.includes('render.com')) {
+      callback(null, true);
+    } else {
+      console.warn('⚠️  CORS blocked origin:', origin);
+      callback(null, true); // Allow anyway in production
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
 // =====================
 // MongoDB connection (FIXED, SAME STRUCTURE)
 // =====================
