@@ -12,47 +12,15 @@ const medicineScheduler = require('./utils/medicineScheduler');
 
 const app = express();
 const server = http.createServer(app);
-// Configure allowed origins for CORS
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'https://localhost:3000',
-  'https://localhost:3001'
-].filter(Boolean); // Remove undefined values
-
 const io = new Server(server, {
   cors: {
-    origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-      
-      // Check if origin is in allowed list or matches pattern
-      if (allowedOrigins.includes(origin) || 
-          origin.includes('vercel.app') || 
-          origin.includes('netlify.app') ||
-          origin.includes('render.com')) {
-        callback(null, true);
-      } else {
-        console.warn('⚠️  CORS blocked origin:', origin);
-        callback(null, true); // Allow anyway in production to prevent issues
-      }
-    },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization']
-  },
-  transports: ['websocket', 'polling'], // Enable both transports
-  allowEIO3: true, // Enable compatibility with older clients
-  pingTimeout: 60000, // Increase ping timeout for Render
-  pingInterval: 25000, // Ping interval
-  upgradeTimeout: 30000, // Upgrade timeout
-  maxHttpBufferSize: 1e8, // 100 MB
-  allowUpgrades: true,
-  perMessageDeflate: false, // Disable compression for better performance on Render
-  httpCompression: false,
-  cookie: false // Disable cookies for better compatibility
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
 });
+
+
 
 // Make io accessible to routes
 app.set('io', io);
@@ -60,26 +28,8 @@ app.set('io', io);
 // Middleware
 // =====================
 // Middleware
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin
-    if (!origin) return callback(null, true);
-    
-    // Check if origin is in allowed list or matches pattern
-    if (allowedOrigins.includes(origin) || 
-        origin.includes('vercel.app') || 
-        origin.includes('netlify.app') ||
-        origin.includes('render.com')) {
-      callback(null, true);
-    } else {
-      console.warn('⚠️  CORS blocked origin:', origin);
-      callback(null, true); // Allow anyway in production
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+// Middleware
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 // =====================
