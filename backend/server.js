@@ -15,9 +15,19 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    methods: ['GET', 'POST'],
-    credentials: true
-  }
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization']
+  },
+  transports: ['websocket', 'polling'], // Enable both transports
+  allowEIO3: true, // Enable compatibility with older clients
+  pingTimeout: 60000, // Increase ping timeout for Render
+  pingInterval: 25000, // Ping interval
+  upgradeTimeout: 30000, // Upgrade timeout
+  maxHttpBufferSize: 1e8, // 100 MB
+  allowUpgrades: true,
+  perMessageDeflate: false, // Disable compression for better performance on Render
+  httpCompression: false
 });
 // Make io accessible to routes
 app.set('io', io);
