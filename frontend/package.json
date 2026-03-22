@@ -12,6 +12,8 @@
     "autoprefixer": "^10.4.23",
     "axios": "^1.6.2",
     "firebase": "^12.8.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",
     "next": "^14.0.4",
     "postcss": "^8.4.32",
