@@ -1,4 +1,6 @@
 const express = require('express');
+const multer = require('multer');
+const cloudinary = require('cloudinary').v2;
 const { cleanupExpiredSlotsForDoctor } = require('../utils/slotCleanup');
 
 const router = express.Router();
@@ -6,6 +8,21 @@ const Doctor = require('../models/Doctor');
 const User = require('../models/User');
 const Booking = require('../models/Booking');
 const { auth } = require('../middleware/auth');
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+const signatureUpload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    allowed.includes(file.mimetype) ? cb(null, true) : cb(new Error('Only image files allowed'), false);
+  },
+  limits: { fileSize: 2 * 1024 * 1024 } // 2MB
+});
 
 // Get all doctors
 router.get('/', async (req, res) => {
@@ -129,6 +146,48 @@ router.get('/payment-stats', auth, async (req, res) => {
     res.json(stats);
   } catch (error) {
     console.error('Error fetching payment stats:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Upload doctor signature - MUST come before /:id route
+router.post('/signature', auth, signatureUpload.single('signature'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+
+    const doctor = await Doctor.findOne({ userId: req.user.userId });
+    if (!doctor) return res.status(404).json({ message: 'Doctor profile not found' });
+
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { folder: 'doctor-signatures', resource_type: 'image' },
+        (error, result) => error ? reject(error) : resolve(result)
+      );
+      stream.end(req.file.buffer);
+    });
+
+    doctor.signatureUrl = result.secure_url;
+    await doctor.save();
+
+    res.json({ signatureUrl: result.secure_url });
+  } catch (error) {
+    console.error('Error uploading signature:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Delete doctor signature - MUST come before /:id route
+router.delete('/signature', auth, async (req, res) => {
+  try {
+    const doctor = await Doctor.findOne({ userId: req.user.userId });
+    if (!doctor) return res.status(404).json({ message: 'Doctor profile not found' });
+
+    doctor.signatureUrl = '';
+    await doctor.save();
+
+    res.json({ message: 'Signature removed' });
+  } catch (error) {
+    console.error('Error removing signature:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
