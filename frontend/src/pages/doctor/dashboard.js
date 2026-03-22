@@ -1463,6 +1463,7 @@ export default function DoctorDashboard() {
         doctor={doctorProfile}
         user={user}
         onClose={() => setShowPrescription(false)}
+        onSignatureUpdate={(url) => setDoctorProfile(prev => prev ? { ...prev, signatureUrl: url } : prev)}
       />
     )}
     </>
