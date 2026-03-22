@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import NotificationBell from './NotificationBell'
+import LocationDisplay from './LocationDisplay'
 
 // Modern SVG Icons with gradients and better designs
 const HomeIcon = ({ className }) => (
@@ -161,6 +162,11 @@ export default function Navbar() {
       {/* Desktop Navigation */}
       <nav className="bg-white/95 backdrop-blur-lg shadow-lg shadow-gray-200/50 sticky top-0 z-50 hidden md:block border-b border-gray-100">
         <div className="container mx-auto px-4">
+          {/* Location Bar */}
+          <div className="py-3 border-b border-gray-100">
+            <LocationDisplay />
+          </div>
+          
           <div className="flex justify-between items-center py-4">
             {/* Logo */}
             <Link href="/" className="flex items-center space-x-2">
@@ -351,6 +357,11 @@ export default function Navbar() {
       {/* Mobile Top Bar */}
       <nav className="bg-white/95 backdrop-blur-lg shadow-lg shadow-gray-200/50 sticky top-0 z-50 md:hidden border-b border-gray-100">
         <div className="container mx-auto px-4">
+          {/* Location Bar */}
+          <div className="py-2 border-b border-gray-100">
+            <LocationDisplay />
+          </div>
+          
           <div className="flex justify-between items-center py-3">
             {/* Logo */}
             <Link href="/" className="flex items-center space-x-2">
