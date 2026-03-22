@@ -60,6 +60,10 @@ const doctorSchema = new mongoose.Schema({
   licenseNumber: {
     type: String,
     required: true
+  },
+  signatureUrl: {
+    type: String,
+    default: ''
   }
 }, {
   timestamps: true // This automatically adds createdAt and updatedAt
