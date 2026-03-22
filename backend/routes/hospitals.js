@@ -8,6 +8,51 @@ const HospitalChat = require('../models/HospitalChat');
 const { createNotification } = require('../utils/notificationHelper');
 const { notifyQueryAccepted, notifyQueryRejected } = require('../utils/socketManager');
 
+// Get nearby hospitals (public endpoint)
+router.get('/nearby', async (req, res) => {
+  try {
+    const { latitude, longitude, radius = 5 } = req.query;
+
+    if (!latitude || !longitude) {
+      return res.status(400).json({ message: 'Latitude and longitude are required' });
+    }
+
+    const lat = parseFloat(latitude);
+    const lon = parseFloat(longitude);
+    const radiusKm = parseFloat(radius);
+
+    // Get all active hospitals
+    const hospitals = await Hospital.find({ isActive: true });
+
+    // Filter hospitals within radius and calculate distance
+    const nearbyHospitals = hospitals
+      .filter(hospital => {
+        if (!hospital.latitude || !hospital.longitude) return false;
+        
+        const distance = calculateDistance(lat, lon, hospital.latitude, hospital.longitude);
+        return distance <= radiusKm;
+      })
+      .map(hospital => {
+        const distance = calculateDistance(lat, lon, hospital.latitude, hospital.longitude);
+        return {
+          ...hospital.toObject(),
+          distance: parseFloat(distance.toFixed(2))
+        };
+      })
+      .sort((a, b) => a.distance - b.distance); // Sort by distance
+
+    res.json({ 
+      hospitals: nearbyHospitals,
+      count: nearbyHospitals.length,
+      radius: radiusKm
+    });
+  } catch (error) {
+    console.error('Error fetching nearby hospitals:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+
 // Get hospital profile
 router.get('/profile', auth, async (req, res) => {
   try {
