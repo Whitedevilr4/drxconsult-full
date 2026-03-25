@@ -330,109 +330,11 @@ export default function BookProfessional() {
         return
       }
 
-      // Check subscription status for regular users
-      const subscriptionCheck = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/can-book-session?professionalType=${professionalType}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      // All bookings require payment — no free subscription bookings
+      const bookingPrice = selectedService.price;
+      const bookingType = 'normal_price';
 
-      let bookingPrice = selectedService.price;
-      let bookingType = 'normal_price';
-      let paymentRequired = true;
-
-      if (subscriptionCheck.data.canBookWithSubscription) {
-        bookingPrice = 0;
-        bookingType = 'subscription';
-        paymentRequired = false;
-        
-        // Show confirmation for free subscription booking
-        const sessionType = professionalType === 'doctor' ? 'doctor consultation' : professionalType === 'nutritionist' ? 'nutritionist consultation' : 'pharmacist session';
-        const confirmFreeBooking = window.confirm(
-          `Great! This ${sessionType} will be covered by your ${subscriptionCheck.data.subscription.planName} subscription.\n\n` +
-          `${professionalType === 'doctor' ? 'Doctor consultations' : 'Sessions'} used: ${subscriptionCheck.data.sessionsUsed}/${subscriptionCheck.data.sessionsLimit}\n\n` +
-          `Click OK to confirm your booking.`
-        );
-        
-        if (!confirmFreeBooking) {
-          setLoading(false);
-          return;
-        }
-      } else if (subscriptionCheck.data.subscription) {
-        // Show pricing info when subscription limit exceeded
-        const sessionType = professionalType === 'doctor' ? 'doctor consultation' : professionalType === 'nutritionist' ? 'nutritionist consultation' : 'pharmacist session';
-        const limitType = professionalType === 'doctor' ? 'Doctor consultation' : professionalType === 'nutritionist' ? 'Nutritionist consultation' : 'Session';
-        const confirmPaidBooking = window.confirm(
-          `Your ${subscriptionCheck.data.subscription.planName} subscription limit has been reached.\n\n` +
-          `${limitType} limit: ${subscriptionCheck.data.sessionsUsed}/${subscriptionCheck.data.sessionsLimit}\n\n` +
-          `This ${sessionType} will be charged at normal price: ₹${selectedService.price}\n\n` +
-          `${subscriptionCheck.data.reason || ''}\n\n` +
-          `Click OK to proceed with payment.`
-        );
-        
-        if (!confirmPaidBooking) {
-          setLoading(false);
-          return;
-        }
-      } else {
-        // Show pricing info for users without subscription
-        const sessionType = professionalType === 'doctor' ? 'doctor consultation' : professionalType === 'nutritionist' ? 'nutritionist consultation' : 'pharmacist session';
-        const confirmPaidBooking = window.confirm(
-          `You don't have an active subscription.\n\n` +
-          `This ${sessionType} will be charged at normal price: ₹${selectedService.price}\n\n` +
-          `Consider subscribing for discounted sessions!\n\n` +
-          `Click OK to proceed with payment.`
-        );
-        
-        if (!confirmPaidBooking) {
-          setLoading(false);
-          return;
-        }
-      }
-
-      // If no payment required (subscription covers it)
-      if (!paymentRequired) {
-        const bookingData = {
-          slotDate: selectedSlot.date,
-          slotTime: selectedSlot.startTime,
-          paymentId: 'SUBSCRIPTION_COVERED',
-          serviceType: selectedService.id,
-          patientDetails,
-          bookingType,
-          actualPrice: bookingPrice
-        }
-        
-        // Add the appropriate ID based on professional type
-        if (professionalType === 'doctor') {
-          bookingData.doctorId = id
-        } else if (professionalType === 'nutritionist') {
-          bookingData.nutritionistId = id
-        } else {
-          bookingData.pharmacistId = id
-        }
-
-        await axios.post(
-          `${process.env.NEXT_PUBLIC_API_URL}/bookings`,
-          bookingData,
-          { headers: { Authorization: `Bearer ${token}` } }
-        )
-
-        // Update subscription usage
-        try {
-          await axios.post(
-            `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/use-session`,
-            { bookingType, professionalType },
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-        } catch (sessionErr) {
-          console.warn('Failed to update session usage:', sessionErr);
-        }
-
-        toast.success(`Booking confirmed using your subscription!`)
-        router.push('/patient/dashboard')
-        return
-      }
-
-      // Regular payment flow for paid bookings
+      // Regular payment flow
       const orderRes = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/payments/create-order`,
         { amount: bookingPrice, currency: 'INR' },
@@ -457,7 +359,6 @@ export default function BookProfessional() {
         setLoading(false)
         return
       }
-
       // Initialize Razorpay
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
@@ -493,17 +394,6 @@ export default function BookProfessional() {
               bookingData,
               { headers: { Authorization: `Bearer ${token}` } }
             )
-
-            // Update session usage based on booking type
-            try {
-              await axios.post(
-                `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/use-session`,
-                { bookingType },
-                { headers: { Authorization: `Bearer ${token}` } }
-              );
-            } catch (sessionErr) {
-              console.warn('Failed to update session usage:', sessionErr);
-            }
 
             toast.success('Booking confirmed successfully!')
             router.push('/patient/dashboard')
