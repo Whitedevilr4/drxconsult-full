@@ -303,18 +303,18 @@ router.post('/', auth, async (req, res) => {
     
     if (serviceType === 'prescription_review') {
       paymentAmount = 149;
-      professionalShare = 75;
+      professionalShare = Math.round(149 * 0.7); // 70% of consultation fee
     } else if (serviceType === 'doctor_consultation') {
       // For doctors, use their consultationFee from profile
       paymentAmount = professional.consultationFee || 499;
-      professionalShare = Math.round(paymentAmount * 0.5); // 50% of consultation fee
+      professionalShare = Math.round(paymentAmount * 0.7); // 70% of consultation fee
     } else if (serviceType === 'nutritionist_consultation') {
       // For nutritionists, use their consultationFee from profile
       paymentAmount = professional.consultationFee || 500;
-      professionalShare = Math.round(paymentAmount * 0.5); // 50% of consultation fee
+      professionalShare = Math.round(paymentAmount * 0.7); // 70% of consultation fee
     } else { // full_consultation
       paymentAmount = 449;
-      professionalShare = 225;
+      professionalShare = Math.round(449 * 0.7); // 70% of consultation fee
     }
     
     // Create booking with enhanced details
