@@ -54,27 +54,27 @@ const bookingSchema = new mongoose.Schema({
   pharmacistShare: { 
     type: Number, 
     default: function() {
-      if (this.serviceType === 'prescription_review') return 75;
-      return 225; // full_consultation - 50% share
+      if (this.serviceType === 'prescription_review') return Math.round(149 * 0.7);
+      return Math.round(449 * 0.7); // full_consultation - 70% share
     }
   },
   doctorShare: { 
     type: Number, 
     default: function() {
-      // For doctor consultations, calculate 50% of paymentAmount
+      // For doctor consultations, calculate 70% of paymentAmount
       if (this.serviceType === 'doctor_consultation' && this.paymentAmount) {
-        return Math.round(this.paymentAmount * 0.5);
+        return Math.round(this.paymentAmount * 0.7);
       }
-      if (this.serviceType === 'prescription_review') return 75;
-      return 225; // full_consultation - 50% share
+      if (this.serviceType === 'prescription_review') return Math.round(149 * 0.7);
+      return Math.round(449 * 0.7); // full_consultation - 70% share
     }
   },
   nutritionistShare: { 
     type: Number, 
     default: function() {
-      // For nutritionist consultations, calculate 50% of paymentAmount
+      // For nutritionist consultations, calculate 70% of paymentAmount
       if (this.serviceType === 'nutritionist_consultation' && this.paymentAmount) {
-        return Math.round(this.paymentAmount * 0.5);
+        return Math.round(this.paymentAmount * 0.7);
       }
       return 0;
     }
