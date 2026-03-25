@@ -234,29 +234,6 @@ export default function Navbar() {
                 </div>
               </div>
 
-              {/* Subscription Plans Link */}
-              <Link
-                href="/subscription-plans"
-                className={`flex flex-col items-center justify-center p-3 rounded-2xl transition-all duration-300 group relative ${
-                  router.pathname === '/subscription-plans'
-                    ? 'text-purple-600 bg-gradient-to-br from-purple-50 to-purple-100 shadow-lg shadow-purple-200/50'
-                    : 'text-gray-400 hover:text-purple-600 hover:bg-gradient-to-br hover:from-purple-50 hover:to-purple-100 hover:shadow-lg hover:shadow-purple-200/30'
-                }`}
-              >
-                <div className={`w-6 h-6 mb-2 transition-all duration-300 ${
-                  router.pathname === '/subscription-plans' ? 'transform scale-110 drop-shadow-sm' : 'group-hover:scale-105 group-hover:drop-shadow-sm'
-                }`}>
-                  <svg className="w-full h-full" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-                <span className={`text-xs font-medium transition-all duration-300 ${
-                  router.pathname === '/subscription-plans' ? 'text-purple-600 font-semibold' : 'text-gray-400 group-hover:text-purple-600'
-                }`}>Plans</span>
-                <div className={`absolute inset-0 rounded-2xl transition-all duration-300 ${
-                  router.pathname === '/subscription-plans' ? 'bg-gradient-to-br from-purple-400/10 to-purple-600/10' : 'group-hover:bg-gradient-to-br group-hover:from-purple-400/5 group-hover:to-purple-600/5'
-                }`}></div>
-              </Link>
               
               {user && (
                 <>
@@ -410,100 +387,51 @@ export default function Navbar() {
 
       {/* Mobile Bottom Navigation */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-gray-100 z-50 shadow-2xl shadow-gray-200/50">
-        <div className="flex justify-around items-center py-3 px-2">
-          <NavIcon
-            href="/"
-            icon={<HomeIcon className="w-full h-full" />}
-            label="Home"
-            isActive={router.pathname === '/'}
-          />
-          
-          {/* Professionals Menu Button */}
+        <div className="flex justify-around items-center py-2 px-1">
+          <NavIcon href="/" icon={<HomeIcon className="w-full h-full" />} label="Home" isActive={router.pathname === '/'} />
+
+          {/* Pros Menu Button */}
           <button
             onClick={() => setShowMobileProfessionalsMenu(!showMobileProfessionalsMenu)}
-            className={`flex flex-col items-center justify-center p-3 rounded-2xl transition-all duration-300 relative min-w-[60px] group ${
+            className={`flex flex-col items-center justify-center p-2 rounded-2xl transition-all duration-300 relative min-w-[48px] group ${
               router.pathname.includes('/pharmacists') || router.pathname.includes('/doctors') || router.pathname.includes('/nutritionists')
-                ? 'text-blue-600 bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg shadow-blue-200/50' 
+                ? 'text-blue-600 bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg shadow-blue-200/50'
                 : 'text-gray-400 hover:text-blue-600 hover:bg-gradient-to-br hover:from-blue-50 hover:to-blue-100'
             }`}
           >
-            <svg className="w-6 h-6 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
-            <span className="text-xs font-medium">Pros</span>
+            <span className="text-[10px] font-medium">Pros</span>
           </button>
-          
+
           {user && (
             <>
-              <NavIcon
-                href="/health-trackers"
-                icon={<HealthIcon className="w-full h-full" />}
-                label="Health"
-                isActive={router.pathname.includes('health-trackers')}
-              />
-              <NavIcon
-                href="/locate-hospital"
-                icon={<HospitalIcon className="w-full h-full" />}
-                label="Hospital"
-                isActive={router.pathname.includes('locate-hospital')}
-              />
+              <NavIcon href="/health-trackers" icon={<HealthIcon className="w-full h-full" />} label="Health" isActive={router.pathname.includes('health-trackers')} />
+              <NavIcon href="/locate-hospital" icon={<HospitalIcon className="w-full h-full" />} label="Hospital" isActive={router.pathname.includes('locate-hospital')} />
             </>
           )}
-          
+
           {user ? (
             <>
-              <NavIcon
-                href="/subscription-plans"
-                icon={
-                  <svg className="w-full h-full" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                }
-                label="Plans"
-                isActive={router.pathname === '/subscription-plans'}
-              />
-              <NavIcon
-                href={getDashboardLink()}
-                icon={<DashboardIcon className="w-full h-full" />}
-                label="Dashboard"
-                isActive={router.pathname.includes('dashboard')}
-              />
-              <NavIcon
-                href="#"
-                icon={<LogoutIcon className="w-full h-full" />}
-                label="Logout"
-                isActive={false}
-                onClick={(e) => {
-                  e.preventDefault()
-                  handleLogout()
-                }}
-              />
+              <NavIcon href={getDashboardLink()} icon={<DashboardIcon className="w-full h-full" />} label="Dashboard" isActive={router.pathname.includes('dashboard')} />
+              <NavIcon href="#" icon={<LogoutIcon className="w-full h-full" />} label="Logout" isActive={false} onClick={(e) => { e.preventDefault(); handleLogout() }} />
             </>
           ) : (
             <>
-              <NavIcon
-                href="/login"
-                icon={<LoginIcon className="w-full h-full" />}
-                label="Login"
-                isActive={router.pathname === '/login'}
-              />
-              <NavIcon
-                href="/signup"
-                icon={<SignUpIcon className="w-full h-full" />}
-                label="Sign Up"
-                isActive={router.pathname === '/signup'}
-              />
+              <NavIcon href="/login" icon={<LoginIcon className="w-full h-full" />} label="Login" isActive={router.pathname === '/login'} />
+              <NavIcon href="/signup" icon={<SignUpIcon className="w-full h-full" />} label="Sign Up" isActive={router.pathname === '/signup'} />
             </>
           )}
         </div>
       </div>
 
-      {/* Mobile Professionals Menu Modal */}
+            {/* Mobile Professionals Menu Modal */}
       {showMobileProfessionalsMenu && (
         <div className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end" onClick={() => setShowMobileProfessionalsMenu(false)}>
           <div className="bg-white w-full rounded-t-3xl p-6 animate-slide-up" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-800">Healthcare Professionals</h3>
+              <h3 className="text-xl font-bold text-gray-800">Healthcare Services</h3>
               <button
                 onClick={() => setShowMobileProfessionalsMenu(false)}
                 className="text-gray-400 hover:text-gray-600"
@@ -559,6 +487,38 @@ export default function Navbar() {
                 <div className="flex-1">
                   <div className="font-semibold text-gray-800">Nutritionists</div>
                   <div className="text-sm text-gray-600">Diet plans & wellness coaching</div>
+                </div>
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+              <Link
+                href="/locate-hospital"
+                onClick={() => setShowMobileProfessionalsMenu(false)}
+                className="flex items-center p-4 bg-gradient-to-r from-red-50 to-orange-50 rounded-xl hover:shadow-lg transition-all"
+              >
+                <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center text-2xl mr-4">
+                  🏥
+                </div>
+                <div className="flex-1">
+                  <div className="font-semibold text-gray-800">Find Hospital</div>
+                  <div className="text-sm text-gray-600">Locate nearby hospitals</div>
+                </div>
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+              <Link
+                href="/subscription-plans"
+                onClick={() => setShowMobileProfessionalsMenu(false)}
+                className="flex items-center p-4 bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl hover:shadow-lg transition-all"
+              >
+                <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center text-2xl mr-4">
+                  💎
+                </div>
+                <div className="flex-1">
+                  <div className="font-semibold text-gray-800">Subscription Plans</div>
+                  <div className="text-sm text-gray-600">Women's Care, Chronic Care & more</div>
                 </div>
                 <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
