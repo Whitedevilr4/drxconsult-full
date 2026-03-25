@@ -119,7 +119,7 @@ export default function SubscriptionPlans() {
         currency: orderRes.data.currency,
         order_id: orderRes.data.id,
         name: 'DrX Consult',
-        description: `${planInfo.name} - ${billingCycle === 'monthly' ? 'Monthly' : 'Yearly'} Plan`,
+        description: `${planInfo.name} - ${billingCycle === 'monthly' ? 'Monthly' : billingCycle === 'yearly' ? 'Yearly' : billingCycle === 'threeMonths' ? '3 Months' : billingCycle === 'sixMonths' ? '6 Months' : '12 Months'} Plan`,
         handler: async (response) => {
           try {
             // Create subscription after successful payment
@@ -226,7 +226,7 @@ export default function SubscriptionPlans() {
         currency: orderRes.data.currency,
         order_id: orderRes.data.id,
         name: 'DrX Consult',
-        description: `Upgrade to ${planInfo.name} - ${billingCycle === 'monthly' ? 'Monthly' : 'Yearly'} Plan`,
+        description: `Upgrade to ${planInfo.name} - ${billingCycle === 'monthly' ? 'Monthly' : billingCycle === 'yearly' ? 'Yearly' : billingCycle === 'threeMonths' ? '3 Months' : billingCycle === 'sixMonths' ? '6 Months' : '12 Months'} Plan`,
         handler: async (response) => {
           try {
             // Update subscription after successful payment
@@ -280,6 +280,15 @@ export default function SubscriptionPlans() {
       setPendingSubscription(null);
     }
   };
+
+  // Billing cycle upgrade order
+  const cycleOrder = { threeMonths: 1, sixMonths: 2, twelveMonths: 3, monthly: 1, yearly: 3 };
+  const canUpgradeTo = (targetCycle) => {
+    if (!currentSubscription) return false;
+    return (cycleOrder[targetCycle] || 0) > (cycleOrder[currentSubscription.billingCycle] || 0);
+  };
+  const isCurrentTier = (planType, cycle) =>
+    currentSubscription?.planType === planType && currentSubscription?.billingCycle === cycle;
 
   const handleCancel = async () => {
     if (!confirm('Are you sure you want to cancel your subscription?')) return;
@@ -354,163 +363,171 @@ export default function SubscriptionPlans() {
 
           {/* Subscription Plans */}
           <div className="max-w-7xl mx-auto grid md:grid-cols-3 gap-8">
-            {/* Essential Care Plan */}
-            <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-green-200">
-              <div className="bg-green-500 text-white p-6">
+            {/* Women's Care Plan */}
+            <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-4 border-pink-500 relative transform scale-105">
+              <div className="absolute top-4 right-4 bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full text-sm font-bold z-10">
+                ⭐ FEATURED
+              </div>
+
+              <div className="bg-gradient-to-r from-pink-500 to-rose-500 text-white p-6">
                 <div className="flex items-center mb-2">
-                  <span className="text-2xl mr-2">🟢</span>
-                  <h2 className="text-2xl font-bold">ESSENTIAL CARE</h2>
+                  <span className="text-2xl mr-2">🌸</span>
+                  <h2 className="text-2xl font-bold">WOMEN'S CARE</h2>
                 </div>
-                <p className="text-green-100">Basic Healthcare</p>
+                <p className="text-pink-100">Complete Women's Health Plan</p>
               </div>
 
               <div className="p-6">
-                {/* Pricing */}
-                <div className="mb-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-3xl font-bold text-gray-900">₹999</span>
-                    <span className="text-gray-600">/ month</span>
+                {/* Pricing Tiers */}
+                <div className="mb-6 space-y-3">
+                  <h4 className="font-semibold text-gray-900">💰 Choose Your Plan</h4>
+                  <div className="bg-pink-100 rounded-lg p-3 flex justify-between items-center border-2 border-pink-300">
+                    <div>
+                      <span className="text-gray-700 font-medium">3 Months</span>
+                      <span className="ml-2 text-xs bg-pink-500 text-white px-2 py-0.5 rounded-full">Best Value</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm text-gray-400 line-through block">₹17,499</span>
+                      <span className="text-2xl font-bold text-pink-600">₹13,999</span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-2xl font-bold text-gray-900">₹9,999</span>
-                    <span className="text-gray-600">/ year</span>
+                  <div className="bg-pink-50 rounded-lg p-3 flex justify-between items-center">
+                    <span className="text-gray-700 font-medium">6 Months</span>
+                    <div className="text-right">
+                      <span className="text-sm text-gray-400 line-through block">₹34,999</span>
+                      <span className="text-2xl font-bold text-pink-600">₹27,499</span>
+                    </div>
                   </div>
-                </div>
-
-                {/* Best For */}
-                <div className="mb-6">
-                  <h4 className="font-semibold text-gray-900 mb-2">👤 Best for</h4>
-                  <p className="text-gray-600">Individuals seeking basic healthcare consultations</p>
+                  <div className="bg-pink-50 rounded-lg p-3 flex justify-between items-center">
+                    <span className="text-gray-700 font-medium">12 Months</span>
+                    <div className="text-right">
+                      <span className="text-sm text-gray-400 line-through block">₹69,999</span>
+                      <span className="text-2xl font-bold text-pink-600">₹54,998</span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Includes */}
                 <div className="mb-6">
                   <h4 className="font-semibold text-gray-900 mb-3">✅ Includes</h4>
                   <ul className="space-y-2">
-                    <li className="flex items-center text-gray-700">
-                      <span className="text-green-500 mr-2">✔</span>
-                      1 Pharmacist consultation
-                    </li>
-                    <li className="flex items-center text-gray-700">
-                      <span className="text-green-500 mr-2">✔</span>
-                      1 Doctor consultation
-                    </li>
-                    <li className="flex items-center text-gray-700">
-                      <span className="text-green-500 mr-2">✔</span>
-                      1 Dietitian consultation
-                    </li>
-                    <li className="flex items-center text-gray-700">
-                      <span className="text-green-500 mr-2">✔</span>
-                      Prescription explanation
-                    </li>
-                    <li className="flex items-center text-gray-700">
-                      <span className="text-green-500 mr-2">✔</span>
-                      Medicine guidance
-                    </li>
-                    <li className="flex items-center text-gray-700">
-                      <span className="text-green-500 mr-2">✔</span>
-                      WhatsApp support
-                    </li>
-                    <li className="flex items-center text-gray-700">
-                      <span className="text-green-500 mr-2">✔</span>
-                      Verified content
-                    </li>
+                    {[
+                      '1-to-1 Gynaecologist consultation',
+                      'Personalised diet chart',
+                      '1-to-1 Dietician consultation',
+                      '1 Comprehensive medical history',
+                      'Hair & skin care',
+                      'Live yoga sessions',
+                      'Period & PCOS care',
+                      'Weight management',
+                      '1-to-1 WhatsApp support',
+                      'Priority care'
+                    ].map((item) => (
+                      <li key={item} className="flex items-center text-gray-700">
+                        <span className="text-pink-500 mr-2">✔</span>
+                        {item}
+                      </li>
+                    ))}
                   </ul>
                 </div>
 
                 {/* Action Buttons */}
                 <div className="space-y-3">
-                  {!currentSubscription || currentSubscription.planType !== 'essential' ? (
+                  {!currentSubscription || currentSubscription.planType !== 'womensCare' ? (
                     <>
-                      <button
-                        onClick={() => handleSubscribe('essential', 'monthly')}
-                        disabled={subscribing}
-                        className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 disabled:opacity-50"
-                      >
-                        {subscribing ? 'Processing...' : 'Start Monthly Plan'}
+                      <button onClick={() => currentSubscription ? handleUpgrade('womensCare', 'threeMonths') : handleSubscribe('womensCare', 'threeMonths')} disabled={subscribing} className="w-full bg-pink-600 text-white py-2 rounded-lg font-semibold hover:bg-pink-700 disabled:opacity-50 text-sm">
+                        {subscribing ? 'Processing...' : 'Start 3-Month Plan — ₹13,999'}
                       </button>
-                      <button
-                        onClick={() => handleSubscribe('essential', 'yearly')}
-                        disabled={subscribing}
-                        className="w-full bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 disabled:opacity-50"
-                      >
-                        {subscribing ? 'Processing...' : 'Start Yearly Plan'}
+                      <button onClick={() => currentSubscription ? handleUpgrade('womensCare', 'sixMonths') : handleSubscribe('womensCare', 'sixMonths')} disabled={subscribing} className="w-full bg-pink-500 text-white py-2 rounded-lg font-semibold hover:bg-pink-600 disabled:opacity-50 text-sm">
+                        {subscribing ? 'Processing...' : 'Start 6-Month Plan — ₹27,499'}
+                      </button>
+                      <button onClick={() => currentSubscription ? handleUpgrade('womensCare', 'twelveMonths') : handleSubscribe('womensCare', 'twelveMonths')} disabled={subscribing} className="w-full bg-rose-600 text-white py-2 rounded-lg font-semibold hover:bg-rose-700 disabled:opacity-50 text-sm">
+                        {subscribing ? 'Processing...' : 'Start 12-Month Plan — ₹54,998'}
                       </button>
                     </>
                   ) : (
-                    <div className="text-center py-3 bg-green-100 rounded-lg">
-                      <span className="text-green-800 font-semibold">Current Plan</span>
-                    </div>
+                    <>
+                      {isCurrentTier('womensCare', 'threeMonths') && <div className="text-center py-2 bg-pink-100 rounded-lg text-pink-800 text-sm font-semibold">✅ Current Plan — 3 Months</div>}
+                      {!isCurrentTier('womensCare', 'sixMonths') && !isCurrentTier('womensCare', 'twelveMonths') && (
+                        <button onClick={() => handleUpgrade('womensCare', 'sixMonths')} disabled={subscribing} className="w-full bg-pink-500 text-white py-2 rounded-lg font-semibold hover:bg-pink-600 disabled:opacity-50 text-sm">
+                          {subscribing ? 'Processing...' : '⬆ Upgrade to 6-Month — ₹27,499'}
+                        </button>
+                      )}
+                      {isCurrentTier('womensCare', 'sixMonths') && <div className="text-center py-2 bg-pink-100 rounded-lg text-pink-800 text-sm font-semibold">✅ Current Plan — 6 Months</div>}
+                      {!isCurrentTier('womensCare', 'twelveMonths') && (
+                        <button onClick={() => handleUpgrade('womensCare', 'twelveMonths')} disabled={subscribing} className="w-full bg-rose-600 text-white py-2 rounded-lg font-semibold hover:bg-rose-700 disabled:opacity-50 text-sm">
+                          {subscribing ? 'Processing...' : '⬆ Upgrade to 12-Month — ₹54,998'}
+                        </button>
+                      )}
+                      {isCurrentTier('womensCare', 'twelveMonths') && <div className="text-center py-2 bg-pink-100 rounded-lg text-pink-800 text-sm font-semibold">✅ Current Plan — 12 Months</div>}
+                    </>
                   )}
                 </div>
               </div>
             </div>
 
             {/* Chronic Care Plan */}
-            <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-4 border-blue-500 relative transform scale-105">
-              <div className="absolute top-4 right-4 bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full text-sm font-bold z-10">
-                ⭐ MOST POPULAR
-              </div>
-              
-              <div className="bg-blue-500 text-white p-6">
+            <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-blue-200">
+              <div className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white p-6">
                 <div className="flex items-center mb-2">
                   <span className="text-2xl mr-2">🔵</span>
                   <h2 className="text-2xl font-bold">CHRONIC CARE</h2>
                 </div>
-                <p className="text-blue-100">Diabetes, PCOS & BP Care</p>
+                <p className="text-blue-100">Complete Chronic Disease Management</p>
               </div>
 
               <div className="p-6">
-                {/* Pricing */}
-                <div className="mb-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-3xl font-bold text-gray-900">₹1,799</span>
-                    <span className="text-gray-600">/ month</span>
+                {/* Pricing Tiers */}
+                <div className="mb-6 space-y-3">
+                  <h4 className="font-semibold text-gray-900">💰 Choose Your Plan</h4>
+                  <div className="bg-blue-100 rounded-lg p-3 flex justify-between items-center border-2 border-blue-300">
+                    <div>
+                      <span className="text-gray-700 font-medium">3 Months</span>
+                      <span className="ml-2 text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full">Best Value</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm text-gray-400 line-through block">₹23,999</span>
+                      <span className="text-2xl font-bold text-blue-600">₹18,999</span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-2xl font-bold text-gray-900">₹16,999</span>
-                    <span className="text-gray-600">/ year</span>
+                  <div className="bg-blue-50 rounded-lg p-3 flex justify-between items-center">
+                    <span className="text-gray-700 font-medium">6 Months</span>
+                    <div className="text-right">
+                      <span className="text-sm text-gray-400 line-through block">₹46,999</span>
+                      <span className="text-2xl font-bold text-blue-600">₹37,499</span>
+                    </div>
                   </div>
-                </div>
-
-                {/* Covers */}
-                <div className="mb-6">
-                  <h4 className="font-semibold text-gray-900 mb-2">👨‍👩‍👧 Covers</h4>
-                  <p className="text-gray-600">Up to 4 family members</p>
+                  <div className="bg-blue-50 rounded-lg p-3 flex justify-between items-center">
+                    <span className="text-gray-700 font-medium">12 Months</span>
+                    <div className="text-right">
+                      <span className="text-sm text-gray-400 line-through block">₹94,999</span>
+                      <span className="text-2xl font-bold text-blue-600">₹75,999</span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Includes */}
                 <div className="mb-6">
                   <h4 className="font-semibold text-gray-900 mb-3">✅ Includes</h4>
                   <ul className="space-y-2">
-                    <li className="flex items-center text-gray-700">
-                      <span className="text-blue-500 mr-2">✔</span>
-                      3 Pharmacist consultations
-                    </li>
-                    <li className="flex items-center text-gray-700">
-                      <span className="text-blue-500 mr-2">✔</span>
-                      2 Doctor consultations
-                    </li>
-                    <li className="flex items-center text-gray-700">
-                      <span className="text-blue-500 mr-2">✔</span>
-                      2 Dietitian consultations with diet chart
-                    </li>
-                    <li className="flex items-center text-gray-700">
-                      <span className="text-blue-500 mr-2">✔</span>
-                      Diabetes, PCOS & BP care
-                    </li>
-                    <li className="flex items-center text-gray-700">
-                      <span className="text-blue-500 mr-2">✔</span>
-                      Lab report explanation
-                    </li>
-                    <li className="flex items-center text-gray-700">
-                      <span className="text-blue-500 mr-2">✔</span>
-                      Medication reminders
-                    </li>
-                    <li className="flex items-center text-gray-700">
-                      <span className="text-blue-500 mr-2">✔</span>
-                      Priority booking
-                    </li>
+                    {[
+                      '1-to-1 Doctor consultation monthly',
+                      'Dedicated diet coach',
+                      'Personalised diet chart',
+                      'Comprehensive medical history',
+                      'BP management',
+                      'Diabetes management',
+                      'Thyroid care',
+                      'Live yoga sessions',
+                      'Weight sessions',
+                      '1-to-1 WhatsApp support',
+                      'Priority care'
+                    ].map((item) => (
+                      <li key={item} className="flex items-center text-gray-700">
+                        <span className="text-blue-500 mr-2">✔</span>
+                        {item}
+                      </li>
+                    ))}
                   </ul>
                 </div>
 
@@ -518,25 +535,32 @@ export default function SubscriptionPlans() {
                 <div className="space-y-3">
                   {!currentSubscription || currentSubscription.planType !== 'chronic' ? (
                     <>
-                      <button
-                        onClick={() => currentSubscription ? handleUpgrade('chronic', 'monthly') : handleSubscribe('chronic', 'monthly')}
-                        disabled={subscribing}
-                        className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50"
-                      >
-                        {subscribing ? 'Processing...' : currentSubscription ? 'Upgrade to Monthly' : 'Start Monthly Plan'}
+                      <button onClick={() => currentSubscription ? handleUpgrade('chronic', 'threeMonths') : handleSubscribe('chronic', 'threeMonths')} disabled={subscribing} className="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 text-sm">
+                        {subscribing ? 'Processing...' : 'Start 3-Month Plan — ₹18,999'}
                       </button>
-                      <button
-                        onClick={() => currentSubscription ? handleUpgrade('chronic', 'yearly') : handleSubscribe('chronic', 'yearly')}
-                        disabled={subscribing}
-                        className="w-full bg-blue-500 text-white py-3 rounded-lg font-semibold hover:bg-blue-600 disabled:opacity-50"
-                      >
-                        {subscribing ? 'Processing...' : currentSubscription ? 'Upgrade to Yearly' : 'Start Yearly Plan'}
+                      <button onClick={() => currentSubscription ? handleUpgrade('chronic', 'sixMonths') : handleSubscribe('chronic', 'sixMonths')} disabled={subscribing} className="w-full bg-blue-500 text-white py-2 rounded-lg font-semibold hover:bg-blue-600 disabled:opacity-50 text-sm">
+                        {subscribing ? 'Processing...' : 'Start 6-Month Plan — ₹37,499'}
+                      </button>
+                      <button onClick={() => currentSubscription ? handleUpgrade('chronic', 'twelveMonths') : handleSubscribe('chronic', 'twelveMonths')} disabled={subscribing} className="w-full bg-cyan-600 text-white py-2 rounded-lg font-semibold hover:bg-cyan-700 disabled:opacity-50 text-sm">
+                        {subscribing ? 'Processing...' : 'Start 12-Month Plan — ₹75,999'}
                       </button>
                     </>
                   ) : (
-                    <div className="text-center py-3 bg-blue-100 rounded-lg">
-                      <span className="text-blue-800 font-semibold">Current Plan</span>
-                    </div>
+                    <>
+                      {isCurrentTier('chronic', 'threeMonths') && <div className="text-center py-2 bg-blue-100 rounded-lg text-blue-800 text-sm font-semibold">✅ Current Plan — 3 Months</div>}
+                      {!isCurrentTier('chronic', 'sixMonths') && !isCurrentTier('chronic', 'twelveMonths') && (
+                        <button onClick={() => handleUpgrade('chronic', 'sixMonths')} disabled={subscribing} className="w-full bg-blue-500 text-white py-2 rounded-lg font-semibold hover:bg-blue-600 disabled:opacity-50 text-sm">
+                          {subscribing ? 'Processing...' : '⬆ Upgrade to 6-Month — ₹37,499'}
+                        </button>
+                      )}
+                      {isCurrentTier('chronic', 'sixMonths') && <div className="text-center py-2 bg-blue-100 rounded-lg text-blue-800 text-sm font-semibold">✅ Current Plan — 6 Months</div>}
+                      {!isCurrentTier('chronic', 'twelveMonths') && (
+                        <button onClick={() => handleUpgrade('chronic', 'twelveMonths')} disabled={subscribing} className="w-full bg-cyan-600 text-white py-2 rounded-lg font-semibold hover:bg-cyan-700 disabled:opacity-50 text-sm">
+                          {subscribing ? 'Processing...' : '⬆ Upgrade to 12-Month — ₹75,999'}
+                        </button>
+                      )}
+                      {isCurrentTier('chronic', 'twelveMonths') && <div className="text-center py-2 bg-blue-100 rounded-lg text-blue-800 text-sm font-semibold">✅ Current Plan — 12 Months</div>}
+                    </>
                   )}
                 </div>
               </div>
@@ -544,61 +568,65 @@ export default function SubscriptionPlans() {
 
             {/* Fat to Fit Plan */}
             <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-purple-200">
-              <div className="bg-purple-500 text-white p-6">
+              <div className="bg-gradient-to-r from-purple-600 to-violet-500 text-white p-6">
                 <div className="flex items-center mb-2">
                   <span className="text-2xl mr-2">🟣</span>
                   <h2 className="text-2xl font-bold">FAT TO FIT</h2>
                 </div>
-                <p className="text-purple-100">Weight Management</p>
+                <p className="text-purple-100">Dedicated Weight Management Plan</p>
               </div>
 
               <div className="p-6">
-                {/* Pricing */}
-                <div className="mb-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-3xl font-bold text-gray-900">₹1,299</span>
-                    <span className="text-gray-600">/ month</span>
+                {/* Pricing Tiers */}
+                <div className="mb-6 space-y-3">
+                  <h4 className="font-semibold text-gray-900">💰 Choose Your Plan</h4>
+                  <div className="bg-purple-100 rounded-lg p-3 flex justify-between items-center border-2 border-purple-300">
+                    <div>
+                      <span className="text-gray-700 font-medium">3 Months</span>
+                      <span className="ml-2 text-xs bg-purple-600 text-white px-2 py-0.5 rounded-full">Best Value</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm text-gray-400 line-through block">₹15,999</span>
+                      <span className="text-2xl font-bold text-purple-600">₹12,999</span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-2xl font-bold text-gray-900">₹12,999</span>
-                    <span className="text-gray-600">/ year</span>
+                  <div className="bg-purple-50 rounded-lg p-3 flex justify-between items-center">
+                    <span className="text-gray-700 font-medium">6 Months</span>
+                    <div className="text-right">
+                      <span className="text-sm text-gray-400 line-through block">₹29,999</span>
+                      <span className="text-2xl font-bold text-purple-600">₹23,999</span>
+                    </div>
                   </div>
-                </div>
-
-                {/* Best For */}
-                <div className="mb-6">
-                  <h4 className="font-semibold text-gray-900 mb-2">🎯 Best for</h4>
-                  <p className="text-gray-600">Weight management and fitness goals</p>
+                  <div className="bg-purple-50 rounded-lg p-3 flex justify-between items-center">
+                    <span className="text-gray-700 font-medium">12 Months</span>
+                    <div className="text-right">
+                      <span className="text-sm text-gray-400 line-through block">₹44,999</span>
+                      <span className="text-2xl font-bold text-purple-600">₹35,999</span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Includes */}
                 <div className="mb-6">
                   <h4 className="font-semibold text-gray-900 mb-3">✅ Includes</h4>
                   <ul className="space-y-2">
-                    <li className="flex items-center text-gray-700">
-                      <span className="text-purple-500 mr-2">✔</span>
-                      1 Doctor consultation
-                    </li>
-                    <li className="flex items-center text-gray-700">
-                      <span className="text-purple-500 mr-2">✔</span>
-                      2 Dietitian consultations
-                    </li>
-                    <li className="flex items-center text-gray-700">
-                      <span className="text-purple-500 mr-2">✔</span>
-                      Personalized diet plan
-                    </li>
-                    <li className="flex items-center text-gray-700">
-                      <span className="text-purple-500 mr-2">✔</span>
-                      Weight management guidance
-                    </li>
-                    <li className="flex items-center text-gray-700">
-                      <span className="text-purple-500 mr-2">✔</span>
-                      WhatsApp support
-                    </li>
-                    <li className="flex items-center text-gray-700">
-                      <span className="text-purple-500 mr-2">✔</span>
-                      Priority booking
-                    </li>
+                    {[
+                      '1-to-1 diet coach',
+                      'Coach follow-up weekly',
+                      'Live yoga sessions',
+                      '1 Comprehensive medical history',
+                      'Personalised diet chart',
+                      'Weight management',
+                      '1-to-1 WhatsApp support',
+                      'Craving care',
+                      'Motivated week planning',
+                      'Cheat meal guidance'
+                    ].map((item) => (
+                      <li key={item} className="flex items-center text-gray-700">
+                        <span className="text-purple-500 mr-2">✔</span>
+                        {item}
+                      </li>
+                    ))}
                   </ul>
                 </div>
 
@@ -606,25 +634,32 @@ export default function SubscriptionPlans() {
                 <div className="space-y-3">
                   {!currentSubscription || currentSubscription.planType !== 'fatToFit' ? (
                     <>
-                      <button
-                        onClick={() => currentSubscription ? handleUpgrade('fatToFit', 'monthly') : handleSubscribe('fatToFit', 'monthly')}
-                        disabled={subscribing}
-                        className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 disabled:opacity-50"
-                      >
-                        {subscribing ? 'Processing...' : currentSubscription ? 'Upgrade to Monthly' : 'Start Monthly Plan'}
+                      <button onClick={() => currentSubscription ? handleUpgrade('fatToFit', 'threeMonths') : handleSubscribe('fatToFit', 'threeMonths')} disabled={subscribing} className="w-full bg-purple-600 text-white py-2 rounded-lg font-semibold hover:bg-purple-700 disabled:opacity-50 text-sm">
+                        {subscribing ? 'Processing...' : 'Start 3-Month Plan — ₹12,999'}
                       </button>
-                      <button
-                        onClick={() => currentSubscription ? handleUpgrade('fatToFit', 'yearly') : handleSubscribe('fatToFit', 'yearly')}
-                        disabled={subscribing}
-                        className="w-full bg-purple-500 text-white py-3 rounded-lg font-semibold hover:bg-purple-600 disabled:opacity-50"
-                      >
-                        {subscribing ? 'Processing...' : currentSubscription ? 'Upgrade to Yearly' : 'Start Yearly Plan'}
+                      <button onClick={() => currentSubscription ? handleUpgrade('fatToFit', 'sixMonths') : handleSubscribe('fatToFit', 'sixMonths')} disabled={subscribing} className="w-full bg-purple-500 text-white py-2 rounded-lg font-semibold hover:bg-purple-600 disabled:opacity-50 text-sm">
+                        {subscribing ? 'Processing...' : 'Start 6-Month Plan — ₹23,999'}
+                      </button>
+                      <button onClick={() => currentSubscription ? handleUpgrade('fatToFit', 'twelveMonths') : handleSubscribe('fatToFit', 'twelveMonths')} disabled={subscribing} className="w-full bg-violet-600 text-white py-2 rounded-lg font-semibold hover:bg-violet-700 disabled:opacity-50 text-sm">
+                        {subscribing ? 'Processing...' : 'Start 12-Month Plan — ₹35,999'}
                       </button>
                     </>
                   ) : (
-                    <div className="text-center py-3 bg-purple-100 rounded-lg">
-                      <span className="text-purple-800 font-semibold">Current Plan</span>
-                    </div>
+                    <>
+                      {isCurrentTier('fatToFit', 'threeMonths') && <div className="text-center py-2 bg-purple-100 rounded-lg text-purple-800 text-sm font-semibold">✅ Current Plan — 3 Months</div>}
+                      {!isCurrentTier('fatToFit', 'sixMonths') && !isCurrentTier('fatToFit', 'twelveMonths') && (
+                        <button onClick={() => handleUpgrade('fatToFit', 'sixMonths')} disabled={subscribing} className="w-full bg-purple-500 text-white py-2 rounded-lg font-semibold hover:bg-purple-600 disabled:opacity-50 text-sm">
+                          {subscribing ? 'Processing...' : '⬆ Upgrade to 6-Month — ₹23,999'}
+                        </button>
+                      )}
+                      {isCurrentTier('fatToFit', 'sixMonths') && <div className="text-center py-2 bg-purple-100 rounded-lg text-purple-800 text-sm font-semibold">✅ Current Plan — 6 Months</div>}
+                      {!isCurrentTier('fatToFit', 'twelveMonths') && (
+                        <button onClick={() => handleUpgrade('fatToFit', 'twelveMonths')} disabled={subscribing} className="w-full bg-violet-600 text-white py-2 rounded-lg font-semibold hover:bg-violet-700 disabled:opacity-50 text-sm">
+                          {subscribing ? 'Processing...' : '⬆ Upgrade to 12-Month — ₹35,999'}
+                        </button>
+                      )}
+                      {isCurrentTier('fatToFit', 'twelveMonths') && <div className="text-center py-2 bg-purple-100 rounded-lg text-purple-800 text-sm font-semibold">✅ Current Plan — 12 Months</div>}
+                    </>
                   )}
                 </div>
               </div>
@@ -660,8 +695,8 @@ export default function SubscriptionPlans() {
               setPendingSubscription(null);
               setSubscribing(false);
             }}
-            amount={plans[pendingSubscription.planType][pendingSubscription.billingCycle].price}
-            serviceName={`${plans[pendingSubscription.planType].name} - ${pendingSubscription.billingCycle === 'monthly' ? 'Monthly' : 'Yearly'} Subscription`}
+            amount={plans[pendingSubscription.planType]?.[pendingSubscription.billingCycle]?.price}
+            serviceName={`${plans[pendingSubscription.planType].name} - ${pendingSubscription.billingCycle === 'monthly' ? 'Monthly' : pendingSubscription.billingCycle === 'yearly' ? 'Yearly' : pendingSubscription.billingCycle === 'threeMonths' ? '3 Months' : pendingSubscription.billingCycle === 'sixMonths' ? '6 Months' : '12 Months'} Subscription`}
           />
         )}
       </div>
