@@ -1915,7 +1915,7 @@ function PaymentsTab() {
       setPayments(res.data)
       
       // Calculate admin revenue (100% of patient payments)
-      const totalRevenue = res.data.reduce((sum, p) => sum + (p.totalEarned * 2), 0) // totalEarned is 50%, so *2 for 100%
+      const totalRevenue = res.data.reduce((sum, p) => sum + (p.totalEarned / 0.7), 0) // totalEarned is 70%, so /0.7 for 100%
       const pharmacistShare = res.data.reduce((sum, p) => sum + p.totalEarned, 0)
       const platformShare = totalRevenue - pharmacistShare
       const totalBookings = res.data.reduce((sum, p) => sum + p.completedBookings, 0)
@@ -2030,12 +2030,12 @@ function PaymentsTab() {
             <p className="text-xs text-gray-500 mt-1">{adminRevenue.totalBookings} bookings</p>
           </div>
           <div className="bg-white p-4 rounded-lg shadow">
-            <p className="text-gray-600 text-sm font-medium">Platform Share (50%)</p>
+            <p className="text-gray-600 text-sm font-medium">Platform Share (30%)</p>
             <p className="text-3xl font-bold text-green-600">₹{adminRevenue.platformShare}</p>
             <p className="text-xs text-gray-500 mt-1">Your earnings</p>
           </div>
           <div className="bg-white p-4 rounded-lg shadow">
-            <p className="text-gray-600 text-sm font-medium">Pharmacist Share (50%)</p>
+            <p className="text-gray-600 text-sm font-medium">Pharmacist Share (70%)</p>
             <p className="text-3xl font-bold text-orange-600">₹{adminRevenue.pharmacistShare}</p>
             <p className="text-xs text-gray-500 mt-1">To be paid out</p>
           </div>
@@ -2055,20 +2055,20 @@ function PaymentsTab() {
           <div className="w-full bg-gray-200 rounded-full h-8 overflow-hidden flex">
             <div 
               className="bg-gradient-to-r from-green-500 to-green-600 h-8 flex items-center justify-center text-white text-sm font-bold"
-              style={{ width: '50%' }}
+              style={{ width: '30%' }}
             >
               Platform: ₹{adminRevenue.platformShare}
             </div>
             <div 
               className="bg-gradient-to-r from-orange-400 to-orange-500 h-8 flex items-center justify-center text-white text-sm font-bold"
-              style={{ width: '50%' }}
+              style={{ width: '70%' }}
             >
               Pharmacists: ₹{adminRevenue.pharmacistShare}
             </div>
           </div>
           <div className="flex justify-between mt-2 text-xs text-gray-600">
-            <span>Platform Revenue: 50%</span>
-            <span>Pharmacist Payouts: 50%</span>
+            <span>Platform Revenue: 30%</span>
+            <span>Pharmacist Payouts: 70%</span>
           </div>
         </div>
       </div>
@@ -5680,7 +5680,7 @@ function DoctorPaymentsTab() {
       setPayments(res.data)
       
       // Calculate admin revenue (100% of patient payments)
-      const totalRevenue = res.data.reduce((sum, p) => sum + (p.totalEarned * 2), 0) // totalEarned is 50%, so *2 for 100%
+      const totalRevenue = res.data.reduce((sum, p) => sum + (p.totalEarned / 0.7), 0) // totalEarned is 70%, so /0.7 for 100%
       const doctorShare = res.data.reduce((sum, p) => sum + p.totalEarned, 0)
       const platformShare = totalRevenue - doctorShare
       const totalBookings = res.data.reduce((sum, p) => sum + p.completedBookings, 0)
@@ -5795,12 +5795,12 @@ function DoctorPaymentsTab() {
             <p className="text-xs text-gray-500 mt-1">{adminRevenue.totalBookings} consultations</p>
           </div>
           <div className="bg-white p-4 rounded-lg shadow">
-            <p className="text-gray-600 text-sm font-medium">Platform Share (50%)</p>
+            <p className="text-gray-600 text-sm font-medium">Platform Share (30%)</p>
             <p className="text-3xl font-bold text-green-600">₹{adminRevenue.platformShare}</p>
             <p className="text-xs text-gray-500 mt-1">Your earnings</p>
           </div>
           <div className="bg-white p-4 rounded-lg shadow">
-            <p className="text-gray-600 text-sm font-medium">Doctor Share (50%)</p>
+            <p className="text-gray-600 text-sm font-medium">Doctor Share (70%)</p>
             <p className="text-3xl font-bold text-orange-600">₹{adminRevenue.doctorShare}</p>
             <p className="text-xs text-gray-500 mt-1">To be paid out</p>
           </div>
@@ -5820,20 +5820,20 @@ function DoctorPaymentsTab() {
           <div className="w-full bg-gray-200 rounded-full h-8 overflow-hidden flex">
             <div 
               className="bg-gradient-to-r from-green-500 to-green-600 h-8 flex items-center justify-center text-white text-sm font-bold"
-              style={{ width: '50%' }}
+              style={{ width: '30%' }}
             >
               Platform: ₹{adminRevenue.platformShare}
             </div>
             <div 
               className="bg-gradient-to-r from-orange-400 to-orange-500 h-8 flex items-center justify-center text-white text-sm font-bold"
-              style={{ width: '50%' }}
+              style={{ width: '70%' }}
             >
               Doctors: ₹{adminRevenue.doctorShare}
             </div>
           </div>
           <div className="flex justify-between mt-2 text-xs text-gray-600">
-            <span>Platform Revenue: 50%</span>
-            <span>Doctor Payouts: 50%</span>
+            <span>Platform Revenue: 30%</span>
+            <span>Doctor Payouts: 70%</span>
           </div>
         </div>
       </div>
@@ -6245,7 +6245,7 @@ function NutritionistPaymentsTab() {
       const token = localStorage.getItem('token')
       const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/nutritionist-payments`, { headers: { Authorization: `Bearer ${token}` } })
       setPayments(res.data)
-      const totalRevenue = res.data.reduce((sum, p) => sum + (p.totalEarned * 2), 0)
+      const totalRevenue = res.data.reduce((sum, p) => sum + (p.totalEarned / 0.7), 0)
       const nutritionistShare = res.data.reduce((sum, p) => sum + p.totalEarned, 0)
       const platformShare = totalRevenue - nutritionistShare
       const totalBookings = res.data.reduce((sum, p) => sum + p.completedBookings, 0)
@@ -6316,8 +6316,8 @@ function NutritionistPaymentsTab() {
         <h3 className="text-xl font-bold text-gray-800 mb-4">Platform Revenue (Nutritionists)</h3>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white p-4 rounded-lg shadow"><p className="text-gray-600 text-sm font-medium">Total Revenue</p><p className="text-3xl font-bold text-green-600">₹{adminRevenue.totalRevenue}</p><p className="text-xs text-gray-500 mt-1">{adminRevenue.totalBookings} consultations</p></div>
-          <div className="bg-white p-4 rounded-lg shadow"><p className="text-gray-600 text-sm font-medium">Platform Share</p><p className="text-3xl font-bold text-teal-600">₹{adminRevenue.platformShare}</p></div>
-          <div className="bg-white p-4 rounded-lg shadow"><p className="text-gray-600 text-sm font-medium">Nutritionist Share</p><p className="text-3xl font-bold text-orange-600">₹{adminRevenue.nutritionistShare}</p></div>
+          <div className="bg-white p-4 rounded-lg shadow"><p className="text-gray-600 text-sm font-medium">Platform Share (30%)</p><p className="text-3xl font-bold text-teal-600">₹{adminRevenue.platformShare}</p></div>
+          <div className="bg-white p-4 rounded-lg shadow"><p className="text-gray-600 text-sm font-medium">Nutritionist Share (70%)</p><p className="text-3xl font-bold text-orange-600">₹{adminRevenue.nutritionistShare}</p></div>
           <div className="bg-white p-4 rounded-lg shadow"><p className="text-gray-600 text-sm font-medium">Per Consultation</p><p className="text-3xl font-bold text-purple-600">Dynamic</p></div>
         </div>
       </div>
