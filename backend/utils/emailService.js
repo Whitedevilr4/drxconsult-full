@@ -341,11 +341,12 @@ const emailTemplates = {
         </div>
         
         <div style="background-color: #fff3cd; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #856404;">💡 Pro Tip: Consider Our Subscription Plans</h3>
-          <p style="margin-bottom: 15px;">Save money with our subscription plans:</p>
+          <h3 style="margin-top: 0; color: #856404;">💡 Save More with a Subscription Plan</h3>
+          <p style="margin-bottom: 15px;">Get more from your healthcare with our plans:</p>
           <ul style="color: #856404; line-height: 1.6;">
-            <li><strong>Essential Plan:</strong> ₹299/month - 2 pharmacist sessions</li>
-            <li><strong>Family Plan:</strong> ₹799/month - 5 pharmacist sessions + 1 doctor consultation</li>
+            <li><strong>Women's Care:</strong> From ₹13,999 — Gynaecologist, diet coach, yoga & more</li>
+            <li><strong>Chronic Care:</strong> From ₹18,999 — Doctor, BP/Diabetes/Thyroid management</li>
+            <li><strong>Fat to Fit:</strong> From ₹12,999 — Diet coach, weight management & yoga</li>
           </ul>
           <div style="text-align: center; margin-top: 15px;">
             <a href="${process.env.FRONTEND_URL}/subscription-plans" 
@@ -386,97 +387,133 @@ const emailTemplates = {
     `
   }),
 
-  subscriptionWelcome: (userName, subscription) => ({
-    subject: `Welcome to ${subscription.planName} - Drx Consult`,
-    html: `
+  subscriptionWelcome: (userName, subscription) => {
+    const billingLabel = {
+      threeMonths: '3-Month Plan',
+      sixMonths: '6-Month Plan',
+      twelveMonths: '12-Month Plan',
+      monthly: 'Monthly Plan',
+      yearly: 'Yearly Plan',
+    }[subscription.billingCycle] || subscription.billingCycle;
+
+    const planFeatures = {
+      womensCare: {
+        color: '#e91e8c',
+        bg: '#fce4ec',
+        icon: '🌸',
+        features: [
+          '1-to-1 Gynaecologist consultation',
+          'Personalised diet chart',
+          '1-to-1 Dietician consultation',
+          '1 Comprehensive medical history',
+          'Hair & skin care',
+          'Live yoga sessions',
+          'Period & PCOS care',
+          'Weight management',
+          '1-to-1 WhatsApp support',
+          'Priority care',
+        ]
+      },
+      chronic: {
+        color: '#1565c0',
+        bg: '#e3f2fd',
+        icon: '🔵',
+        features: [
+          '1-to-1 Doctor consultation monthly',
+          'Dedicated diet coach',
+          'Personalised diet chart',
+          'Comprehensive medical history',
+          'BP management',
+          'Diabetes management',
+          'Thyroid care',
+          'Live yoga sessions',
+          'Weight sessions',
+          '1-to-1 WhatsApp support',
+          'Priority care',
+        ]
+      },
+      fatToFit: {
+        color: '#6a1b9a',
+        bg: '#f3e5f5',
+        icon: '🟣',
+        features: [
+          '1-to-1 diet coach',
+          'Coach follow-up weekly',
+          'Live yoga sessions',
+          '1 Comprehensive medical history',
+          'Personalised diet chart',
+          'Weight management',
+          '1-to-1 WhatsApp support',
+          'Craving care',
+          'Motivated week planning',
+          'Cheat meal guidance',
+        ]
+      },
+    };
+
+    const meta = planFeatures[subscription.planType] || { color: '#27ae60', bg: '#e8f5e8', icon: '⭐', features: [] };
+
+    return {
+      subject: `Welcome to ${subscription.planName} - Drx Consult`,
+      html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background-color: #e8f5e8; padding: 30px; border-radius: 10px; margin-bottom: 20px; text-align: center;">
-          <h1 style="color: #27ae60; margin: 0 0 10px 0;">🎉 Subscription Activated!</h1>
-          <p style="color: #2d5a2d; margin: 0; font-size: 18px;">Welcome to ${subscription.planName}</p>
+        <div style="background-color: ${meta.bg}; padding: 30px; border-radius: 10px; margin-bottom: 20px; text-align: center; border-top: 4px solid ${meta.color};">
+          <div style="font-size: 40px; margin-bottom: 10px;">${meta.icon}</div>
+          <h1 style="color: ${meta.color}; margin: 0 0 8px 0;">🎉 Subscription Activated!</h1>
+          <p style="color: #333; margin: 0; font-size: 18px; font-weight: bold;">Welcome to ${subscription.planName}</p>
         </div>
-        
+
         <p style="font-size: 16px;">Hello ${userName},</p>
-        
-        <p>Congratulations! Your <strong>${subscription.planName}</strong> subscription has been successfully activated. You now have access to discounted healthcare consultations!</p>
-        
+        <p>Your <strong>${subscription.planName}</strong> (${billingLabel}) has been successfully activated. Here's everything included in your plan.</p>
+
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #2c3e50;">📋 Your Subscription Details:</h3>
-          <p><strong>Plan:</strong> ${subscription.planName}</p>
-          <p><strong>Billing:</strong> ${subscription.billingCycle === 'monthly' ? 'Monthly' : 'Yearly'} (₹${subscription.price})</p>
-          <p><strong>Start Date:</strong> ${new Date(subscription.startDate).toLocaleDateString()}</p>
-          <p><strong>Next Billing:</strong> ${new Date(subscription.nextBillingDate).toLocaleDateString()}</p>
-          <p><strong>Status:</strong> <span style="color: #27ae60; font-weight: bold;">Active</span></p>
+          <h3 style="margin-top: 0; color: #2c3e50;">📋 Subscription Details</h3>
+          <p style="margin: 6px 0;"><strong>Plan:</strong> ${subscription.planName}</p>
+          <p style="margin: 6px 0;"><strong>Duration:</strong> ${billingLabel} — ₹${subscription.price.toLocaleString('en-IN')}</p>
+          <p style="margin: 6px 0;"><strong>Start Date:</strong> ${new Date(subscription.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+          <p style="margin: 6px 0;"><strong>Valid Until:</strong> ${new Date(subscription.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+          <p style="margin: 6px 0;"><strong>Status:</strong> <span style="color: #27ae60; font-weight: bold;">Active ✅</span></p>
         </div>
-        
-        <div style="background-color: #e3f2fd; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #1565c0;">🎯 Your Monthly Allowance:</h3>
-          <ul style="color: #1976d2; line-height: 1.8;">
-            <li><strong>Pharmacist Sessions:</strong> ${subscription.sessionsLimit} sessions per month</li>
-            ${subscription.doctorConsultationsLimit > 0 ? `<li><strong>Doctor Consultations:</strong> ${subscription.doctorConsultationsLimit} consultation per month</li>` : ''}
-            <li><strong>Family Members:</strong> Up to ${subscription.familyMembersLimit} ${subscription.familyMembersLimit === 1 ? 'member' : 'members'}</li>
+
+        <div style="background-color: ${meta.bg}; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid ${meta.color};">
+          <h3 style="margin-top: 0; color: ${meta.color};">✅ What's Included in Your Plan</h3>
+          <ul style="color: #333; line-height: 2; margin: 0; padding-left: 20px;">
+            ${meta.features.map(f => `<li>${f}</li>`).join('')}
           </ul>
         </div>
-        
-        ${subscription.planType === 'family' ? `
-        <div style="background-color: #fff3cd; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #856404;">👨‍👩‍👧‍👦 Family Plan Benefits:</h3>
-          <ul style="color: #856404; line-height: 1.8;">
-            <li>✅ Chronic care guidance</li>
-            <li>✅ Lab report explanations</li>
-            <li>✅ Medication reminders</li>
-            <li>✅ Priority booking</li>
-            <li>✅ Doctor consultations included</li>
-          </ul>
-        </div>
-        ` : `
-        <div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #27ae60;">💊 Essential Plan Benefits:</h3>
-          <ul style="color: #2d5a2d; line-height: 1.8;">
-            <li>✅ Prescription explanations</li>
-            <li>✅ Medicine guidance</li>
-            <li>✅ WhatsApp support</li>
-            <li>✅ Verified content</li>
-          </ul>
-        </div>
-        `}
-        
+
         <div style="background-color: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
-          <h3 style="margin-top: 0; color: #155724;">🚀 Ready to Use Your Subscription?</h3>
-          <p style="color: #155724; margin-bottom: 15px;">Start booking your discounted sessions now!</p>
-          <a href="${process.env.FRONTEND_URL}/" 
+          <h3 style="margin-top: 0; color: #155724;">🚀 Get Started</h3>
+          <p style="color: #155724; margin-bottom: 15px;">Your plan is active — visit your dashboard to access all features.</p>
+          <a href="${process.env.FRONTEND_URL}/patient/dashboard"
              style="background-color: #28a745; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block; margin-right: 10px;">
-            Book Session
+            Go to Dashboard
           </a>
-          <a href="${process.env.FRONTEND_URL}/patient/dashboard" 
+          <a href="${process.env.FRONTEND_URL}/subscription-plans"
              style="background-color: #17a2b8; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block;">
-            View Dashboard
+            View Plans
           </a>
         </div>
-        
-        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0;">
-          <h4 style="margin-top: 0; color: #495057;">💡 How It Works:</h4>
-          <ol style="color: #555; line-height: 1.6;">
-            <li>Book sessions as usual through our platform</li>
-            <li>Your subscription sessions will be used automatically</li>
-            <li>Once your monthly limit is reached, you'll pay normal prices</li>
-            <li>Your allowance resets every month on your billing date</li>
-          </ol>
-        </div>
-        
-        <p>Thank you for subscribing to Drx Consult. We're committed to providing you with the best healthcare guidance!</p>
-        
+
+        <p>Thank you for choosing Drx Consult. We're here to support your health journey!</p>
         <p>Best regards,<br/>The Drx Consult Team</p>
-        
+
         <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
         <p style="color: #666; font-size: 12px; text-align: center;">
-          Manage your subscription anytime from your <a href="${process.env.FRONTEND_URL}/patient/dashboard">dashboard</a><br/>
+          Manage your subscription from your <a href="${process.env.FRONTEND_URL}/patient/dashboard">dashboard</a><br/>
           Questions? Contact us at support@drxconsult.com
         </p>
       </div>
     `
-  }),
+    };
+  },
 
-  subscriptionExpiring: (userName, subscription, daysLeft) => ({
+  subscriptionExpiring: (userName, subscription, daysLeft) => {
+    const billingLabel = {
+      threeMonths: '3-Month Plan', sixMonths: '6-Month Plan', twelveMonths: '12-Month Plan',
+      monthly: 'Monthly Plan', yearly: 'Yearly Plan',
+    }[subscription.billingCycle] || subscription.billingCycle;
+    return ({
     subject: `Your ${subscription.planName} expires in ${daysLeft} days - Drx Consult`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -486,32 +523,29 @@ const emailTemplates = {
         </div>
         
         <p style="font-size: 16px;">Hello ${userName},</p>
-        
-        <p>Your <strong>${subscription.planName}</strong> subscription will expire in <strong>${daysLeft} days</strong> on ${new Date(subscription.endDate).toLocaleDateString()}.</p>
+        <p>Your <strong>${subscription.planName}</strong> (${billingLabel}) will expire in <strong>${daysLeft} days</strong> on ${new Date(subscription.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}.</p>
         
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #2c3e50;">📊 Your Current Usage:</h3>
-          <p><strong>Pharmacist Sessions:</strong> ${subscription.sessionsUsed}/${subscription.sessionsLimit} used this month</p>
-          ${subscription.doctorConsultationsLimit > 0 ? `<p><strong>Doctor Consultations:</strong> ${subscription.doctorConsultationsUsed}/${subscription.doctorConsultationsLimit} used this month</p>` : ''}
-          <p><strong>Next Billing Date:</strong> ${new Date(subscription.nextBillingDate).toLocaleDateString()}</p>
+          <h3 style="margin-top: 0; color: #2c3e50;">📋 Plan Details</h3>
+          <p style="margin: 6px 0;"><strong>Plan:</strong> ${subscription.planName} — ${billingLabel}</p>
+          <p style="margin: 6px 0;"><strong>Expires:</strong> ${new Date(subscription.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
         </div>
         
         <div style="background-color: #fee; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #e74c3c;">
-          <h3 style="margin-top: 0; color: #c0392b;">⚠️ What Happens After Expiry:</h3>
+          <h3 style="margin-top: 0; color: #c0392b;">⚠️ What Happens After Expiry</h3>
           <ul style="color: #721c24; line-height: 1.6;">
-            <li>You'll lose access to discounted sessions</li>
-            <li>All future bookings will be at regular prices</li>
-            <li>Premium features will be disabled</li>
-            <li>Your consultation history will remain accessible</li>
+            <li>Access to all plan features will end</li>
+            <li>Your consultation history remains accessible</li>
+            <li>You can renew or upgrade at any time</li>
           </ul>
         </div>
         
         <div style="background-color: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
           <h3 style="margin-top: 0; color: #155724;">🔄 Renew Your Subscription</h3>
-          <p style="color: #155724; margin-bottom: 15px;">Continue enjoying discounted healthcare consultations!</p>
+          <p style="color: #155724; margin-bottom: 15px;">Continue your healthcare journey without interruption!</p>
           <a href="${process.env.FRONTEND_URL}/subscription-plans" 
              style="background-color: #28a745; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block; margin-right: 10px;">
-            Renew Subscription
+            Renew Now
           </a>
           <a href="${process.env.FRONTEND_URL}/patient/dashboard" 
              style="background-color: #17a2b8; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block;">
@@ -540,9 +574,15 @@ const emailTemplates = {
         </p>
       </div>
     `
-  }),
+    });
+  },
 
-  subscriptionExpired: (userName, subscription) => ({
+  subscriptionExpired: (userName, subscription) => {
+    const billingLabel = {
+      threeMonths: '3-Month Plan', sixMonths: '6-Month Plan', twelveMonths: '12-Month Plan',
+      monthly: 'Monthly Plan', yearly: 'Yearly Plan',
+    }[subscription.billingCycle] || subscription.billingCycle;
+    return ({
     subject: `Your ${subscription.planName} has expired - Drx Consult`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -552,37 +592,33 @@ const emailTemplates = {
         </div>
         
         <p style="font-size: 16px;">Hello ${userName},</p>
-        
-        <p>Your <strong>${subscription.planName}</strong> subscription expired on ${new Date(subscription.endDate).toLocaleDateString()}. We hope you enjoyed the benefits of discounted healthcare consultations!</p>
+        <p>Your <strong>${subscription.planName}</strong> (${billingLabel}) expired on ${new Date(subscription.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}. We hope you enjoyed the benefits!</p>
         
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #2c3e50;">📊 Your Final Usage Summary:</h3>
-          <p><strong>Total Sessions Used:</strong> ${subscription.sessionsUsed}/${subscription.sessionsLimit}</p>
-          ${subscription.doctorConsultationsLimit > 0 ? `<p><strong>Doctor Consultations Used:</strong> ${subscription.doctorConsultationsUsed}/${subscription.doctorConsultationsLimit}</p>` : ''}
-          <p><strong>Subscription Period:</strong> ${new Date(subscription.startDate).toLocaleDateString()} - ${new Date(subscription.endDate).toLocaleDateString()}</p>
-          <p><strong>Total Savings:</strong> Approximately ₹${Math.round((subscription.sessionsUsed * 75) + (subscription.doctorConsultationsUsed * 225))}</p>
+          <h3 style="margin-top: 0; color: #2c3e50;">📋 Subscription Summary</h3>
+          <p style="margin: 6px 0;"><strong>Plan:</strong> ${subscription.planName} — ${billingLabel}</p>
+          <p style="margin: 6px 0;"><strong>Period:</strong> ${new Date(subscription.startDate).toLocaleDateString('en-IN')} – ${new Date(subscription.endDate).toLocaleDateString('en-IN')}</p>
         </div>
         
         <div style="background-color: #fff3cd; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #856404;">📋 What's Changed:</h3>
+          <h3 style="margin-top: 0; color: #856404;">📋 What's Changed</h3>
           <ul style="color: #856404; line-height: 1.6;">
-            <li>Future bookings will be at regular prices</li>
-            <li>Premium features are no longer available</li>
-            <li>You can still access your consultation history</li>
-            <li>All previous reports and documents remain available</li>
+            <li>Plan features are no longer active</li>
+            <li>Your consultation history remains accessible</li>
+            <li>You can subscribe again at any time</li>
           </ul>
         </div>
         
         <div style="background-color: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
           <h3 style="margin-top: 0; color: #155724;">🔄 Reactivate Your Subscription</h3>
-          <p style="color: #155724; margin-bottom: 15px;">Miss the savings? Reactivate your subscription anytime!</p>
+          <p style="color: #155724; margin-bottom: 15px;">Continue your health journey — subscribe again anytime!</p>
           <a href="${process.env.FRONTEND_URL}/subscription-plans" 
              style="background-color: #28a745; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block; margin-right: 10px;">
             View Plans
           </a>
-          <a href="${process.env.FRONTEND_URL}/" 
+          <a href="${process.env.FRONTEND_URL}/patient/dashboard" 
              style="background-color: #17a2b8; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block;">
-            Book Session
+            Dashboard
           </a>
         </div>
         
@@ -602,7 +638,8 @@ const emailTemplates = {
         </p>
       </div>
     `
-  }),
+    });
+  },
 
   // Medical Form Email Templates
   medicalFormSubmitted: (patientName, patientEmail, formId) => ({
