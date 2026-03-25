@@ -308,17 +308,26 @@ const PeriodPCOSTracker = () => {
   const markPeriodStarted = async () => {
     try {
       const today = new Date().toISOString().split('T')[0];
-      const updatedData = {
-        ...tracker,
-        lastPeriodDate: today
-      };
-      
-      const response = await axios.post('/health-trackers/period-tracker', updatedData);
+      const response = await axios.post('/health-trackers/period-tracker/log-cycle', {
+        startDate: today
+      });
       setTracker(response.data);
-      toast.success('Period marked as started! Cycle updated.');
+      toast.success('Period marked as started! Cycle logged.');
     } catch (error) {
       console.error('Error updating period start:', error);
       toast.error('Failed to update period start');
+    }
+  };
+
+  const deletePeriodRecord = async (periodId) => {
+    if (!confirm('Delete this cycle record?')) return;
+    try {
+      const response = await axios.delete(`/health-trackers/period-tracker/period/${periodId}`);
+      setTracker(response.data.tracker);
+      toast.success('Record deleted.');
+    } catch (error) {
+      console.error('Error deleting period record:', error);
+      toast.error('Failed to delete record');
     }
   };
 
@@ -480,6 +489,16 @@ const PeriodPCOSTracker = () => {
             }`}
           >
             PCOS Assessment
+          </button>
+          <button
+            onClick={() => setActiveTab('cycle-history')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'cycle-history'
+                ? 'border-pink-500 text-pink-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Cycle History
           </button>
         </nav>
       </div>
@@ -982,6 +1001,71 @@ const PeriodPCOSTracker = () => {
                     Back to Overview
                   </button>
                 </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {/* Cycle History Tab */}
+      {activeTab === 'cycle-history' && (
+        <div className="max-w-3xl mx-auto">
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-xl font-semibold mb-4">Cycle History</h2>
+            {(!tracker.periods || tracker.periods.length === 0) ? (
+              <div className="text-center py-10 text-gray-500">
+                <div className="text-4xl mb-3">🌸</div>
+                <p>No cycle records yet.</p>
+                <p className="text-sm mt-1">Click "Mark Period Started" on the Overview tab to log your first cycle.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {[...tracker.periods].reverse().map((record) => {
+                  const daysLate = record.daysLate ?? null;
+                  let statusLabel, statusClass;
+                  if (daysLate === null || record.expectedDate == null) {
+                    statusLabel = 'Logged';
+                    statusClass = 'bg-gray-100 text-gray-600';
+                  } else if (daysLate > 0) {
+                    statusLabel = `Late by ${daysLate} day${daysLate > 1 ? 's' : ''}`;
+                    statusClass = 'bg-red-100 text-red-700';
+                  } else if (daysLate < 0) {
+                    statusLabel = `Early by ${Math.abs(daysLate)} day${Math.abs(daysLate) > 1 ? 's' : ''}`;
+                    statusClass = 'bg-blue-100 text-blue-700';
+                  } else {
+                    statusLabel = 'On time';
+                    statusClass = 'bg-green-100 text-green-700';
+                  }
+
+                  return (
+                    <div key={record._id} className="flex items-center justify-between border rounded-lg p-4">
+                      <div>
+                        <div className="font-medium text-gray-800">
+                          {new Date(record.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </div>
+                        {record.expectedDate && (
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            Expected: {new Date(record.expectedDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </div>
+                        )}
+                        {record.flow && record.flow !== 'normal' && (
+                          <div className="text-xs text-gray-500 capitalize mt-0.5">Flow: {record.flow}</div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusClass}`}>
+                          {statusLabel}
+                        </span>
+                        <button
+                          onClick={() => deletePeriodRecord(record._id)}
+                          className="text-red-400 hover:text-red-600 transition-colors text-sm"
+                          title="Delete record"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
