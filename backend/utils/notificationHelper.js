@@ -440,7 +440,7 @@ async function notifyMedicalFormPaid({ patientId, patientName, professionalId, p
      userId: professionalId,
      type: 'medical_form_payment_received',
      title: 'Payment Received',
-     message: `Payment received for ${patientName}'s medical form analysis. You earned ₹${amount/2} (50% of ₹${amount}).`,
+     message: `Payment received for ${patientName}'s medical form analysis. You earned ₹${Math.round(amount * 0.7)} (70% of ₹${amount}).`,
      patientId: patientId,
      medicalFormId: formId
    });
