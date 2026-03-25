@@ -9,7 +9,9 @@ const periodRecordSchema = new mongoose.Schema({
     type: String,
     enum: ['cramps', 'headache', 'mood_swings', 'bloating', 'fatigue', 'acne', 'breast_tenderness']
   }],
-  notes: { type: String }
+  notes: { type: String },
+  expectedDate: { type: Date }, // predicted start date for this cycle
+  daysLate: { type: Number, default: 0 } // positive = late, negative = early, 0 = on time
 });
 
 const pcosAssessmentSchema = new mongoose.Schema({
