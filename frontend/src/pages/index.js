@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import axios from 'axios'
 import Layout from '@/components/Layout'
 import SEO from '@/components/SEO'
+import SubscriptionStatus from '@/components/SubscriptionStatus'
 
 export default function Home() {
   const router = useRouter()
@@ -290,54 +291,63 @@ export default function Home() {
   const fetchSubscriptionPlans = async () => {
     try {
       const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/subscriptions/plans`)
-      // The API returns { plans: { essential: {...}, chronic: {...}, fatToFit: {...} } }
-      // Convert to array format for display
       const plansData = res.data.plans
+
+      // Plan icons and accent colors for display
+      const planMeta = {
+        womensCare: { icon: '🌸', color: 'pink' },
+        chronic:    { icon: '🔵', color: 'blue' },
+        fatToFit:   { icon: '🟣', color: 'purple' },
+        essential:  { icon: '🟢', color: 'green' },
+      }
+
       const plansArray = Object.keys(plansData).map(key => {
         const plan = plansData[key]
+        // Pick the first available billing tier for the starting price
+        const firstTier = plan.threeMonths || plan.monthly || Object.values(plan).find(v => v && typeof v.price === 'number') || {}
         const features = []
-        
-        // Add consultation limits
-        if (plan.monthly.sessionsLimit > 0) {
-          features.push(`${plan.monthly.sessionsLimit} Pharmacist Consultation${plan.monthly.sessionsLimit > 1 ? 's' : ''}`)
+
+        // New feature flags
+        if (plan.features.gynaecologistConsultation) features.push('1-to-1 Gynaecologist consultation')
+        if (plan.features.dieticianConsultation || plan.features.dietCoachOneToOne) features.push('1-to-1 Dietician / Diet coach')
+        if (plan.features.personalizedDietChart || plan.features.dietChart) features.push('Personalised diet chart')
+        if (plan.features.comprehensiveMedicalHistory) features.push('Comprehensive medical history')
+        if (plan.features.hairAndSkinCare) features.push('Hair & skin care')
+        if (plan.features.liveYogaSession) features.push('Live yoga sessions')
+        if (plan.features.periodAndPcosCare) features.push('Period & PCOS care')
+        if (plan.features.weightManagement || plan.features.weightSession) features.push('Weight management')
+        if (plan.features.whatsappSupportOneToOne || plan.features.whatsappSupport) features.push('1-to-1 WhatsApp support')
+        if (plan.features.priorityCare || plan.features.priorityBooking) features.push('Priority care')
+        if (plan.features.doctorConsultationMonthly) features.push('1-to-1 Doctor consultation monthly')
+        if (plan.features.dedicatedDietCoach) features.push('Dedicated diet coach')
+        if (plan.features.bpManagement) features.push('BP management')
+        if (plan.features.diabetesManagement) features.push('Diabetes management')
+        if (plan.features.thyroidCare) features.push('Thyroid care')
+        if (plan.features.coachFollowUpWeekly) features.push('Coach follow-up weekly')
+        if (plan.features.cravingCare) features.push('Craving care')
+        if (plan.features.motivatedWeekPlanning) features.push('Motivated week planning')
+        if (plan.features.cheatMeal) features.push('Cheat meal guidance')
+
+        // Strikethrough (original) prices — ~20% above actual
+        const strikethrough = {
+          womensCare: { threeMonths: 17499, sixMonths: 34999, twelveMonths: 69999 },
+          chronic:    { threeMonths: 23999, sixMonths: 46999, twelveMonths: 94999 },
+          fatToFit:   { threeMonths: 15999, sixMonths: 29999, twelveMonths: 44999 },
         }
-        if (plan.monthly.doctorConsultationsLimit > 0) {
-          features.push(`${plan.monthly.doctorConsultationsLimit} Doctor Consultation${plan.monthly.doctorConsultationsLimit > 1 ? 's' : ''}`)
-        }
-        if (plan.monthly.nutritionistConsultationsLimit > 0) {
-          features.push(`${plan.monthly.nutritionistConsultationsLimit} Dietitian Consultation${plan.monthly.nutritionistConsultationsLimit > 1 ? 's' : ''}`)
-        }
-        
-        // Add other features
-        if (plan.features.dietChart) features.push('Personalized Diet Chart')
-        if (plan.features.diabetesCare) features.push('Diabetes Care')
-        if (plan.features.pcosCare) features.push('PCOS Care')
-        if (plan.features.bpCare) features.push('BP Care')
-        if (plan.features.weightManagement) features.push('Weight Management')
-        if (plan.features.personalizedDietPlan) features.push('Personalized Diet Plan')
-        if (plan.features.prescriptionExplanation) features.push('Prescription Explanation')
-        if (plan.features.medicineGuidance) features.push('Medicine Guidance')
-        if (plan.features.whatsappSupport) features.push('WhatsApp Support')
-        if (plan.features.verifiedContent) features.push('Verified Content')
-        if (plan.features.chronicCareGuidance) features.push('Chronic Care Guidance')
-        if (plan.features.labReportExplanation) features.push('Lab Report Explanation')
-        if (plan.features.medicationReminders) features.push('Medication Reminders')
-        if (plan.features.priorityBooking) features.push('Priority Booking')
-        
-        features.push(`Up to ${plan.monthly.familyMembersLimit} family member${plan.monthly.familyMembersLimit > 1 ? 's' : ''}`)
-        
+
         return {
-          id: key,
           name: plan.name,
           description: plan.description,
-          price: plan.monthly.price,
-          yearlyPrice: plan.yearly?.price,
-          duration: 1,
-          durationType: 'month',
-          consultationsPerMonth: plan.monthly.sessionsLimit + plan.monthly.doctorConsultationsLimit + plan.monthly.nutritionistConsultationsLimit,
-          features: features,
-          discount: 0,
-          isActive: true
+          icon: planMeta[key]?.icon || '⭐',
+          color: planMeta[key]?.color || 'blue',
+          startingPrice: firstTier.price,
+          threeMonthsPrice: plan.threeMonths?.price,
+          sixMonthsPrice: plan.sixMonths?.price,
+          twelveMonthsPrice: plan.twelveMonths?.price,
+          threeMonthsOriginal: strikethrough[key]?.threeMonths,
+          sixMonthsOriginal: strikethrough[key]?.sixMonths,
+          twelveMonthsOriginal: strikethrough[key]?.twelveMonths,
+          features,
         }
       })
       setSubscriptionPlans(plansArray)
@@ -1245,208 +1255,186 @@ export default function Home() {
         {subscriptionPlans.length > 0 && (
           <div className="bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 py-16 sm:py-20">
             <div className="container mx-auto px-4">
-              <div className="text-center mb-12">
+              <div className="text-center mb-10">
                 <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-800 mb-4">
                   Choose Your Health Plan
                 </h2>
                 <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                  Affordable subscription plans for comprehensive healthcare access
+                  Personalised healthcare plans with expert consultations, diet coaching, yoga & more
                 </p>
               </div>
-              
-              {/* Desktop: Grid view */}
+
+              {/* Active subscription widget for logged-in users */}
+              {mounted && typeof window !== 'undefined' && localStorage.getItem('token') && (
+                <div className="max-w-2xl mx-auto mb-10">
+                  <SubscriptionStatus />
+                </div>
+              )}
+
+              {/* Desktop: Grid */}
               <div className="hidden lg:grid grid-cols-3 gap-8 max-w-7xl mx-auto">
-                {subscriptionPlans.map((plan, index) => (
-                  <div 
-                    key={plan.id}
-                    className={`bg-white rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-105 hover:shadow-2xl ${
-                      plan.id === 'chronic' ? 'scale-105 border-4 border-blue-500' : ''
-                    }`}
-                  >
-                    {plan.id === 'chronic' && (
-                      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white text-center py-2 text-sm font-semibold">
-                        ⭐ MOST POPULAR
+                {subscriptionPlans.map((plan) => {
+                  const styles = {
+                    pink:   { border: 'border-pink-400',   header: 'bg-gradient-to-r from-pink-500 to-rose-500',     btn: 'bg-pink-600 hover:bg-pink-700' },
+                    blue:   { border: 'border-blue-500',   header: 'bg-gradient-to-r from-blue-600 to-cyan-500',     btn: 'bg-blue-600 hover:bg-blue-700' },
+                    purple: { border: 'border-purple-500', header: 'bg-gradient-to-r from-purple-600 to-violet-500', btn: 'bg-purple-600 hover:bg-purple-700' },
+                    green:  { border: 'border-green-400',  header: 'bg-gradient-to-r from-green-500 to-emerald-500', btn: 'bg-green-600 hover:bg-green-700' },
+                  }
+                  const s = styles[plan.color] || styles.blue
+                  return (
+                    <div key={plan.id} className={`bg-white rounded-2xl shadow-xl overflow-hidden border-2 ${s.border} transform transition-all duration-300 hover:scale-105 hover:shadow-2xl`}>
+                      <div className={`${s.header} text-white p-6`}>
+                        <div className="flex items-center gap-3 mb-1">
+                          <span className="text-2xl">{plan.icon}</span>
+                          <h3 className="text-xl font-bold">{plan.name}</h3>
+                        </div>
+                        <p className="text-white/80 text-sm">{plan.description}</p>
                       </div>
-                    )}
-                    
-                    <div className="p-8">
-                      <div className="text-center mb-6">
-                        <h3 className="text-2xl font-bold text-gray-800 mb-2">{plan.name}</h3>
-                        <p className="text-gray-600 text-sm mb-4">{plan.description}</p>
-                        <div className="mb-3">
-                          <div className="flex items-baseline justify-center">
-                            <span className="text-5xl font-bold text-gray-900">₹{plan.price}</span>
-                            <span className="text-gray-600 ml-2">/month</span>
-                          </div>
-                          {plan.yearlyPrice && (
-                            <div className="mt-2 text-sm text-gray-600">
-                              or ₹{plan.yearlyPrice}/year
+                      <div className="p-6">
+                        <div className="space-y-2 mb-5">
+                          {plan.threeMonthsPrice && (
+                            <div className="bg-gray-50 rounded-lg p-2.5 flex justify-between items-center border-2 border-gray-200">
+                              <div className="flex items-center gap-2">
+                                <span className="text-gray-700 font-medium text-sm">3 Months</span>
+                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${s.border.replace('border-','bg-').replace('-400','').replace('-500','')}-100 text-${plan.color}-700`} style={{background: plan.color === 'pink' ? '#fce7f3' : plan.color === 'blue' ? '#dbeafe' : plan.color === 'purple' ? '#ede9fe' : '#d1fae5', color: plan.color === 'pink' ? '#be185d' : plan.color === 'blue' ? '#1d4ed8' : plan.color === 'purple' ? '#7c3aed' : '#065f46'}}>Best Value</span>
+                              </div>
+                              <div className="text-right">
+                                {plan.threeMonthsOriginal && <span className="text-xs text-gray-400 line-through block">₹{plan.threeMonthsOriginal.toLocaleString('en-IN')}</span>}
+                                <span className="font-bold text-gray-900">₹{plan.threeMonthsPrice.toLocaleString('en-IN')}</span>
+                              </div>
+                            </div>
+                          )}
+                          {plan.sixMonthsPrice && (
+                            <div className="bg-gray-50 rounded-lg p-2.5 flex justify-between items-center">
+                              <span className="text-gray-700 font-medium text-sm">6 Months</span>
+                              <div className="text-right">
+                                {plan.sixMonthsOriginal && <span className="text-xs text-gray-400 line-through block">₹{plan.sixMonthsOriginal.toLocaleString('en-IN')}</span>}
+                                <span className="font-bold text-gray-900">₹{plan.sixMonthsPrice.toLocaleString('en-IN')}</span>
+                              </div>
+                            </div>
+                          )}
+                          {plan.twelveMonthsPrice && (
+                            <div className="bg-gray-50 rounded-lg p-2.5 flex justify-between items-center">
+                              <span className="text-gray-700 font-medium text-sm">12 Months</span>
+                              <div className="text-right">
+                                {plan.twelveMonthsOriginal && <span className="text-xs text-gray-400 line-through block">₹{plan.twelveMonthsOriginal.toLocaleString('en-IN')}</span>}
+                                <span className="font-bold text-gray-900">₹{plan.twelveMonthsPrice.toLocaleString('en-IN')}</span>
+                              </div>
                             </div>
                           )}
                         </div>
+                        <ul className="space-y-1.5 mb-6">
+                          {plan.features.slice(0, 6).map((f, i) => (
+                            <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                              <svg className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>
+                              {f}
+                            </li>
+                          ))}
+                          {plan.features.length > 6 && <li className="text-xs text-gray-500 pl-6">+{plan.features.length - 6} more benefits</li>}
+                        </ul>
+                        <button onClick={() => router.push('/subscription-plans')} className={`w-full py-3 rounded-xl font-semibold text-white transition-colors ${s.btn}`}>
+                          View Plan
+                        </button>
                       </div>
-                      
-                      <div className="space-y-4 mb-8">
-                        <div className="flex items-start">
-                          <svg className="w-5 h-5 text-green-500 mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          <div>
-                            <p className="font-semibold text-gray-800">
-                              {plan.consultationsPerMonth === -1 ? 'Unlimited' : plan.consultationsPerMonth} Consultations
-                            </p>
-                            <p className="text-sm text-gray-600">Per month</p>
-                          </div>
-                        </div>
-                        
-                        {plan.features && plan.features.length > 0 && plan.features.slice(0, 6).map((feature, idx) => (
-                          <div key={idx} className="flex items-start">
-                            <svg className="w-5 h-5 text-green-500 mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                            <p className="text-gray-700">{feature}</p>
-                          </div>
-                        ))}
-                        
-                        {plan.discount > 0 && (
-                          <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-4">
-                            <p className="text-green-700 font-semibold text-sm text-center">
-                              🎉 Save {plan.discount}% on this plan!
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <button
-                        onClick={() => router.push('/patient/dashboard?tab=subscription')}
-                        className={`w-full py-3 px-6 rounded-xl font-semibold transition-all duration-300 ${
-                          plan.id === 'chronic'
-                            ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl'
-                            : 'bg-gray-800 text-white hover:bg-gray-900'
-                        }`}
-                      >
-                        Get Started
-                      </button>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
 
-              {/* Mobile & Tablet: Swipeable carousel */}
+              {/* Mobile: Swipeable carousel */}
               <div className="lg:hidden">
                 <div className="relative overflow-hidden">
-                  <div 
-                    className="flex transition-transform duration-300 ease-out touch-pan-x"
-                    style={{ 
-                      transform: `translateX(-${currentPlanSlide * 100}%)`,
-                      scrollSnapType: 'x mandatory'
-                    }}
+                  <div
+                    className="flex transition-transform duration-300 ease-out"
+                    style={{ transform: `translateX(-${currentPlanSlide * 100}%)` }}
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
                   >
-                    {subscriptionPlans.map((plan, index) => (
-                      <div 
-                        key={plan.id}
-                        className="w-full flex-shrink-0 px-4"
-                        style={{ scrollSnapAlign: 'start' }}
-                      >
-                        <div 
-                          className={`bg-white rounded-2xl shadow-xl overflow-hidden mx-auto max-w-md ${
-                            plan.id === 'chronic' ? 'border-4 border-blue-500' : ''
-                          }`}
-                        >
-                          {plan.id === 'chronic' && (
-                            <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white text-center py-2 text-sm font-semibold">
-                              ⭐ MOST POPULAR
+                    {subscriptionPlans.map((plan) => {
+                      const styles = {
+                        pink:   { border: 'border-pink-400',   header: 'bg-gradient-to-r from-pink-500 to-rose-500',     btn: 'bg-pink-600 hover:bg-pink-700' },
+                        blue:   { border: 'border-blue-500',   header: 'bg-gradient-to-r from-blue-600 to-cyan-500',     btn: 'bg-blue-600 hover:bg-blue-700' },
+                        purple: { border: 'border-purple-500', header: 'bg-gradient-to-r from-purple-600 to-violet-500', btn: 'bg-purple-600 hover:bg-purple-700' },
+                        green:  { border: 'border-green-400',  header: 'bg-gradient-to-r from-green-500 to-emerald-500', btn: 'bg-green-600 hover:bg-green-700' },
+                      }
+                      const s = styles[plan.color] || styles.blue
+                      return (
+                        <div key={plan.id} className="w-full flex-shrink-0 px-4">
+                          <div className={`bg-white rounded-2xl shadow-xl overflow-hidden border-2 ${s.border} mx-auto max-w-md`}>
+                            <div className={`${s.header} text-white p-5`}>
+                              <div className="flex items-center gap-3 mb-1">
+                                <span className="text-2xl">{plan.icon}</span>
+                                <h3 className="text-xl font-bold">{plan.name}</h3>
+                              </div>
+                              <p className="text-white/80 text-sm">{plan.description}</p>
                             </div>
-                          )}
-                          
-                          <div className="p-6">
-                            <div className="text-center mb-6">
-                              <h3 className="text-2xl font-bold text-gray-800 mb-2">{plan.name}</h3>
-                              <p className="text-gray-600 text-sm mb-4">{plan.description}</p>
-                              <div className="mb-3">
-                                <div className="flex items-baseline justify-center">
-                                  <span className="text-4xl font-bold text-gray-900">₹{plan.price}</span>
-                                  <span className="text-gray-600 ml-2">/month</span>
-                                </div>
-                                {plan.yearlyPrice && (
-                                  <div className="mt-2 text-sm text-gray-600">
-                                    or ₹{plan.yearlyPrice}/year
+                            <div className="p-5">
+                              <div className="space-y-2 mb-4">
+                                {plan.threeMonthsPrice && (
+                                  <div className="bg-gray-50 rounded-lg p-2.5 flex justify-between items-center border-2 border-gray-200">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-gray-700 font-medium text-sm">3 Months</span>
+                                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{background: plan.color === 'pink' ? '#fce7f3' : plan.color === 'blue' ? '#dbeafe' : plan.color === 'purple' ? '#ede9fe' : '#d1fae5', color: plan.color === 'pink' ? '#be185d' : plan.color === 'blue' ? '#1d4ed8' : plan.color === 'purple' ? '#7c3aed' : '#065f46'}}>Best Value</span>
+                                    </div>
+                                    <div className="text-right">
+                                      {plan.threeMonthsOriginal && <span className="text-xs text-gray-400 line-through block">₹{plan.threeMonthsOriginal.toLocaleString('en-IN')}</span>}
+                                      <span className="font-bold text-gray-900">₹{plan.threeMonthsPrice.toLocaleString('en-IN')}</span>
+                                    </div>
+                                  </div>
+                                )}
+                                {plan.sixMonthsPrice && (
+                                  <div className="bg-gray-50 rounded-lg p-2.5 flex justify-between items-center">
+                                    <span className="text-gray-700 font-medium text-sm">6 Months</span>
+                                    <div className="text-right">
+                                      {plan.sixMonthsOriginal && <span className="text-xs text-gray-400 line-through block">₹{plan.sixMonthsOriginal.toLocaleString('en-IN')}</span>}
+                                      <span className="font-bold text-gray-900">₹{plan.sixMonthsPrice.toLocaleString('en-IN')}</span>
+                                    </div>
+                                  </div>
+                                )}
+                                {plan.twelveMonthsPrice && (
+                                  <div className="bg-gray-50 rounded-lg p-2.5 flex justify-between items-center">
+                                    <span className="text-gray-700 font-medium text-sm">12 Months</span>
+                                    <div className="text-right">
+                                      {plan.twelveMonthsOriginal && <span className="text-xs text-gray-400 line-through block">₹{plan.twelveMonthsOriginal.toLocaleString('en-IN')}</span>}
+                                      <span className="font-bold text-gray-900">₹{plan.twelveMonthsPrice.toLocaleString('en-IN')}</span>
+                                    </div>
                                   </div>
                                 )}
                               </div>
+                              <ul className="space-y-1.5 mb-5">
+                                {plan.features.slice(0, 5).map((f, i) => (
+                                  <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                                    <svg className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>
+                                    {f}
+                                  </li>
+                                ))}
+                                {plan.features.length > 5 && <li className="text-xs text-gray-500 pl-6">+{plan.features.length - 5} more benefits</li>}
+                              </ul>
+                              <button onClick={() => router.push('/subscription-plans')} className={`w-full py-3 rounded-xl font-semibold text-white transition-colors ${s.btn}`}>
+                                View Plan
+                              </button>
                             </div>
-                            
-                            <div className="space-y-3 mb-6">
-                              <div className="flex items-start">
-                                <svg className="w-5 h-5 text-green-500 mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                </svg>
-                                <div>
-                                  <p className="font-semibold text-gray-800">
-                                    {plan.consultationsPerMonth === -1 ? 'Unlimited' : plan.consultationsPerMonth} Consultations
-                                  </p>
-                                  <p className="text-sm text-gray-600">Per month</p>
-                                </div>
-                              </div>
-                              
-                              {plan.features && plan.features.length > 0 && plan.features.slice(0, 5).map((feature, idx) => (
-                                <div key={idx} className="flex items-start">
-                                  <svg className="w-5 h-5 text-green-500 mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                  </svg>
-                                  <p className="text-gray-700 text-sm">{feature}</p>
-                                </div>
-                              ))}
-                            </div>
-                            
-                            <button
-                              onClick={() => router.push('/patient/dashboard?tab=subscription')}
-                              className={`w-full py-3 px-6 rounded-xl font-semibold transition-all duration-300 ${
-                                plan.id === 'chronic'
-                                  ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 shadow-lg'
-                                  : 'bg-gray-800 text-white hover:bg-gray-900'
-                              }`}
-                            >
-                              Get Started
-                            </button>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
-
-                {/* Slide Indicators */}
+                {/* Slide indicators */}
                 <div className="flex justify-center space-x-2 mt-6">
                   {subscriptionPlans.map((plan, index) => (
-                    <button
-                      key={plan.id}
-                      onClick={() => setCurrentPlanSlide(index)}
-                      className={`transition-all rounded-full ${
-                        index === currentPlanSlide
-                          ? 'bg-blue-600 w-8 h-3' 
-                          : 'bg-gray-300 w-3 h-3'
-                      }`}
-                      aria-label={`Go to ${plan.name} plan`}
-                    />
+                    <button key={plan.id} onClick={() => setCurrentPlanSlide(index)} className={`transition-all rounded-full ${index === currentPlanSlide ? 'bg-blue-600 w-8 h-3' : 'bg-gray-300 w-3 h-3'}`} aria-label={`Go to ${plan.name} plan`} />
                   ))}
                 </div>
-
-                {/* Swipe Instructions */}
                 <div className="text-center mt-4">
                   <p className="text-sm text-gray-500">← Swipe to see more plans →</p>
                 </div>
               </div>
-              
+
               <div className="text-center mt-12">
-                <a 
-                  href="/patient/dashboard?tab=subscription"
-                  className="inline-block text-blue-600 hover:text-blue-700 font-semibold text-lg hover:underline"
-                >
-                  View All Plans & Compare Features →
+                <a href="/subscription-plans" className="inline-block bg-gray-900 text-white px-8 py-3 rounded-xl font-semibold hover:bg-gray-800 transition-colors">
+                  View All Plans & Compare →
                 </a>
               </div>
             </div>
