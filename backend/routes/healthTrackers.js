@@ -272,6 +272,72 @@ router.post('/period-tracker/pcos-assessment', auth, async (req, res) => {
   }
 });
 
+// Log a cycle record (called when period starts or cycle completes)
+router.post('/period-tracker/log-cycle', [
+  auth,
+  body('startDate').isISO8601().withMessage('Valid start date is required')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const { startDate, flow, symptoms, notes } = req.body;
+
+    const tracker = await PeriodTracker.findOne({ userId: req.user.userId });
+    if (!tracker) {
+      return res.status(404).json({ message: 'Period tracker not found' });
+    }
+
+    // Calculate expected date based on previous lastPeriodDate + cycleLength
+    const expectedDate = new Date(tracker.lastPeriodDate);
+    expectedDate.setDate(expectedDate.getDate() + tracker.averageCycleLength);
+
+    const actualStart = new Date(startDate);
+    const diffDays = Math.round((actualStart - expectedDate) / (1000 * 60 * 60 * 24));
+
+    const periodRecord = {
+      startDate: actualStart,
+      endDate: null,
+      flow: flow || 'normal',
+      symptoms: symptoms || [],
+      notes: notes || '',
+      expectedDate,
+      daysLate: diffDays // positive = late, negative = early, 0 = on time
+    };
+
+    tracker.periods.push(periodRecord);
+    tracker.lastPeriodDate = actualStart;
+
+    await tracker.save();
+    res.json(tracker);
+  } catch (error) {
+    console.error('Error logging cycle:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Delete a period record
+router.delete('/period-tracker/period/:periodId', auth, async (req, res) => {
+  try {
+    const { periodId } = req.params;
+    const tracker = await PeriodTracker.findOne({ userId: req.user.userId });
+
+    if (!tracker) {
+      return res.status(404).json({ message: 'Period tracker not found' });
+    }
+
+    tracker.periods = tracker.periods.filter(p => p._id.toString() !== periodId);
+    await tracker.save();
+
+    res.json({ message: 'Period record deleted', tracker });
+  } catch (error) {
+    console.error('Error deleting period record:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // ===== BP TRACKER ROUTES =====
 
 // Get BP readings for user
