@@ -171,7 +171,7 @@ export default function Navbar() {
             {/* Logo */}
             <Link href="/" className="flex items-center space-x-2">
               <div className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent">
-                💊 DrX Consult
+                💊 DRx Consult
               </div>
             </Link>
 
@@ -233,6 +233,30 @@ export default function Navbar() {
                   </div>
                 </div>
               </div>
+
+              {/* Subscription Plans Link */}
+              <Link
+                href="/subscription-plans"
+                className={`flex flex-col items-center justify-center p-3 rounded-2xl transition-all duration-300 group relative ${
+                  router.pathname === '/subscription-plans'
+                    ? 'text-purple-600 bg-gradient-to-br from-purple-50 to-purple-100 shadow-lg shadow-purple-200/50'
+                    : 'text-gray-400 hover:text-purple-600 hover:bg-gradient-to-br hover:from-purple-50 hover:to-purple-100 hover:shadow-lg hover:shadow-purple-200/30'
+                }`}
+              >
+                <div className={`w-6 h-6 mb-2 transition-all duration-300 ${
+                  router.pathname === '/subscription-plans' ? 'transform scale-110 drop-shadow-sm' : 'group-hover:scale-105 group-hover:drop-shadow-sm'
+                }`}>
+                  <svg className="w-full h-full" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <span className={`text-xs font-medium transition-all duration-300 ${
+                  router.pathname === '/subscription-plans' ? 'text-purple-600 font-semibold' : 'text-gray-400 group-hover:text-purple-600'
+                }`}>Plans</span>
+                <div className={`absolute inset-0 rounded-2xl transition-all duration-300 ${
+                  router.pathname === '/subscription-plans' ? 'bg-gradient-to-br from-purple-400/10 to-purple-600/10' : 'group-hover:bg-gradient-to-br group-hover:from-purple-400/5 group-hover:to-purple-600/5'
+                }`}></div>
+              </Link>
               
               {user && (
                 <>
@@ -366,7 +390,7 @@ export default function Navbar() {
             {/* Logo */}
             <Link href="/" className="flex items-center space-x-2">
               <div className="text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent">
-                💊 DrX Consult
+                💊 DRx Consult
               </div>
             </Link>
 
@@ -428,6 +452,16 @@ export default function Navbar() {
           
           {user ? (
             <>
+              <NavIcon
+                href="/subscription-plans"
+                icon={
+                  <svg className="w-full h-full" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                }
+                label="Plans"
+                isActive={router.pathname === '/subscription-plans'}
+              />
               <NavIcon
                 href={getDashboardLink()}
                 icon={<DashboardIcon className="w-full h-full" />}
