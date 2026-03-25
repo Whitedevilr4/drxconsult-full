@@ -4,13 +4,13 @@ const subscriptionSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   planType: { 
     type: String, 
-    enum: ['essential', 'family', 'chronic', 'fatToFit'], 
+    enum: ['essential', 'womensCare', 'family', 'chronic', 'fatToFit'], 
     required: true 
   },
   planName: { type: String, required: true },
   billingCycle: { 
     type: String, 
-    enum: ['monthly', 'yearly'], 
+    enum: ['monthly', 'yearly', 'threeMonths', 'sixMonths', 'twelveMonths'], 
     required: true 
   },
   price: { type: Number, required: true },
@@ -86,10 +86,10 @@ subscriptionSchema.methods.canBookSession = function() {
   return this.status === 'active' && this.sessionsUsed < this.sessionsLimit;
 };
 
-// Check if user can book doctor consultation (family plan only)
+// Check if user can book doctor consultation
 subscriptionSchema.methods.canBookDoctorConsultation = function() {
   return this.status === 'active' && 
-         this.planType === 'family' && 
+         this.doctorConsultationsLimit > 0 &&
          this.doctorConsultationsUsed < this.doctorConsultationsLimit;
 };
 
