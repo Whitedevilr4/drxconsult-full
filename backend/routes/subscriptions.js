@@ -9,82 +9,28 @@ const router = express.Router();
 
 // Subscription plans configuration
 const SUBSCRIPTION_PLANS = {
-  essential: {
-    name: 'Essential Care',
-    description: 'Perfect for individuals seeking basic healthcare consultations',
-    monthly: {
-      price: 999,
-      sessionsLimit: 1, // 1 pharmacist
-      doctorConsultationsLimit: 1, // 1 doctor
-      nutritionistConsultationsLimit: 1, // 1 nutritionist
+  womensCare: {
+    name: "Women's Care",
+    description: "Comprehensive women's health plan with gynaecologist, dietitian, yoga, and more",
+    threeMonths: {
+      price: 13999,
+      sessionsLimit: 0,
+      doctorConsultationsLimit: 1, // 1-to-1 gynaecologist
+      nutritionistConsultationsLimit: 1, // 1-to-1 dietitian
       familyMembersLimit: 1
     },
-    yearly: {
-      price: 9999,
-      sessionsLimit: 1,
+    sixMonths: {
+      price: 27499,
+      sessionsLimit: 0,
       doctorConsultationsLimit: 1,
       nutritionistConsultationsLimit: 1,
       familyMembersLimit: 1
     },
-    features: {
-      prescriptionExplanation: true,
-      medicineGuidance: true,
-      whatsappSupport: true,
-      verifiedContent: true,
-      chronicCareGuidance: false,
-      labReportExplanation: false,
-      medicationReminders: false,
-      priorityBooking: false,
-      dietChart: false
-    }
-  },
-  chronic: {
-    name: 'Chronic Care',
-    description: 'Specialized care for Diabetes, PCOS, and BP management',
-    monthly: {
-      price: 1799,
-      sessionsLimit: 3, // 3 pharmacist
-      doctorConsultationsLimit: 2, // 2 doctor
-      nutritionistConsultationsLimit: 2, // 2 dietitian with diet chart
-      familyMembersLimit: 4
-    },
-    yearly: {
-      price: 16999,
-      sessionsLimit: 3,
-      doctorConsultationsLimit: 2,
-      nutritionistConsultationsLimit: 2,
-      familyMembersLimit: 4
-    },
-    features: {
-      prescriptionExplanation: true,
-      medicineGuidance: true,
-      whatsappSupport: true,
-      verifiedContent: true,
-      chronicCareGuidance: true,
-      labReportExplanation: true,
-      medicationReminders: true,
-      priorityBooking: true,
-      dietChart: true,
-      diabetesCare: true,
-      pcosCare: true,
-      bpCare: true
-    }
-  },
-  fatToFit: {
-    name: 'Fat to Fit',
-    description: 'Weight management with personalized diet plans',
-    monthly: {
-      price: 1299,
-      sessionsLimit: 0, // No pharmacist
-      doctorConsultationsLimit: 1, // 1 doctor
-      nutritionistConsultationsLimit: 2, // 2 dietitian
-      familyMembersLimit: 1
-    },
-    yearly: {
-      price: 12999,
+    twelveMonths: {
+      price: 54998,
       sessionsLimit: 0,
       doctorConsultationsLimit: 1,
-      nutritionistConsultationsLimit: 2,
+      nutritionistConsultationsLimit: 1,
       familyMembersLimit: 1
     },
     features: {
@@ -97,8 +43,109 @@ const SUBSCRIPTION_PLANS = {
       medicationReminders: false,
       priorityBooking: true,
       dietChart: true,
+      gynaecologistConsultation: true,
+      personalizedDietChart: true,
+      dieticianConsultation: true,
+      comprehensiveMedicalHistory: true,
+      hairAndSkinCare: true,
+      liveYogaSession: true,
+      periodAndPcosCare: true,
       weightManagement: true,
-      personalizedDietPlan: true
+      whatsappSupportOneToOne: true,
+      priorityCare: true
+    }
+  },
+  chronic: {
+    name: 'Chronic Care',
+    description: 'Complete chronic disease management with dedicated doctor and diet coach',
+    threeMonths: {
+      price: 18999,
+      sessionsLimit: 0,
+      doctorConsultationsLimit: 1,
+      nutritionistConsultationsLimit: 1,
+      familyMembersLimit: 1
+    },
+    sixMonths: {
+      price: 37499,
+      sessionsLimit: 0,
+      doctorConsultationsLimit: 1,
+      nutritionistConsultationsLimit: 1,
+      familyMembersLimit: 1
+    },
+    twelveMonths: {
+      price: 75999,
+      sessionsLimit: 0,
+      doctorConsultationsLimit: 1,
+      nutritionistConsultationsLimit: 1,
+      familyMembersLimit: 1
+    },
+    features: {
+      prescriptionExplanation: false,
+      medicineGuidance: false,
+      whatsappSupport: true,
+      verifiedContent: true,
+      chronicCareGuidance: true,
+      labReportExplanation: false,
+      medicationReminders: false,
+      priorityBooking: true,
+      dietChart: true,
+      doctorConsultationMonthly: true,
+      dedicatedDietCoach: true,
+      personalizedDietChart: true,
+      comprehensiveMedicalHistory: true,
+      bpManagement: true,
+      diabetesManagement: true,
+      thyroidCare: true,
+      liveYogaSession: true,
+      weightSession: true,
+      whatsappSupportOneToOne: true,
+      priorityCare: true
+    }
+  },
+  fatToFit: {
+    name: 'Fat to Fit',
+    description: 'Dedicated weight management with personal diet coach and weekly follow-ups',
+    threeMonths: {
+      price: 12999,
+      sessionsLimit: 0,
+      doctorConsultationsLimit: 0,
+      nutritionistConsultationsLimit: 0,
+      familyMembersLimit: 1
+    },
+    sixMonths: {
+      price: 23999,
+      sessionsLimit: 0,
+      doctorConsultationsLimit: 0,
+      nutritionistConsultationsLimit: 0,
+      familyMembersLimit: 1
+    },
+    twelveMonths: {
+      price: 35999,
+      sessionsLimit: 0,
+      doctorConsultationsLimit: 0,
+      nutritionistConsultationsLimit: 0,
+      familyMembersLimit: 1
+    },
+    features: {
+      prescriptionExplanation: false,
+      medicineGuidance: false,
+      whatsappSupport: true,
+      verifiedContent: true,
+      chronicCareGuidance: false,
+      labReportExplanation: false,
+      medicationReminders: false,
+      priorityBooking: true,
+      dietChart: true,
+      dietCoachOneToOne: true,
+      coachFollowUpWeekly: true,
+      liveYogaSession: true,
+      comprehensiveMedicalHistory: true,
+      personalizedDietChart: true,
+      weightManagement: true,
+      whatsappSupportOneToOne: true,
+      cravingCare: true,
+      motivatedWeekPlanning: true,
+      cheatMeal: true
     }
   }
 };
@@ -139,8 +186,8 @@ router.get('/current', auth, async (req, res) => {
 // Create new subscription
 router.post('/create', [
   auth,
-  body('planType').isIn(['essential', 'chronic', 'fatToFit']).withMessage('Invalid plan type'),
-  body('billingCycle').isIn(['monthly', 'yearly']).withMessage('Invalid billing cycle'),
+  body('planType').isIn(['womensCare', 'chronic', 'fatToFit']).withMessage('Invalid plan type'),
+  body('billingCycle').isIn(['monthly', 'yearly', 'threeMonths', 'sixMonths', 'twelveMonths']).withMessage('Invalid billing cycle'),
   body('paymentId').optional().isString().withMessage('Payment ID must be a string'),
   body('orderId').optional().isString().withMessage('Order ID must be a string')
 ], async (req, res) => {
@@ -171,7 +218,16 @@ router.post('/create', [
     const endDate = new Date();
     const nextBillingDate = new Date();
     
-    if (billingCycle === 'monthly') {
+    if (billingCycle === 'threeMonths') {
+      endDate.setMonth(endDate.getMonth() + 3);
+      nextBillingDate.setMonth(nextBillingDate.getMonth() + 3);
+    } else if (billingCycle === 'sixMonths') {
+      endDate.setMonth(endDate.getMonth() + 6);
+      nextBillingDate.setMonth(nextBillingDate.getMonth() + 6);
+    } else if (billingCycle === 'twelveMonths') {
+      endDate.setFullYear(endDate.getFullYear() + 1);
+      nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1);
+    } else if (billingCycle === 'monthly') {
       endDate.setMonth(endDate.getMonth() + 1);
       nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
     } else {
@@ -224,8 +280,8 @@ router.post('/create', [
 // Update subscription (upgrade/downgrade)
 router.put('/update', [
   auth,
-  body('planType').isIn(['essential', 'chronic', 'fatToFit']).withMessage('Invalid plan type'),
-  body('billingCycle').isIn(['monthly', 'yearly']).withMessage('Invalid billing cycle'),
+  body('planType').isIn(['womensCare', 'chronic', 'fatToFit']).withMessage('Invalid plan type'),
+  body('billingCycle').isIn(['monthly', 'yearly', 'threeMonths', 'sixMonths', 'twelveMonths']).withMessage('Invalid billing cycle'),
   body('paymentId').optional().isString().withMessage('Payment ID must be a string'),
   body('orderId').optional().isString().withMessage('Order ID must be a string')
 ], async (req, res) => {
