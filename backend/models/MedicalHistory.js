@@ -41,8 +41,8 @@ const medicalHistorySchema = new mongoose.Schema({
     amount: { type: Number, default: 50 },
     paymentId: String,
     paidAt: Date,
-    pharmacistShare: { type: Number, default: 25 }, // 50% of 50
-    adminShare: { type: Number, default: 25 }, // 50% of 50
+    pharmacistShare: { type: Number, default: 35 }, // 70% of 50
+    adminShare: { type: Number, default: 15 }, // 30% of 50
     pharmacistPaid: { type: Boolean, default: false },
     pharmacistPaidAt: Date
   },
