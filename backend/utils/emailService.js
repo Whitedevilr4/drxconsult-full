@@ -123,8 +123,8 @@ const emailTemplates = {
         
         <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0;">
           <h4 style="margin-top: 0; color: #856404;">Your Earnings:</h4>
-          <p><strong>Your Share:</strong> ₹${booking.pharmacistShare || booking.doctorShare || (booking.serviceType === 'prescription_review' ? 75 : booking.serviceType === 'doctor_consultation' ? 250 : 225)}</p>
-          <p><em>50% of the total booking amount</em></p>
+          <p><strong>Your Share:</strong> ₹${booking.pharmacistShare || booking.doctorShare || (booking.serviceType === 'prescription_review' ? Math.round(149 * 0.7) : booking.serviceType === 'doctor_consultation' ? 250 : Math.round(449 * 0.7))}</p>
+          <p><em>70% of the total booking amount</em></p>
         </div>
         
         <p>Please log in to your dashboard to:</p>
@@ -837,10 +837,10 @@ const emailTemplates = {
         
         <div style="background-color: #e3f2fd; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <h3 style="margin-top: 0; color: #1565c0;">📊 Earnings Breakdown:</h3>
-          <p>As a ${professionalType}, you receive 50% of each consultation fee:</p>
+          <p>As a ${professionalType}, you receive 70% of each consultation fee:</p>
           <ul style="color: #1976d2; line-height: 1.6;">
-            <li>Prescription Reviews: ₹75 per session (from ₹149)</li>
-            <li>Full Consultations: ₹225 per session (from ₹449)</li>
+            <li>Prescription Reviews: ₹${Math.round(149 * 0.7)} per session (from ₹149)</li>
+            <li>Full Consultations: ₹${Math.round(449 * 0.7)} per session (from ₹449)</li>
           </ul>
         </div>
         
@@ -901,7 +901,36 @@ const sendPasswordResetEmail = async (email, resetToken, userName) => {
 };
 
 const sendBookingConfirmationEmail = async (patientEmail, booking, patientName, pharmacistName) => {
-  return await sendEmail(patientEmail, emailTemplates.bookingConfirmation, booking, patientName, pharmacistName);
+  try {
+    const { generateInvoicePDF } = require('./invoiceGenerator');
+    const transporter = createTransporter();
+    const emailContent = emailTemplates.bookingConfirmation(booking, patientName, pharmacistName);
+
+    let pdfBuffer = null;
+    try {
+      pdfBuffer = await generateInvoicePDF(booking, patientName, pharmacistName);
+    } catch (pdfErr) {
+      console.error('Invoice PDF generation failed, sending email without attachment:', pdfErr.message);
+    }
+
+    const mailOptions = {
+      from: process.env.EMAIL_FROM,
+      to: patientEmail,
+      subject: emailContent.subject,
+      html: emailContent.html,
+      attachments: pdfBuffer ? [{
+        filename: `Invoice-${booking._id}.pdf`,
+        content: pdfBuffer,
+        contentType: 'application/pdf'
+      }] : []
+    };
+
+    const result = await transporter.sendMail(mailOptions);
+    return { success: true, messageId: result.messageId };
+  } catch (error) {
+    console.error('Error sending booking confirmation email:', error);
+    return { success: false, error: error.message };
+  }
 };
 
 const sendPharmacistBookingNotification = async (pharmacistEmail, booking, patientName, patientEmail, patientPhone) => {
