@@ -1,62 +1,45 @@
 function generateSiteMap() {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://drxconsult.in'
-  
-  // Static pages
-  const staticPages = [
-    '',
-    '/login',
-    '/signup',
-    '/forgot-password',
-    '/reset-password',
-    '/privacy-policy',
-    '/terms-and-conditions',
-    '/faq',
-    '/customer-service',
-  ]
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://drxconsult.in' || 'https://drxconsult.com'
+  const now = new Date().toISOString()
 
-  // Dynamic pages (you can fetch these from your API)
-  const dynamicPages = [
-    // Add dynamic routes here if needed
-    // '/book/pharmacist-1',
-    // '/book/pharmacist-2',
+  const pages = [
+    { path: '',                    changefreq: 'daily',   priority: '1.0' },
+    { path: '/subscription-plans', changefreq: 'weekly',  priority: '0.9' },
+    { path: '/doctors',            changefreq: 'daily',   priority: '0.9' },
+    { path: '/pharmacists',        changefreq: 'daily',   priority: '0.9' },
+    { path: '/nutritionists',      changefreq: 'daily',   priority: '0.9' },
+    { path: '/locate-hospital',    changefreq: 'weekly',  priority: '0.8' },
+    { path: '/health-trackers',    changefreq: 'weekly',  priority: '0.8' },
+    { path: '/faq',                changefreq: 'monthly', priority: '0.7' },
+    { path: '/customer-service',   changefreq: 'monthly', priority: '0.7' },
+    { path: '/login',              changefreq: 'monthly', priority: '0.5' },
+    { path: '/signup',             changefreq: 'monthly', priority: '0.5' },
+    { path: '/privacy-policy',     changefreq: 'yearly',  priority: '0.4' },
+    { path: '/terms-and-conditions', changefreq: 'yearly', priority: '0.4' },
+    { path: '/disclaimer',         changefreq: 'yearly',  priority: '0.4' },
+    { path: '/refund-policy',      changefreq: 'yearly',  priority: '0.4' },
   ]
-
-  const allPages = [...staticPages, ...dynamicPages]
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-   <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-     ${allPages
-       .map((page) => {
-         return `
-       <url>
-           <loc>${baseUrl}${page}</loc>
-           <lastmod>${new Date().toISOString()}</lastmod>
-           <changefreq>${page === '' ? 'daily' : 'weekly'}</changefreq>
-           <priority>${page === '' ? '1.0' : '0.8'}</priority>
-       </url>
-     `
-       })
-       .join('')}
-   </urlset>
- `
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${pages.map(({ path, changefreq, priority }) => `  <url>
+    <loc>${baseUrl}${path}</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>${changefreq}</changefreq>
+    <priority>${priority}</priority>
+  </url>`).join('\n')}
+</urlset>`
 }
 
-function SiteMap() {
-  // getServerSideProps will do the heavy lifting
-}
+function SiteMap() {}
 
 export async function getServerSideProps({ res }) {
-  // We make an API call to gather the URLs for our site
   const sitemap = generateSiteMap()
-
   res.setHeader('Content-Type', 'text/xml')
-  // we send the XML to the browser
+  res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate')
   res.write(sitemap)
   res.end()
-
-  return {
-    props: {},
-  }
+  return { props: {} }
 }
 
 export default SiteMap
