@@ -1,124 +1,113 @@
 import Head from 'next/head'
 
 const SEO = ({
-  title = "DrX Consult - Online Pharmacy Consultation & Medical Counseling",
-  description = "Get expert pharmaceutical counseling from certified pharmacists. Book online consultations, prescription reviews, and personalized medication guidance. 24/7 healthcare support available.",
-  keywords = "online pharmacy consultation, pharmacist counseling, prescription review, medication guidance, healthcare consultation, medical advice, pharmacy services, drug interaction check, medication management, online pharmacist",
+  title = "DrX Consult - Online Healthcare Consultation Platform",
+  description = "Connect with certified doctors, pharmacists, and dietitians for comprehensive healthcare guidance. Women's Care, Chronic Care, and Fat to Fit subscription plans available.",
+  keywords = "online doctor consultation, pharmacist counseling, dietitian consultation, women's care, chronic care, weight management, prescription review, medication guidance, healthcare platform India, online doctor consultancy, doctors near me, online doctors near me, apollo pharmacy, medplus mart, cardiologist near me, how to reduce sugar, bp problem, sexologist, weight management, how to become fit in 10 days, how to become fit to impress girl",
   image = "/og-image.jpg",
   url = "",
   type = "website",
-  author = "DrX Consult",
-  publishedTime,
-  modifiedTime,
-  section,
-  tags = [],
   noindex = false,
   canonical
 }) => {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://drxconsult.in/'
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://drxconsult.in' || 'https://drxconsult.com').replace(/\/$/, '')
   const fullUrl = url ? `${siteUrl}${url}` : siteUrl
   const imageUrl = image.startsWith('http') ? image : `${siteUrl}${image}`
-  
-  // Structured data for healthcare organization
+
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "MedicalOrganization",
     "name": "DrX Consult",
-    "description": description,
+    "description": "Comprehensive online healthcare consultation platform with doctors, pharmacists, and dietitians.",
     "url": siteUrl,
-    "logo": `${siteUrl}/logo.png`,
-    "contactPoint": {
-      "@type": "ContactPoint",
-      "telephone": "+91-XXXXXXXXXX",
-      "contactType": "customer service",
-      "availableLanguage": ["English", "Hindi"]
-    },
-    "address": {
-      "@type": "PostalAddress",
-      "addressCountry": "IN"
-    },
-    "medicalSpecialty": [
-      "Pharmacy",
-      "Clinical Pharmacy",
-      "Pharmaceutical Care",
-      "Medication Therapy Management"
-    ],
+    "logo": `${siteUrl}/favicon-32x32.png`,
+    "email": "drxcall.counselling@gmail.com",
+    "address": { "@type": "PostalAddress", "addressCountry": "IN" },
+    "medicalSpecialty": ["Pharmacy", "General Practice", "Nutrition", "Women's Health"],
     "serviceType": [
-      "Online Pharmacy Consultation",
-      "Prescription Review",
-      "Medication Counseling",
-      "Drug Interaction Checking"
+      "Online Doctor Consultation",
+      "Pharmacist Counseling",
+      "Dietitian Consultation",
+      "Women's Care Plan",
+      "Chronic Disease Management",
+      "Weight Management"
     ]
   }
 
-  // Structured data for medical services
   const serviceSchema = {
     "@context": "https://schema.org",
     "@type": "MedicalBusiness",
     "name": "DrX Consult",
-    "description": "Professional online pharmacy consultation and medication counseling services",
     "url": siteUrl,
-    "priceRange": "₹149-₹449",
-    "paymentAccepted": ["Cash", "Credit Card", "UPI", "Net Banking"],
+    "priceRange": "₹12,999 - ₹75,999",
+    "paymentAccepted": ["Credit Card", "UPI", "Net Banking"],
     "currenciesAccepted": "INR",
     "openingHours": "Mo-Su 00:00-23:59",
-    "telephone": "+91-XXXXXXXXXX",
     "email": "drxcall.counselling@gmail.com",
     "hasOfferCatalog": {
       "@type": "OfferCatalog",
-      "name": "Pharmacy Consultation Services",
+      "name": "Healthcare Subscription Plans",
       "itemListElement": [
         {
           "@type": "Offer",
           "itemOffered": {
             "@type": "Service",
-            "name": "Prescription Review",
-            "description": "Expert review of your prescriptions and medications"
+            "name": "Women's Care Plan",
+            "description": "1-to-1 gynaecologist, dietician, yoga, period & PCOS care, hair & skin care"
           },
-          "price": "200",
+          "price": "13999",
           "priceCurrency": "INR"
         },
         {
           "@type": "Offer",
           "itemOffered": {
             "@type": "Service",
-            "name": "Full Consultation",
-            "description": "Comprehensive pharmaceutical consultation and counseling"
+            "name": "Chronic Care Plan",
+            "description": "Doctor consultation, BP/diabetes/thyroid management, dedicated diet coach"
           },
-          "price": "500",
+          "price": "18999",
+          "priceCurrency": "INR"
+        },
+        {
+          "@type": "Offer",
+          "itemOffered": {
+            "@type": "Service",
+            "name": "Fat to Fit Plan",
+            "description": "1-to-1 diet coach, weekly follow-up, yoga, weight management, craving care"
+          },
+          "price": "12999",
           "priceCurrency": "INR"
         }
       ]
     }
   }
 
-  // FAQ Schema for common questions
   const faqSchema = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
     "mainEntity": [
       {
         "@type": "Question",
-        "name": "What is online pharmacy consultation?",
+        "name": "What subscription plans does DrX Consult offer?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Online pharmacy consultation is a service where certified pharmacists provide professional advice about medications, drug interactions, side effects, and proper usage through digital platforms."
+          "text": "DrX Consult offers three plans: Women's Care (from ₹13,999), Chronic Care (from ₹18,999), and Fat to Fit (from ₹12,999). Each plan is available in 3-month, 6-month, and 12-month durations."
         }
       },
       {
         "@type": "Question",
-        "name": "How much does a consultation cost?",
+        "name": "Can I consult a doctor online on DrX Consult?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "We offer prescription review for ₹149 and comprehensive consultation for ₹449. All consultations are conducted by certified pharmacists."
+          "text": "Yes. DrX Consult connects you with certified doctors, pharmacists, and dietitians for online consultations via video call."
         }
       },
       {
         "@type": "Question",
-        "name": "Are the pharmacists certified?",
+        "name": "Are the professionals on DrX Consult certified?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Yes, all our pharmacists are licensed professionals with proper certifications and extensive experience in pharmaceutical care."
+          "text": "Yes, all doctors, pharmacists, and nutritionists on DrX Consult are licensed professionals with verified credentials."
         }
       },
       {
@@ -126,7 +115,7 @@ const SEO = ({
         "name": "Is my health information secure?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Absolutely. We follow strict privacy protocols and use secure encryption to protect all patient health information and personal data."
+          "text": "Yes. DrX Consult uses secure encryption to protect all patient health information and personal data."
         }
       }
     ]
@@ -134,88 +123,37 @@ const SEO = ({
 
   return (
     <Head>
-      {/* Basic Meta Tags */}
       <title>{title}</title>
       <meta name="description" content={description} />
       <meta name="keywords" content={keywords} />
-      <meta name="author" content={author} />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <meta httpEquiv="Content-Type" content="text/html; charset=utf-8" />
-      <meta name="language" content="English" />
       <meta name="robots" content={noindex ? "noindex,nofollow" : "index,follow"} />
-      
-      {/* Canonical URL */}
+      <meta name="theme-color" content="#2563eb" />
+      <meta name="geo.region" content="IN" />
+      <meta name="geo.country" content="India" />
+
       <link rel="canonical" href={canonical || fullUrl} />
-      
-      {/* Open Graph Meta Tags */}
+
+      {/* Open Graph */}
       <meta property="og:type" content={type} />
       <meta property="og:title" content={title} />
       <meta property="og:description" content={description} />
       <meta property="og:image" content={imageUrl} />
       <meta property="og:url" content={fullUrl} />
       <meta property="og:site_name" content="DrX Consult" />
-      <meta property="og:locale" content="en_US" />
-      
-      {/* Twitter Card Meta Tags */}
+      <meta property="og:locale" content="en_IN" />
+
+      {/* Twitter Card */}
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={title} />
       <meta name="twitter:description" content={description} />
       <meta name="twitter:image" content={imageUrl} />
       <meta name="twitter:site" content="@drxconsult" />
-      <meta name="twitter:creator" content="@drxconsult" />
-      
-      {/* Article specific meta tags */}
-      {publishedTime && <meta property="article:published_time" content={publishedTime} />}
-      {modifiedTime && <meta property="article:modified_time" content={modifiedTime} />}
-      {section && <meta property="article:section" content={section} />}
-      {tags.length > 0 && tags.map(tag => (
-        <meta key={tag} property="article:tag" content={tag} />
-      ))}
-      
-      {/* Additional SEO Meta Tags */}
-      <meta name="theme-color" content="#2563eb" />
-      <meta name="msapplication-TileColor" content="#2563eb" />
-      <meta name="application-name" content="DrX Consult" />
-      <meta name="apple-mobile-web-app-title" content="DrX Consult" />
-      <meta name="apple-mobile-web-app-capable" content="yes" />
-      <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-      <meta name="mobile-web-app-capable" content="yes" />
-      
-      {/* Geo Meta Tags for Local SEO */}
-      <meta name="geo.region" content="IN" />
-      <meta name="geo.country" content="India" />
-      <meta name="ICBM" content="28.6139, 77.2090" />
-      <meta name="geo.position" content="28.6139;77.2090" />
-      
-      {/* Healthcare specific meta tags */}
-      <meta name="medical-disclaimer" content="This service provides pharmaceutical consultation and should not replace professional medical diagnosis or treatment." />
-      <meta name="health-topics" content="pharmacy, medication, prescription, drug interaction, pharmaceutical care" />
-      
+
       {/* Structured Data */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceSchema) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
-      />
-      
-      {/* Preconnect to external domains */}
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="true" />
-      <link rel="preconnect" href="https://ui-avatars.com" />
-      
-      {/* Favicon and Icons */}
-      <link rel="icon" href="/favicon.ico" />
-      <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-      <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
-      <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-      <link rel="manifest" href="/site.webmanifest" />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceSchema) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
     </Head>
   )
 }
