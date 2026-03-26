@@ -65,12 +65,7 @@ const nextConfig = {
   
   // Rewrites for clean URLs
   async rewrites() {
-    return [
-      {
-        source: '/sitemap.xml',
-        destination: '/api/sitemap'
-      }
-    ]
+    return []
   },
   
   // Environment variables for build optimization
