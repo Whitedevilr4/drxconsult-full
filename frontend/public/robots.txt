@@ -1,25 +1,33 @@
 User-agent: *
 Allow: /
 
-# Disallow admin and private pages
+# Public pages
+Allow: /subscription-plans
+Allow: /doctors
+Allow: /pharmacists
+Allow: /nutritionists
+Allow: /locate-hospital
+Allow: /health-trackers
+Allow: /faq
+Allow: /customer-service
+Allow: /login
+Allow: /signup
+Allow: /privacy-policy
+Allow: /terms-and-conditions
+Allow: /disclaimer
+Allow: /refund-policy
+
+# Disallow private/dashboard pages
 Disallow: /admin/
 Disallow: /patient/
 Disallow: /pharmacist/
+Disallow: /doctor/
+Disallow: /nutritionist/
+Disallow: /hospital/
 Disallow: /api/
 Disallow: /_next/
-Disallow: /static/
+Disallow: /book/
 
-# Allow important pages
-Allow: /
-Allow: /login
-Allow: /signup
-Allow: /faq
-Allow: /privacy-policy
-Allow: /terms-and-conditions
-Allow: /customer-service
-
-# Sitemap location
-Sitemap: https://drxconsult.netlify.app/sitemap.xml
-
-# Crawl delay (optional)
 Crawl-delay: 1
+
+Sitemap: https://drxconsult.in/sitemap.xml
