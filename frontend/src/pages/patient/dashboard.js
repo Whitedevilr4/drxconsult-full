@@ -23,6 +23,7 @@ export default function PatientDashboard() {
   const [medicalHistory, setMedicalHistory] = useState(null)
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [accessDenied, setAccessDenied] = useState(false)
   const [reviewingBooking, setReviewingBooking] = useState(null)
   const [rating, setRating] = useState(0)
   const [feedback, setFeedback] = useState('')
@@ -77,6 +78,13 @@ export default function PatientDashboard() {
       // Demo mode - use dummy data
       setUser({ name: 'Demo Patient', email: 'demo@example.com' })
       setBookings(dummyBookings)
+      setLoading(false)
+      return
+    }
+
+    // Role guard — professionals must not access patient dashboard
+    if (token && userData.role && userData.role !== 'patient') {
+      setAccessDenied(true)
       setLoading(false)
       return
     }
@@ -450,6 +458,43 @@ export default function PatientDashboard() {
 
   return (
     <Layout>
+      {/* Access Denied — professionals trying to access patient dashboard */}
+      {accessDenied && (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+            <div className="text-6xl mb-4">🚫</div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Access Denied</h2>
+            <p className="text-gray-600 mb-6">
+              This dashboard is for patients only. Please go to your professional dashboard.
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  const userData = JSON.parse(localStorage.getItem('user') || '{}')
+                  const role = userData.role
+                  if (role === 'pharmacist') router.push('/pharmacist/dashboard')
+                  else if (role === 'doctor') router.push('/doctor/dashboard')
+                  else if (role === 'nutritionist') router.push('/nutritionist/dashboard')
+                  else if (role === 'admin') router.push('/admin/dashboard')
+                  else if (role === 'hospital') router.push('/hospital/dashboard')
+                  else router.push('/')
+                }}
+                className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Go to My Dashboard
+              </button>
+              <button
+                onClick={() => router.push('/')}
+                className="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Go to Home
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!accessDenied && (
       <div className="bg-gray-50 min-h-screen">
         <div className="container mx-auto px-4 py-4 md:py-8">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4 md:mb-6">Patient Dashboard</h1>
@@ -1390,6 +1435,7 @@ export default function PatientDashboard() {
         )}
         </div>
       </div>
+      )}
     </Layout>
   )
 }
