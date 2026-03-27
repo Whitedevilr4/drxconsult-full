@@ -16,7 +16,7 @@ const createTransporter = () => {
 // Email templates
 const emailTemplates = {
   passwordReset: (resetLink, userName) => ({
-    subject: 'Password Reset Request -Drx Consult Patient Counselling App',
+    subject: 'Password Reset Request -DrX Consult Digital Heathcare Platform',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
@@ -48,7 +48,7 @@ const emailTemplates = {
   }),
 
   bookingConfirmation: (booking, patientName, professionalName, professionalEmail) => ({
-    subject: 'Booking Confirmation -Drx Consult Patient Counselling App',
+    subject: 'Booking Confirmation -DrX Consult Digital Heathcare Platform',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background-color: #e8f5e8; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
@@ -91,7 +91,7 @@ const emailTemplates = {
   }),
 
   professionalBookingNotification: (booking, patientName, patientEmail, patientPhone) => ({
-    subject: 'New Booking Received -Drx Consult Patient Counselling App',
+    subject: 'New Booking Received -DrX Consult Digital Heathcare Platform',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background-color: #fff3cd; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
@@ -146,7 +146,7 @@ const emailTemplates = {
   }),
 
   meetingLinkAdded: (booking, patientName, pharmacistName, professionalType = 'pharmacist') => ({
-    subject: 'Meeting Link Added -Drx Consult Patient Counselling App',
+    subject: 'Meeting Link Added -DrX Consult Digital Heathcare Platform',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background-color: #d4edda; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
@@ -173,7 +173,7 @@ const emailTemplates = {
   }),
 
   reportSubmitted: (booking, patientName, pharmacistName, professionalType = 'pharmacist') => ({
-    subject: 'Counselling Report Available -Drx Consult Patient Counselling App',
+    subject: 'Counselling Report Available -DrX Consult Digital Heathcare Platform',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background-color: #d1ecf1; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
@@ -207,7 +207,7 @@ const emailTemplates = {
   }),
 
   testResultUploaded: (booking, patientName, pharmacistName, professionalType = 'pharmacist') => ({
-    subject: 'Test Results Available - Drx Consult',
+    subject: 'Test Results Available - DrX Consult Digital Heathcare Platform',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background-color: #fff3cd; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
@@ -240,7 +240,7 @@ const emailTemplates = {
   }),
 
   userSuspended: (userName, reason, adminName) => ({
-    subject: 'Account Suspended - Drx Consult',
+    subject: 'Account Suspended - DrX Consult Digital Heathcare Platform',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background-color: #fee; padding: 20px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid #e74c3c;">
@@ -279,7 +279,7 @@ const emailTemplates = {
   }),
 
   userUnsuspended: (userName, adminName) => ({
-    subject: 'Account Reactivated - Drx Consult',
+    subject: 'Account Reactivated - DrX Consult Digital Heathcare Platform',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background-color: #e8f5e8; padding: 20px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid #27ae60;">
@@ -454,7 +454,7 @@ const emailTemplates = {
     const meta = planFeatures[subscription.planType] || { color: '#27ae60', bg: '#e8f5e8', icon: '⭐', features: [] };
 
     return {
-      subject: `Welcome to ${subscription.planName} - Drx Consult`,
+      subject: `Welcome to ${subscription.planName} - DrX Consult Digital Heathcare Platform`,
       html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background-color: ${meta.bg}; padding: 30px; border-radius: 10px; margin-bottom: 20px; text-align: center; border-top: 4px solid ${meta.color};">
@@ -1024,7 +1024,7 @@ const sendOTPEmail = async (email, otp, userName = '', type = 'signup') => {
     
     switch (type) {
       case 'signup':
-        subject = 'Verify Your Email - Medecil';
+        subject = 'Verify Your Email - DrX Consult Digital Heathcare Platform';
         htmlContent = `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
             <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
@@ -1036,7 +1036,7 @@ const sendOTPEmail = async (email, otp, userName = '', type = 'signup') => {
               <h2 style="color: #333; margin-bottom: 20px;">Hello ${userName || 'User'}!</h2>
               
               <p style="color: #555; line-height: 1.6; margin-bottom: 25px;">
-                Welcome to Medecil! To complete your account registration, please verify your email address using the OTP below:
+                Welcome to DrX Consult Digital Heathcare Platform! To complete your account registration, please verify your email address using the OTP below:
               </p>
               
               <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; text-align: center; margin: 25px 0;">
@@ -1059,7 +1059,7 @@ const sendOTPEmail = async (email, otp, userName = '', type = 'signup') => {
                   This is an automated email. Please do not reply to this message.
                 </p>
                 <p style="color: #9ca3af; font-size: 12px; margin: 5px 0 0 0;">
-                  © ${new Date().getFullYear()} Medecil. All rights reserved.
+                  © ${new Date().getFullYear()} DrX Consult. All rights reserved.
                 </p>
               </div>
             </div>
@@ -1068,7 +1068,7 @@ const sendOTPEmail = async (email, otp, userName = '', type = 'signup') => {
         break;
         
       default:
-        subject = 'Verification Code - Medecil';
+        subject = 'Verification Code - DrX Consult Digital Heathcare Platform';
         htmlContent = `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
             <h2>Verification Code</h2>
@@ -1079,7 +1079,7 @@ const sendOTPEmail = async (email, otp, userName = '', type = 'signup') => {
     }
 
     const mailOptions = {
-      from: process.env.EMAIL_FROM || 'Medecil <noreply@medecil.in>',
+      from: process.env.EMAIL_FROM || 'DrX Consult <noreply@drxconsult.in>',
       to: email,
       subject: subject,
       html: htmlContent
