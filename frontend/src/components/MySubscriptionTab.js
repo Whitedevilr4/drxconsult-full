@@ -58,7 +58,7 @@ function ConsultantGroup({ title, icon, professionals, providerType, existingBoo
   const [booking, setBooking] = useState({})
   const [openChat, setOpenChat] = useState(null) // { bookingId, name }
 
-  // On mount, mark already-booked professionals
+  // On mount, mark already-booked professionals (any status this month = booked)
   useEffect(() => {
     if (!existingBookings?.length) return
     const fieldMap = { pharmacist: 'pharmacistId', doctor: 'doctorId', nutritionist: 'nutritionistId' }
@@ -66,7 +66,7 @@ function ConsultantGroup({ title, icon, professionals, providerType, existingBoo
     const initial = {}
     existingBookings.forEach(b => {
       const profId = b[field]?._id || b[field]
-      if (profId) initial[profId] = { state: 'done', bookingId: b._id }
+      if (profId) initial[profId] = { state: 'done', bookingId: b._id, status: b.status }
     })
     setBooking(initial)
   }, [existingBookings, providerType])
@@ -81,7 +81,7 @@ function ConsultantGroup({ title, icon, professionals, providerType, existingBoo
         { [fieldMap[providerType]]: professionalId },
         { headers: { Authorization: `Bearer ${token}` } }
       )
-      setBooking(prev => ({ ...prev, [professionalId]: { state: 'done', bookingId: res.data.booking._id } }))
+      setBooking(prev => ({ ...prev, [professionalId]: { state: 'done', bookingId: res.data.booking._id, status: res.data.booking.status } }))
       if (onBooked) onBooked()
     } catch (err) {
       const msg = err.response?.data?.message || 'Booking failed'
@@ -97,9 +97,11 @@ function ConsultantGroup({ title, icon, professionals, providerType, existingBoo
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {professionals.map((p) => {
           const info = booking[p._id] || {}
-          const isDone = info.state === 'done'
+          const isBooked = info.state === 'done'   // booked this month (any status)
           const isLoading = info.state === 'loading'
           const isError = info.state === 'error'
+          const bookingId = info.bookingId
+          const bookingStatus = info.status        // 'confirmed' | 'completed' | etc.
           return (
             <div key={p._id} className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-xl p-3">
               <img
@@ -121,22 +123,26 @@ function ConsultantGroup({ title, icon, professionals, providerType, existingBoo
                   {p.status || 'offline'}
                 </span>
                 {isError && <p className="text-xs text-red-500 mt-1">{info.msg}</p>}
+                {isBooked && bookingStatus === 'completed' && (
+                  <p className="text-xs text-gray-400 mt-1">Session completed · chat open till month end</p>
+                )}
               </div>
               <div className="flex flex-col gap-1 flex-shrink-0">
                 <button
-                  onClick={() => !isDone && !isLoading && handleBook(p._id)}
-                  disabled={isDone || isLoading}
+                  onClick={() => !isBooked && !isLoading && handleBook(p._id)}
+                  disabled={isBooked || isLoading}
                   className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
-                    isDone ? 'bg-green-100 text-green-700 cursor-default' :
+                    isBooked ? 'bg-green-100 text-green-700 cursor-default' :
                     isLoading ? 'bg-gray-100 text-gray-400 cursor-wait' :
                     'bg-blue-600 hover:bg-blue-700 text-white'
                   }`}
                 >
-                  {isDone ? '✓ Booked' : isLoading ? '...' : 'Book'}
+                  {isBooked ? '✓ Booked' : isLoading ? '...' : 'Book'}
                 </button>
-                {isDone && info.bookingId && (
+                {/* Chat always available once booked this month, even after completion */}
+                {isBooked && bookingId && (
                   <button
-                    onClick={() => setOpenChat({ bookingId: info.bookingId, name: p.userId?.name })}
+                    onClick={() => setOpenChat({ bookingId, name: p.userId?.name })}
                     className="text-xs font-medium px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
                   >
                     💬 Chat
