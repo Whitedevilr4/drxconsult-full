@@ -165,7 +165,21 @@ export default function LocationDisplay() {
           onClick={() => {
             setError(null)
             setPermissionState('prompt')
-            fetchLocation()
+            // Re-query permission state before trying
+            if (navigator.permissions) {
+              navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+                setPermissionState(result.state)
+                if (result.state === 'denied') {
+                  setError('denied')
+                } else {
+                  fetchLocation()
+                }
+              }).catch(() => {
+                fetchLocation()
+              })
+            } else {
+              fetchLocation()
+            }
           }}
           className="text-xs text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors border border-blue-200"
         >
