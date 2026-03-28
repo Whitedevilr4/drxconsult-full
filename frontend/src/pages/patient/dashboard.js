@@ -8,6 +8,7 @@ import ComplaintList from '@/components/ComplaintList'
 import ComplaintForm from '@/components/ComplaintForm'
 import ComplaintDetail from '@/components/ComplaintDetail'
 import SubscriptionStatus from '@/components/SubscriptionStatus'
+import MySubscriptionTab from '@/components/MySubscriptionTab'
 import MedicalFormSubmission from '@/components/MedicalFormSubmission'
 import MedicalFormsList from '@/components/MedicalFormsList'
 import AmbulanceTracker from '@/components/AmbulanceTracker'
@@ -548,6 +549,7 @@ export default function PatientDashboard() {
               <option value="medical">Test Results</option>
               <option value="medical-forms">Medical Forms</option>
               <option value="hospital-queries">Hospital Queries</option>
+              <option value="my-subscription">My Subscription</option>
             </select>
           </div>
 
@@ -602,6 +604,16 @@ export default function PatientDashboard() {
               }`}
             >
               Hospital Queries
+            </button>
+            <button
+              onClick={() => setActiveTab('my-subscription')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-1 ${
+                activeTab === 'my-subscription'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              💳 My Subscription
             </button>
           </nav>
         </div>
@@ -1414,6 +1426,11 @@ export default function PatientDashboard() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* My Subscription Tab */}
+        {activeTab === 'my-subscription' && (
+          <MySubscriptionTab />
         )}
 
         {/* Complaint Detail Modal */}
