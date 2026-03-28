@@ -34,22 +34,24 @@ export default function LocationDisplay() {
       navigator.permissions.query({ name: 'geolocation' }).then((result) => {
         setPermissionState(result.state)
         if (result.state === 'granted') {
-          // Already granted — fetch silently
           fetchLocation()
+        } else if (result.state === 'denied') {
+          setError('denied')
         }
-        // If 'prompt' or 'denied', wait for user to click the button
+        // 'prompt' → show the button, wait for user click
         result.onchange = () => {
           setPermissionState(result.state)
           if (result.state === 'granted') {
+            setError(null)
             fetchLocation()
+          } else if (result.state === 'denied') {
+            setError('denied')
           }
         }
       }).catch(() => {
-        // permissions API not available, fall back to button-triggered flow
         setPermissionState('prompt')
       })
     }
-    // If permissions API not available, just show the button
   }, [])
 
   const fetchLocation = () => {
@@ -148,14 +150,27 @@ export default function LocationDisplay() {
 
   if (error === 'denied') {
     return (
-      <div className="flex flex-col items-center space-y-2 text-sm">
-        <div className="flex items-center space-x-2 text-gray-400">
+      <div className="flex flex-col items-center space-y-3 text-sm py-2">
+        <div className="flex items-center space-x-2 text-gray-500">
           <LocationIcon />
-          <span>Location access denied</span>
+          <span>Location access blocked</span>
         </div>
-        <p className="text-xs text-gray-400 text-center max-w-xs">
-          To enable, click the lock/info icon in your browser address bar and allow location access, then refresh.
-        </p>
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-center max-w-sm">
+          <p className="text-xs text-amber-800 font-medium mb-2">To enable location:</p>
+          <p className="text-xs text-amber-700">
+            Click the 🔒 lock icon in the address bar → <strong>Site settings</strong> → <strong>Location</strong> → set to <strong>Allow</strong>
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setError(null)
+            setPermissionState('prompt')
+            fetchLocation()
+          }}
+          className="text-xs text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors border border-blue-200"
+        >
+          🔄 I've enabled it — try again
+        </button>
       </div>
     )
   }
