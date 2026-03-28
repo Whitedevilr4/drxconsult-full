@@ -4832,7 +4832,7 @@ function SubscriptionManagementTab() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-purple-100 text-sm font-medium">Total Revenue</p>
-                <p className="text-4xl font-bold mt-2">₹{analytics.revenue.totalRecurring.toLocaleString()}</p>
+                <p className="text-4xl font-bold mt-2">₹{(analytics.revenue?.totalRecurring || analytics.revenue?.total || 0).toLocaleString()}</p>
               </div>
               <div className="bg-white bg-opacity-20 p-3 rounded-full">
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -4872,6 +4872,8 @@ function SubscriptionManagementTab() {
                 { label: "Women's Care", key: 'womensCare', color: 'bg-pink-500' },
                 { label: 'Chronic Care',  key: 'chronic',    color: 'bg-blue-500' },
                 { label: 'Fat to Fit',    key: 'fatToFit',   color: 'bg-purple-500' },
+                { label: 'Essential',     key: 'essential',  color: 'bg-teal-500' },
+                { label: 'Family',        key: 'family',     color: 'bg-orange-500' },
               ].map(({ label, key, color }) => (
                 <div key={key} className="flex justify-between items-center">
                   <span className="text-gray-600">{label}</span>
@@ -4953,6 +4955,8 @@ function SubscriptionManagementTab() {
               <option value="womensCare">Women's Care</option>
               <option value="chronic">Chronic Care</option>
               <option value="fatToFit">Fat to Fit</option>
+              <option value="essential">Essential</option>
+              <option value="family">Family</option>
             </select>
           </div>
           <div className="flex items-end">
