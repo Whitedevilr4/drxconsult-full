@@ -133,44 +133,8 @@ export default function LocationDisplay() {
     )
   }
 
-  if (status === 'denied') {
-    return (
-      <div className="flex flex-col items-center space-y-3 text-sm py-1">
-        <div className="flex items-center space-x-2 text-gray-500">
-          <LocationIcon />
-          <span>Location access blocked</span>
-        </div>
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-center max-w-sm">
-          <p className="text-xs text-amber-800 font-medium mb-1">To enable location:</p>
-          <p className="text-xs text-amber-700">
-            Click the 🔒 lock icon in the address bar → <strong>Site settings</strong> → <strong>Location</strong> → set to <strong>Allow</strong>, then click below
-          </p>
-        </div>
-        <button
-          onClick={requestLocation}
-          className="text-xs text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-full transition-colors border border-blue-200 font-medium"
-        >
-          🔄 I've allowed it — detect my location
-        </button>
-      </div>
-    )
-  }
-
-  if (status === 'unavailable') {
-    return (
-      <div className="flex flex-col items-center space-y-2 text-sm">
-        <div className="flex items-center space-x-2 text-gray-400">
-          <LocationIcon />
-          <span>Location unavailable</span>
-        </div>
-        <button
-          onClick={requestLocation}
-          className="text-xs text-blue-600 hover:text-blue-700 underline"
-        >
-          Try again
-        </button>
-      </div>
-    )
+  if (status === 'denied' || status === 'unavailable') {
+    return null
   }
 
   if (status === 'idle') {
