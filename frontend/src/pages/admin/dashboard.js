@@ -4831,7 +4831,7 @@ function SubscriptionManagementTab() {
           <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-lg shadow-lg text-white">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-purple-100 text-sm font-medium">Monthly Revenue</p>
+                <p className="text-purple-100 text-sm font-medium">Total Revenue</p>
                 <p className="text-4xl font-bold mt-2">₹{analytics.revenue.totalRecurring.toLocaleString()}</p>
               </div>
               <div className="bg-white bg-opacity-20 p-3 rounded-full">
@@ -4868,92 +4868,48 @@ function SubscriptionManagementTab() {
           <div className="bg-white p-6 rounded-lg shadow">
             <h3 className="text-lg font-semibold mb-4">Plan Distribution</h3>
             <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">Essential Care</span>
-                <div className="flex items-center space-x-2">
-                  <div className="w-32 bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-green-500 h-2 rounded-full" 
-                      style={{ 
-                        width: `${analytics.activeSubscriptions > 0 
-                          ? (analytics.planBreakdown.essential / analytics.activeSubscriptions) * 100 
-                          : 0}%` 
-                      }}
-                    ></div>
+              {[
+                { label: "Women's Care", key: 'womensCare', color: 'bg-pink-500' },
+                { label: 'Chronic Care',  key: 'chronic',    color: 'bg-blue-500' },
+                { label: 'Fat to Fit',    key: 'fatToFit',   color: 'bg-purple-500' },
+              ].map(({ label, key, color }) => (
+                <div key={key} className="flex justify-between items-center">
+                  <span className="text-gray-600">{label}</span>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-32 bg-gray-200 rounded-full h-2">
+                      <div
+                        className={`${color} h-2 rounded-full`}
+                        style={{ width: `${analytics.activeSubscriptions > 0 ? ((analytics.planBreakdown[key] || 0) / analytics.activeSubscriptions) * 100 : 0}%` }}
+                      ></div>
+                    </div>
+                    <span className="font-semibold">{analytics.planBreakdown[key] || 0}</span>
                   </div>
-                  <span className="font-semibold">{analytics.planBreakdown.essential}</span>
                 </div>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">Chronic Care</span>
-                <div className="flex items-center space-x-2">
-                  <div className="w-32 bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-blue-500 h-2 rounded-full" 
-                      style={{ 
-                        width: `${analytics.activeSubscriptions > 0 
-                          ? (analytics.planBreakdown.chronic / analytics.activeSubscriptions) * 100 
-                          : 0}%` 
-                      }}
-                    ></div>
-                  </div>
-                  <span className="font-semibold">{analytics.planBreakdown.chronic}</span>
-                </div>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">Fat to Fit</span>
-                <div className="flex items-center space-x-2">
-                  <div className="w-32 bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-purple-500 h-2 rounded-full" 
-                      style={{ 
-                        width: `${analytics.activeSubscriptions > 0 
-                          ? (analytics.planBreakdown.fatToFit / analytics.activeSubscriptions) * 100 
-                          : 0}%` 
-                      }}
-                    ></div>
-                  </div>
-                  <span className="font-semibold">{analytics.planBreakdown.fatToFit}</span>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
           <div className="bg-white p-6 rounded-lg shadow">
             <h3 className="text-lg font-semibold mb-4">Billing Cycle Distribution</h3>
             <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">Monthly</span>
-                <div className="flex items-center space-x-2">
-                  <div className="w-32 bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-purple-500 h-2 rounded-full" 
-                      style={{ 
-                        width: `${analytics.activeSubscriptions > 0 
-                          ? (analytics.billingBreakdown.monthly / analytics.activeSubscriptions) * 100 
-                          : 0}%` 
-                      }}
-                    ></div>
+              {[
+                { label: '3 Months',  key: 'threeMonths',  color: 'bg-green-500' },
+                { label: '6 Months',  key: 'sixMonths',    color: 'bg-yellow-500' },
+                { label: '12 Months', key: 'twelveMonths', color: 'bg-orange-500' },
+              ].map(({ label, key, color }) => (
+                <div key={key} className="flex justify-between items-center">
+                  <span className="text-gray-600">{label}</span>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-32 bg-gray-200 rounded-full h-2">
+                      <div
+                        className={`${color} h-2 rounded-full`}
+                        style={{ width: `${analytics.activeSubscriptions > 0 ? ((analytics.billingBreakdown[key] || 0) / analytics.activeSubscriptions) * 100 : 0}%` }}
+                      ></div>
+                    </div>
+                    <span className="font-semibold">{analytics.billingBreakdown[key] || 0}</span>
                   </div>
-                  <span className="font-semibold">{analytics.billingBreakdown.monthly}</span>
                 </div>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">Yearly</span>
-                <div className="flex items-center space-x-2">
-                  <div className="w-32 bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-orange-500 h-2 rounded-full" 
-                      style={{ 
-                        width: `${analytics.activeSubscriptions > 0 
-                          ? (analytics.billingBreakdown.yearly / analytics.activeSubscriptions) * 100 
-                          : 0}%` 
-                      }}
-                    ></div>
-                  </div>
-                  <span className="font-semibold">{analytics.billingBreakdown.yearly}</span>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         </div>
@@ -4994,7 +4950,7 @@ function SubscriptionManagementTab() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
             >
               <option value="all">All Plans</option>
-              <option value="essential">Essential Care</option>
+              <option value="womensCare">Women's Care</option>
               <option value="chronic">Chronic Care</option>
               <option value="fatToFit">Fat to Fit</option>
             </select>
