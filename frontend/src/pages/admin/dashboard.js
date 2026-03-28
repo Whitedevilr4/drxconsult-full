@@ -259,7 +259,7 @@ export default function AdminDashboard() {
                   <option value="payments">💰 Pharmacist Payments</option>
                   <option value="doctor-payments">💰 Doctor Payments</option>
                   <option value="nutritionist-payments">💰 Nutritionist Payments</option>
-                  <option value="reviews">⭐ Reviews</option>
+                  <option value="incentives">🎁 Incentives</option>
                   <option value="complaints">📝 Complaints</option>
                   <option value="live-chat">💬 Live Chat</option>
                   <option value="website">🌐 Website</option>
@@ -422,6 +422,16 @@ export default function AdminDashboard() {
                   💰 Nutritionist Payments
                 </button>
                 <button
+                  onClick={() => setActiveTab('incentives')}
+                  className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
+                    activeTab === 'incentives'
+                      ? 'border-b-2 border-emerald-600 text-emerald-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  🎁 Incentives
+                </button>
+                <button
                   onClick={() => setActiveTab('reviews')}
                   className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
                     activeTab === 'reviews'
@@ -521,6 +531,7 @@ export default function AdminDashboard() {
               {activeTab === 'payments' && <PaymentsTab />}
               {activeTab === 'doctor-payments' && <DoctorPaymentsTab />}
               {activeTab === 'nutritionist-payments' && <NutritionistPaymentsTab />}
+              {activeTab === 'incentives' && <IncentivesTab />}
               {activeTab === 'reviews' && <ReviewsTab pharmacists={pharmacists} doctors={doctors} />}
               {activeTab === 'manage' && <ManageUsersTab users={users} pharmacists={pharmacists} onUpdate={() => fetchData(localStorage.getItem('token'))} />}
               {activeTab === 'complaints' && <ComplaintsTab complaints={complaints} loading={complaintsLoading} onComplaintClick={handleComplaintClick} onRefresh={() => fetchComplaints(localStorage.getItem('token'))} />}
@@ -1338,6 +1349,21 @@ function ManageUsersTab({ users, pharmacists, onUpdate }) {
   const [editingPharmacist, setEditingPharmacist] = useState(null)
   const [editForm, setEditForm] = useState({})
 
+  const handleToggleCoreTeam = async (pharmacistId, current) => {
+    try {
+      const token = localStorage.getItem('token')
+      await axios.patch(
+        `${process.env.NEXT_PUBLIC_API_URL}/admin/pharmacists/${pharmacistId}/core-team`,
+        { coreTeam: !current },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      onUpdate()
+      toast.success(`Pharmacist ${!current ? 'added to' : 'removed from'} Core Team`)
+    } catch (err) {
+      toast.error('Failed to update core team status')
+    }
+  }
+
   const handleToggleStatus = async (pharmacistId, currentAdminDisabled) => {
     try {
       const token = localStorage.getItem('token')
@@ -1472,7 +1498,7 @@ function ManageUsersTab({ users, pharmacists, onUpdate }) {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2 flex-wrap gap-2">
                     <button
                       onClick={() => handleToggleStatus(pharmacist._id, pharmacist.adminDisabled)}
                       className={`px-3 py-1 rounded text-sm font-medium ${
@@ -1482,6 +1508,16 @@ function ManageUsersTab({ users, pharmacists, onUpdate }) {
                       }`}
                     >
                       {pharmacist.adminDisabled ? '🔴 Bookings Disabled' : '🟢 Bookings Enabled'}
+                    </button>
+                    <button
+                      onClick={() => handleToggleCoreTeam(pharmacist._id, pharmacist.coreTeam)}
+                      className={`px-3 py-1 rounded text-sm font-medium border ${
+                        pharmacist.coreTeam
+                          ? 'bg-yellow-100 text-yellow-800 border-yellow-300'
+                          : 'bg-gray-100 text-gray-500 border-gray-300'
+                      }`}
+                    >
+                      {pharmacist.coreTeam ? '⭐ Core Team' : '☆ Core Team'}
                     </button>
                   </div>
                 </div>
@@ -5408,6 +5444,21 @@ function ManageDoctorsTab({ onUpdate }) {
     }
   }
 
+  const handleToggleCoreTeam = async (doctorId, current) => {
+    try {
+      const token = localStorage.getItem('token')
+      await axios.patch(
+        `${process.env.NEXT_PUBLIC_API_URL}/admin/doctors/${doctorId}/core-team`,
+        { coreTeam: !current },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      fetchDoctors()
+      toast.success(`Doctor ${!current ? 'added to' : 'removed from'} Core Team`)
+    } catch (err) {
+      toast.error('Failed to update core team status')
+    }
+  }
+
   const handleEdit = (doctor) => {
     setEditingDoctor(doctor._id)
     setEditForm({
@@ -5568,7 +5619,7 @@ function ManageDoctorsTab({ onUpdate }) {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2 flex-wrap gap-2">
                     <button
                       onClick={() => handleToggleStatus(doctor._id, doctor.adminDisabled)}
                       className={`px-3 py-1 rounded text-sm font-medium ${
@@ -5578,6 +5629,16 @@ function ManageDoctorsTab({ onUpdate }) {
                       }`}
                     >
                       {doctor.adminDisabled ? '🔴 Bookings Disabled' : '🟢 Bookings Enabled'}
+                    </button>
+                    <button
+                      onClick={() => handleToggleCoreTeam(doctor._id, doctor.coreTeam)}
+                      className={`px-3 py-1 rounded text-sm font-medium border ${
+                        doctor.coreTeam
+                          ? 'bg-yellow-100 text-yellow-800 border-yellow-300'
+                          : 'bg-gray-100 text-gray-500 border-gray-300'
+                      }`}
+                    >
+                      {doctor.coreTeam ? '⭐ Core Team' : '☆ Core Team'}
                     </button>
                   </div>
                 </div>
@@ -6069,6 +6130,21 @@ function ManageNutritionistsTab({ onUpdate }) {
     }
   }
 
+  const handleToggleCoreTeam = async (nutritionistId, current) => {
+    try {
+      const token = localStorage.getItem('token')
+      await axios.patch(
+        `${process.env.NEXT_PUBLIC_API_URL}/admin/nutritionists/${nutritionistId}/core-team`,
+        { coreTeam: !current },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      fetchNutritionists()
+      toast.success(`Nutritionist ${!current ? 'added to' : 'removed from'} Core Team`)
+    } catch (err) {
+      toast.error('Failed to update core team status')
+    }
+  }
+
   const handleToggleStatus = async (nutritionistId, currentAdminDisabled) => {
     try {
       const token = localStorage.getItem('token')
@@ -6171,7 +6247,15 @@ function ManageNutritionistsTab({ onUpdate }) {
                       {nutritionist.description && <p className="text-sm text-gray-500 mt-1">{nutritionist.description}</p>}
                     </div>
                   </div>
-                  <button onClick={() => handleToggleStatus(nutritionist._id, nutritionist.adminDisabled)} className={`px-3 py-1 rounded text-sm font-medium ${nutritionist.adminDisabled ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{nutritionist.adminDisabled ? '🔴 Bookings Disabled' : '🟢 Bookings Enabled'}</button>
+                  <div className="flex items-center space-x-2 flex-wrap gap-2">
+                    <button onClick={() => handleToggleStatus(nutritionist._id, nutritionist.adminDisabled)} className={`px-3 py-1 rounded text-sm font-medium ${nutritionist.adminDisabled ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{nutritionist.adminDisabled ? '🔴 Bookings Disabled' : '🟢 Bookings Enabled'}</button>
+                    <button
+                      onClick={() => handleToggleCoreTeam(nutritionist._id, nutritionist.coreTeam)}
+                      className={`px-3 py-1 rounded text-sm font-medium border ${nutritionist.coreTeam ? 'bg-yellow-100 text-yellow-800 border-yellow-300' : 'bg-gray-100 text-gray-500 border-gray-300'}`}
+                    >
+                      {nutritionist.coreTeam ? '⭐ Core Team' : '☆ Core Team'}
+                    </button>
+                  </div>
                 </div>
                 <div className="flex space-x-2 mt-3">
                   <button onClick={() => handleEdit(nutritionist)} className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700">Edit</button>
@@ -6314,6 +6398,181 @@ function NutritionistPaymentsTab() {
           </div>
         ))}
         {payments.length === 0 && <div className="text-center py-8"><p className="text-gray-500">No payment data found.</p></div>}
+      </div>
+    </div>
+  )
+}
+
+// Incentives Tab Component
+function IncentivesTab() {
+  const [pharmacists, setPharmacists] = useState([])
+  const [doctors, setDoctors] = useState([])
+  const [nutritionists, setNutritionists] = useState([])
+  const [incentives, setIncentives] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [form, setForm] = useState({ professionalType: 'pharmacist', professionalId: '', amount: '', reason: '' })
+  const [sending, setSending] = useState(false)
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    Promise.all([
+      axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/pharmacists`, { headers: { Authorization: `Bearer ${token}` } }),
+      axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/doctors`, { headers: { Authorization: `Bearer ${token}` } }),
+      axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/nutritionists`, { headers: { Authorization: `Bearer ${token}` } }),
+      axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/incentives`, { headers: { Authorization: `Bearer ${token}` } }),
+    ]).then(([p, d, n, i]) => {
+      setPharmacists(p.data)
+      setDoctors(d.data)
+      setNutritionists(n.data)
+      setIncentives(i.data)
+    }).catch(console.error).finally(() => setLoading(false))
+  }, [])
+
+  const professionalsForType = () => {
+    if (form.professionalType === 'pharmacist') return pharmacists
+    if (form.professionalType === 'doctor') return doctors
+    return nutritionists
+  }
+
+  const handleSend = async () => {
+    if (!form.professionalId || !form.amount || !form.reason) {
+      toast.error('Please fill all fields')
+      return
+    }
+    setSending(true)
+    try {
+      const token = localStorage.getItem('token')
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/admin/incentive`, {
+        professionalId: form.professionalId,
+        professionalType: form.professionalType,
+        amount: Number(form.amount),
+        reason: form.reason,
+      }, { headers: { Authorization: `Bearer ${token}` } })
+      toast.success('Incentive sent successfully!')
+      setForm(prev => ({ ...prev, professionalId: '', amount: '', reason: '' }))
+      // Refresh incentives list
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/incentives`, { headers: { Authorization: `Bearer ${token}` } })
+      setIncentives(res.data)
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to send incentive')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  if (loading) return (
+    <div className="text-center py-8">
+      <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+    </div>
+  )
+
+  const totalSent = incentives.reduce((s, i) => s + i.amount, 0)
+
+  return (
+    <div className="max-w-4xl">
+      <h2 className="text-2xl font-bold mb-6">🎁 Incentive Payments</h2>
+
+      {/* Summary */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
+          <p className="text-sm text-emerald-700 font-medium">Total Incentives Sent</p>
+          <p className="text-3xl font-bold text-emerald-700 mt-1">₹{totalSent.toLocaleString()}</p>
+        </div>
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+          <p className="text-sm text-blue-700 font-medium">Total Transactions</p>
+          <p className="text-3xl font-bold text-blue-700 mt-1">{incentives.length}</p>
+        </div>
+        <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 text-center">
+          <p className="text-sm text-purple-700 font-medium">Avg. Incentive</p>
+          <p className="text-3xl font-bold text-purple-700 mt-1">₹{incentives.length > 0 ? Math.round(totalSent / incentives.length).toLocaleString() : 0}</p>
+        </div>
+      </div>
+
+      {/* Send Incentive Form */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm mb-8">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">Send Incentive / Bonus</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Professional Type</label>
+            <select
+              value={form.professionalType}
+              onChange={(e) => setForm({ ...form, professionalType: e.target.value, professionalId: '' })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+            >
+              <option value="pharmacist">Pharmacist</option>
+              <option value="doctor">Doctor</option>
+              <option value="nutritionist">Nutritionist</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Select Professional</label>
+            <select
+              value={form.professionalId}
+              onChange={(e) => setForm({ ...form, professionalId: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+            >
+              <option value="">-- Select --</option>
+              {professionalsForType().map(p => (
+                <option key={p._id} value={p._id}>{p.userId?.name} ({p.userId?.email})</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₹)</label>
+            <input
+              type="number"
+              min="1"
+              value={form.amount}
+              onChange={(e) => setForm({ ...form, amount: e.target.value })}
+              placeholder="e.g. 500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
+            <input
+              type="text"
+              value={form.reason}
+              onChange={(e) => setForm({ ...form, reason: e.target.value })}
+              placeholder="e.g. Performance bonus, Extra sessions..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+            />
+          </div>
+        </div>
+        <button
+          onClick={handleSend}
+          disabled={sending}
+          className="mt-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white px-6 py-2.5 rounded-lg font-medium text-sm transition-colors"
+        >
+          {sending ? 'Sending...' : '🎁 Send Incentive'}
+        </button>
+      </div>
+
+      {/* History */}
+      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-800">Incentive History</h3>
+        </div>
+        {incentives.length === 0 ? (
+          <div className="text-center py-10 text-gray-400 text-sm">No incentives sent yet.</div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {incentives.map(inc => (
+              <div key={inc._id} className="px-6 py-4 flex items-center justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-900 text-sm">{inc.professionalUserId?.name}</p>
+                  <p className="text-xs text-gray-500">{inc.professionalUserId?.email} · {inc.professionalType}</p>
+                  <p className="text-xs text-gray-600 mt-0.5 italic">"{inc.reason}"</p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="text-lg font-bold text-emerald-600">₹{inc.amount.toLocaleString()}</p>
+                  <p className="text-xs text-gray-400">{new Date(inc.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                  <p className="text-xs text-gray-400">by {inc.paidBy?.name}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
