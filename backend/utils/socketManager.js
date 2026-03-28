@@ -79,6 +79,18 @@ const initializeSocket = (io) => {
       console.log(`User left query chat: ${queryId}`);
     });
 
+    // Handle joining booking chat room (subscription chat)
+    socket.on('join-booking-chat', (bookingId) => {
+      socket.join(`booking:${bookingId}`);
+      console.log(`User joined booking chat: ${bookingId}`);
+    });
+
+    // Handle leaving booking chat room
+    socket.on('leave-booking-chat', (bookingId) => {
+      socket.leave(`booking:${bookingId}`);
+      console.log(`User left booking chat: ${bookingId}`);
+    });
+
     // Handle chat message
     socket.on('send-message', async (data) => {
       const { queryId, message, senderType } = data;
