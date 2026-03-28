@@ -1062,13 +1062,12 @@ router.post('/subscription', auth, async (req, res) => {
       professionalField = { nutritionistId, nutritionistShare: Math.round(fee * 0.7), paymentAmount: fee }
     }
 
-    // Check if patient already has an active subscription booking with this professional THIS MONTH
+    // Block re-booking this month regardless of status (confirmed, completed, cancelled)
     const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     const existingQuery = {
       patientId: req.user.userId,
       isSubscriptionBooking: true,
-      status: { $in: ['confirmed', 'pending'] },
       createdAt: { $gte: startOfMonth }
     }
     if (pharmacistId) existingQuery.pharmacistId = pharmacistId
@@ -1077,7 +1076,7 @@ router.post('/subscription', auth, async (req, res) => {
 
     const existing = await Booking.findOne(existingQuery)
     if (existing) {
-      return res.status(400).json({ message: 'You already have an active subscription booking with this professional' })
+      return res.status(400).json({ message: 'You already have a subscription booking this month with this professional. New booking allowed next month.' })
     }
 
     const booking = new Booking({
@@ -1153,12 +1152,13 @@ router.get('/subscription-status', auth, async (req, res) => {
     const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
+    // Return ALL bookings this month regardless of status — completed ones still block re-booking
+    // but chat should remain accessible
     const bookings = await Booking.find({
       patientId: req.user.userId,
       isSubscriptionBooking: true,
-      status: { $in: ['confirmed', 'pending'] },
       createdAt: { $gte: startOfMonth }
-    }).select('pharmacistId doctorId nutritionistId providerType createdAt')
+    }).select('pharmacistId doctorId nutritionistId providerType status createdAt')
 
     res.json({ bookings })
   } catch (err) {
