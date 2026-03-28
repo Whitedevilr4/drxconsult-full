@@ -564,41 +564,42 @@ router.get('/admin/analytics', auth, isAdmin, async (req, res) => {
   try {
     const totalSubscriptions = await Subscription.countDocuments();
     const activeSubscriptions = await Subscription.countDocuments({ status: 'active' });
-    const essentialSubscriptions = await Subscription.countDocuments({ planType: 'essential', status: 'active' });
+
+    const womensCareSubscriptions = await Subscription.countDocuments({ planType: 'womensCare', status: 'active' });
     const chronicSubscriptions = await Subscription.countDocuments({ planType: 'chronic', status: 'active' });
     const fatToFitSubscriptions = await Subscription.countDocuments({ planType: 'fatToFit', status: 'active' });
-    const monthlySubscriptions = await Subscription.countDocuments({ billingCycle: 'monthly', status: 'active' });
-    const yearlySubscriptions = await Subscription.countDocuments({ billingCycle: 'yearly', status: 'active' });
+    const essentialSubscriptions = await Subscription.countDocuments({ planType: 'essential', status: 'active' });
+    const familySubscriptions = await Subscription.countDocuments({ planType: 'family', status: 'active' });
 
-    // Calculate revenue
+    const threeMonthsSubscriptions = await Subscription.countDocuments({ billingCycle: 'threeMonths', status: 'active' });
+    const sixMonthsSubscriptions = await Subscription.countDocuments({ billingCycle: 'sixMonths', status: 'active' });
+    const twelveMonthsSubscriptions = await Subscription.countDocuments({ billingCycle: 'twelveMonths', status: 'active' });
+
+    // Calculate total revenue from all active subscriptions
     const subscriptions = await Subscription.find({ status: 'active' });
-    const monthlyRevenue = subscriptions
-      .filter(s => s.billingCycle === 'monthly')
-      .reduce((sum, s) => sum + s.price, 0);
-    const yearlyRevenue = subscriptions
-      .filter(s => s.billingCycle === 'yearly')
-      .reduce((sum, s) => sum + s.price, 0);
-    
-    // Total monthly recurring revenue (yearly subscriptions divided by 12)
-    const totalMonthlyRecurring = monthlyRevenue + (yearlyRevenue / 12);
+    const totalRevenue = subscriptions.reduce((sum, s) => sum + s.price, 0);
 
     res.json({
       analytics: {
         totalSubscriptions,
         activeSubscriptions,
         planBreakdown: {
-          essential: essentialSubscriptions,
+          womensCare: womensCareSubscriptions,
           chronic: chronicSubscriptions,
-          fatToFit: fatToFitSubscriptions
+          fatToFit: fatToFitSubscriptions,
+          essential: essentialSubscriptions,
+          family: familySubscriptions
         },
         billingBreakdown: {
-          monthly: monthlySubscriptions,
-          yearly: yearlySubscriptions
+          threeMonths: threeMonthsSubscriptions,
+          sixMonths: sixMonthsSubscriptions,
+          twelveMonths: twelveMonthsSubscriptions
         },
         revenue: {
-          monthlyRecurring: monthlyRevenue,
-          yearlyRecurring: yearlyRevenue,
-          totalRecurring: Math.round(totalMonthlyRecurring) // Monthly recurring revenue (normalized)
+          total: totalRevenue,
+          monthlyRecurring: 0,
+          yearlyRecurring: 0,
+          totalRecurring: totalRevenue
         }
       }
     });
