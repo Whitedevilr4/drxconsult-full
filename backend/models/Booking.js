@@ -40,9 +40,9 @@ const bookingSchema = new mongoose.Schema({
   
   // Patient Details
   patientDetails: {
-    age: { type: Number, required: true },
-    sex: { type: String, enum: ['male', 'female', 'other'], required: true },
-    prescriptionUrl: { type: String, required: true }, // Uploaded prescription
+    age: { type: Number, default: 0 },
+    sex: { type: String, enum: ['male', 'female', 'other'], default: 'other' },
+    prescriptionUrl: { type: String, default: '' },
     additionalNotes: String
   },
   
@@ -91,6 +91,8 @@ const bookingSchema = new mongoose.Schema({
     feedback: String,
     submittedAt: Date
   },
+  // Subscription booking flag
+  isSubscriptionBooking: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now }
 });
 
