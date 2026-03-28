@@ -16,38 +16,62 @@ const HospitalIcon = () => (
 
 export default function LocationDisplay() {
   const [location, setLocation] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [permissionState, setPermissionState] = useState('prompt') // 'prompt' | 'granted' | 'denied'
   const [nearbyHospitals, setNearbyHospitals] = useState([])
   const [userCoords, setUserCoords] = useState(null)
   const [showHospitals, setShowHospitals] = useState(false)
 
   useEffect(() => {
-    // Check if geolocation is supported
     if (!navigator.geolocation) {
-      setError('Location not supported')
-      setLoading(false)
+      setError('Location not supported by your browser')
       return
     }
 
-    // Get user's location
+    // Check existing permission state before prompting
+    if (navigator.permissions) {
+      navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+        setPermissionState(result.state)
+        if (result.state === 'granted') {
+          // Already granted — fetch silently
+          fetchLocation()
+        }
+        // If 'prompt' or 'denied', wait for user to click the button
+        result.onchange = () => {
+          setPermissionState(result.state)
+          if (result.state === 'granted') {
+            fetchLocation()
+          }
+        }
+      }).catch(() => {
+        // permissions API not available, fall back to button-triggered flow
+        setPermissionState('prompt')
+      })
+    }
+    // If permissions API not available, just show the button
+  }, [])
+
+  const fetchLocation = () => {
+    setLoading(true)
+    setError(null)
+
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords
         setUserCoords({ latitude, longitude })
-        
+        setPermissionState('granted')
+
         try {
-          // Reverse geocode to get location name
           const response = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`
           )
           const data = await response.json()
-          
-          // Extract city and state/country
+
           const city = data.address.city || data.address.town || data.address.village || data.address.county
           const state = data.address.state
           const country = data.address.country
-          
+
           let locationText = ''
           if (city && state) {
             locationText = `${city}, ${state}`
@@ -58,12 +82,9 @@ export default function LocationDisplay() {
           } else {
             locationText = country || 'Unknown Location'
           }
-          
+
           setLocation(locationText)
-          
-          // Fetch nearby hospitals
           await fetchNearbyHospitals(latitude, longitude)
-          
           setLoading(false)
         } catch (err) {
           console.error('Error fetching location name:', err)
@@ -72,17 +93,18 @@ export default function LocationDisplay() {
         }
       },
       (err) => {
-        console.error('Error getting location:', err)
-        setError('Location access denied')
+        console.error('Geolocation error:', err)
+        setPermissionState('denied')
+        setError(err.code === 1 ? 'denied' : 'unavailable')
         setLoading(false)
       },
       {
         enableHighAccuracy: false,
         timeout: 10000,
-        maximumAge: 300000 // Cache for 5 minutes
+        maximumAge: 300000
       }
     )
-  }, [])
+  }
 
   const fetchNearbyHospitals = async (latitude, longitude) => {
     try {
@@ -124,12 +146,39 @@ export default function LocationDisplay() {
     )
   }
 
-  if (error) {
+  if (error === 'denied') {
+    return (
+      <div className="flex flex-col items-center space-y-2 text-sm">
+        <div className="flex items-center space-x-2 text-gray-400">
+          <LocationIcon />
+          <span>Location access denied</span>
+        </div>
+        <p className="text-xs text-gray-400 text-center max-w-xs">
+          To enable, click the lock/info icon in your browser address bar and allow location access, then refresh.
+        </p>
+      </div>
+    )
+  }
+
+  if (error === 'unavailable') {
     return (
       <div className="flex items-center space-x-2 text-gray-400 text-sm">
         <LocationIcon />
-        <span>{error}</span>
+        <span>Location unavailable</span>
       </div>
+    )
+  }
+
+  // Show button to request location if not yet granted
+  if (!location && permissionState !== 'granted') {
+    return (
+      <button
+        onClick={fetchLocation}
+        className="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors"
+      >
+        <LocationIcon />
+        <span>Share location for nearby hospitals</span>
+      </button>
     )
   }
 
