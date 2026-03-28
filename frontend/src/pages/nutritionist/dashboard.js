@@ -7,6 +7,7 @@ import PdfUploader from '@/components/EnhancedUploader'
 import PdfViewer from '@/components/PdfViewer'
 import SimplePdfViewer from '@/components/SimplePdfViewer'
 import { toast } from 'react-toastify'
+import SubscriptionPatientsTab from '@/components/SubscriptionPatientsTab'
 
 export default function NutritionistDashboard() {
   const router = useRouter()
@@ -37,6 +38,11 @@ export default function NutritionistDashboard() {
   const [mounted, setMounted] = useState(false)
   const [isOnline, setIsOnline] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [isCoreTeam, setIsCoreTeam] = useState(false)
+  const [subscriptionPatients, setSubscriptionPatients] = useState([])
+  const [subscriptionPatientsLoading, setSubscriptionPatientsLoading] = useState(false)
+  const [incentives, setIncentives] = useState([])
+  const [incentivesTotal, setIncentivesTotal] = useState(0)
 
   useEffect(() => {
     setMounted(true)
@@ -65,6 +71,7 @@ export default function NutritionistDashboard() {
     setUser(userData)
     fetchBookings(token) // This will also fetch payment stats
     fetchReviews(token)
+    fetchIncentives(token)
   }, [activeTab, router])
 
   // Recalculate payment stats whenever bookings change
@@ -107,6 +114,10 @@ export default function NutritionistDashboard() {
         
         if (profileRes.data && profileRes.data.status) {
           setIsOnline(profileRes.data.status === 'online')
+          if (profileRes.data.coreTeam) {
+            setIsCoreTeam(true)
+            fetchSubscriptionPatients(token)
+          }
         }
       } catch (err) {
         console.error('Error fetching nutritionist profile:', err)
@@ -119,7 +130,7 @@ export default function NutritionistDashboard() {
       }, 0)
       
       const paidBookingsArray = completedBookings.filter(b => b.nutritionistPaid)
-      const totalPaid = paidBookingsArray.reduce((sum, b) => sum + (b.nutritionistShare || 225), 0)
+      const totalPaid = paidBookingsArray.reduce((sum, b) => sum + (b.nutritionistShare || Math.round((b.paymentAmount || 500) * 0.7)), 0)
       const outstanding = totalEarned - totalPaid
       const paidBookings = paidBookingsArray.length
       const unpaidBookings = completedBookings.length - paidBookings
@@ -179,6 +190,32 @@ export default function NutritionistDashboard() {
         paidBookings: 0,
         unpaidBookings: 0
       })
+    }
+  }
+
+  const fetchSubscriptionPatients = async (token) => {
+    setSubscriptionPatientsLoading(true)
+    try {
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/bookings/subscription-patients`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setSubscriptionPatients(res.data)
+    } catch (err) {
+      console.error('Error fetching subscription patients:', err)
+    } finally {
+      setSubscriptionPatientsLoading(false)
+    }
+  }
+
+  const fetchIncentives = async (token) => {
+    try {
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/incentives/my`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setIncentives(res.data)
+      setIncentivesTotal(res.data.reduce((s, i) => s + i.amount, 0))
+    } catch (err) {
+      console.error('Error fetching incentives:', err)
     }
   }
 
@@ -409,9 +446,9 @@ export default function NutritionistDashboard() {
   const calculatedPaymentStats = useMemo(() => {
     const completedBookings = bookings.filter(b => b.status === 'completed')
 
-    const totalEarned = completedBookings.reduce((sum, b) => sum + (b.nutritionistShare || 225), 0)
+    const totalEarned = completedBookings.reduce((sum, b) => sum + (b.nutritionistShare || Math.round((b.paymentAmount || 500) * 0.7)), 0)
     const paidBookingsArray = completedBookings.filter(b => b.nutritionistPaid)
-    const totalPaid = paidBookingsArray.reduce((sum, b) => sum + (b.nutritionistShare || 225), 0)
+    const totalPaid = paidBookingsArray.reduce((sum, b) => sum + (b.nutritionistShare || Math.round((b.paymentAmount || 500) * 0.7)), 0)
     const outstanding = totalEarned - totalPaid
     
     const result = {
@@ -673,6 +710,7 @@ export default function NutritionistDashboard() {
                     <option value="payments">💰 Payments</option>
                     <option value="reviews">⭐ Reviews</option>
                     <option value="medical-forms">📋 Medical Forms</option>
+                    {isCoreTeam && <option value="subscription">💳 Subscription Patients</option>}
                   </select>
                 </div>
 
@@ -779,6 +817,18 @@ export default function NutritionistDashboard() {
                   >
                     📋 Medical Forms
                   </button>
+                  {isCoreTeam && (
+                    <button
+                      onClick={() => setActiveTab('subscription')}
+                      className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
+                        activeTab === 'subscription'
+                          ? 'border-b-2 border-yellow-600 text-yellow-600'
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      💳 Subscription
+                    </button>
+                  )}
                 </nav>
               </div>
             </div>
@@ -850,11 +900,34 @@ export default function NutritionistDashboard() {
                     </div>
                     <div className="ml-3">
                       <p className="text-sm text-green-700">
-                        <strong>Payment Information:</strong> You receive 50% (₹225) from each ₹449 consultation. 
+                        <strong>Payment Information:</strong> You receive 70% from each consultation. 
                         Outstanding payments are processed by the admin and will be credited to your account soon.
                       </p>
                     </div>
                   </div>
+                </div>
+
+                {/* Incentives Section */}
+                <div className="mt-6 bg-emerald-50 border border-emerald-200 rounded-xl p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-emerald-800">🎁 Incentives & Bonuses</h3>
+                    <span className="text-2xl font-bold text-emerald-700">₹{incentivesTotal.toLocaleString()}</span>
+                  </div>
+                  {incentives.length === 0 ? (
+                    <p className="text-sm text-emerald-600">No incentives received yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {incentives.map(inc => (
+                        <div key={inc._id} className="bg-white rounded-lg px-4 py-3 flex items-center justify-between shadow-sm">
+                          <div>
+                            <p className="text-sm font-medium text-gray-800">"{inc.reason}"</p>
+                            <p className="text-xs text-gray-400">{new Date(inc.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                          </div>
+                          <span className="text-lg font-bold text-emerald-600">+₹{inc.amount.toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -954,8 +1027,18 @@ export default function NutritionistDashboard() {
               <MedicalFormsTabContent />
             )}
 
+            {/* Subscription Patients Tab */}
+            {activeTab === 'subscription' && (
+              <SubscriptionPatientsTab
+                patients={subscriptionPatients}
+                loading={subscriptionPatientsLoading}
+                currentUserId={user?._id || user?.id}
+                onRefresh={() => fetchSubscriptionPatients(localStorage.getItem('token'))}
+              />
+            )}
+
             {/* Date Filter - Only show for booking tabs */}
-            {activeTab !== 'slots' && activeTab !== 'payments' && activeTab !== 'reviews' && activeTab !== 'medical-forms' && (
+            {activeTab !== 'slots' && activeTab !== 'payments' && activeTab !== 'reviews' && activeTab !== 'medical-forms' && activeTab !== 'subscription' && (
               <div className="bg-white rounded-lg shadow p-4 mb-6">
                 <div className="flex items-center space-x-2">
                   <span className="text-sm font-medium text-gray-700">Filter by Date:</span>
@@ -1009,16 +1092,16 @@ export default function NutritionistDashboard() {
             )}
 
             {/* Bookings List */}
-            {activeTab !== 'slots' && activeTab !== 'payments' && activeTab !== 'reviews' && activeTab !== 'medical-forms' && <h2 className="text-2xl font-bold mb-4">Consultations</h2>}
-            {activeTab !== 'slots' && activeTab !== 'payments' && activeTab !== 'reviews' && activeTab !== 'medical-forms' && loading ? (
+            {activeTab !== 'slots' && activeTab !== 'payments' && activeTab !== 'reviews' && activeTab !== 'medical-forms' && activeTab !== 'subscription' && <h2 className="text-2xl font-bold mb-4">Consultations</h2>}
+            {activeTab !== 'slots' && activeTab !== 'payments' && activeTab !== 'reviews' && activeTab !== 'medical-forms' && activeTab !== 'subscription' && loading ? (
               <div className="text-center py-8">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
               </div>
-            ) : activeTab !== 'slots' && activeTab !== 'payments' && activeTab !== 'reviews' && activeTab !== 'medical-forms' && filteredBookings.length === 0 ? (
+            ) : activeTab !== 'slots' && activeTab !== 'payments' && activeTab !== 'reviews' && activeTab !== 'medical-forms' && activeTab !== 'subscription' && filteredBookings.length === 0 ? (
               <div className="bg-white p-6 rounded-lg shadow text-center">
                 <p className="text-gray-600">No bookings in this category</p>
               </div>
-            ) : activeTab !== 'slots' && activeTab !== 'payments' && activeTab !== 'reviews' && activeTab !== 'medical-forms' && (
+            ) : activeTab !== 'slots' && activeTab !== 'payments' && activeTab !== 'reviews' && activeTab !== 'medical-forms' && activeTab !== 'subscription' && (
               <div className="space-y-4">
                 {filteredBookings.map(booking => (
                   <div key={booking._id} className="bg-white p-6 rounded-lg shadow">
