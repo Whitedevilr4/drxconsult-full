@@ -1015,4 +1015,279 @@ router.get('/reviews/:professionalId', async (req, res) => {
   }
 });
 
+// Create subscription booking — no payment, no slot required
+router.post('/subscription', auth, async (req, res) => {
+  try {
+    const { pharmacistId, doctorId, nutritionistId } = req.body
+
+    // Exactly one professional
+    const ids = [pharmacistId, doctorId, nutritionistId].filter(Boolean)
+    if (ids.length !== 1) {
+      return res.status(400).json({ message: 'Exactly one professional ID is required' })
+    }
+
+    // Verify patient has active subscription
+    const Subscription = require('../models/Subscription')
+    const subscription = await Subscription.findOne({ userId: req.user.userId, status: 'active' })
+    if (!subscription) {
+      return res.status(403).json({ message: 'No active subscription found' })
+    }
+
+    let professional, professionalUser, providerType, serviceType, professionalField
+
+    if (pharmacistId) {
+      professional = await Pharmacist.findById(pharmacistId)
+      if (!professional || !professional.coreTeam) return res.status(404).json({ message: 'Pharmacist not found or not in core team' })
+      professionalUser = await User.findById(professional.userId)
+      providerType = 'pharmacist'
+      serviceType = 'full_consultation'
+      const fee = 449
+      professionalField = { pharmacistId, pharmacistShare: Math.round(fee * 0.7), paymentAmount: fee }
+    } else if (doctorId) {
+      professional = await Doctor.findById(doctorId)
+      if (!professional || !professional.coreTeam) return res.status(404).json({ message: 'Doctor not found or not in core team' })
+      professionalUser = await User.findById(professional.userId)
+      providerType = 'doctor'
+      serviceType = 'doctor_consultation'
+      const fee = professional.consultationFee || 499
+      professionalField = { doctorId, doctorShare: Math.round(fee * 0.7), paymentAmount: fee }
+    } else {
+      const Nutritionist = require('../models/Nutritionist')
+      professional = await Nutritionist.findById(nutritionistId)
+      if (!professional || !professional.coreTeam) return res.status(404).json({ message: 'Nutritionist not found or not in core team' })
+      professionalUser = await User.findById(professional.userId)
+      providerType = 'nutritionist'
+      serviceType = 'nutritionist_consultation'
+      const fee = professional.consultationFee || 500
+      professionalField = { nutritionistId, nutritionistShare: Math.round(fee * 0.7), paymentAmount: fee }
+    }
+
+    // Check if patient already has an active subscription booking with this professional THIS MONTH
+    const now = new Date()
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    const existingQuery = {
+      patientId: req.user.userId,
+      isSubscriptionBooking: true,
+      status: { $in: ['confirmed', 'pending'] },
+      createdAt: { $gte: startOfMonth }
+    }
+    if (pharmacistId) existingQuery.pharmacistId = pharmacistId
+    else if (doctorId) existingQuery.doctorId = doctorId
+    else existingQuery.nutritionistId = nutritionistId
+
+    const existing = await Booking.findOne(existingQuery)
+    if (existing) {
+      return res.status(400).json({ message: 'You already have an active subscription booking with this professional' })
+    }
+
+    const booking = new Booking({
+      patientId: req.user.userId,
+      slotDate: new Date(),
+      slotTime: 'Subscription',
+      status: 'confirmed',
+      serviceType,
+      providerType,
+      isSubscriptionBooking: true,
+      patientDetails: { age: 1, sex: 'other', prescriptionUrl: 'subscription' },
+      ...professionalField
+    })
+
+    await booking.save()
+
+    // Notify professional via socket
+    const io = req.app.get('io')
+    const patient = await User.findById(req.user.userId)
+    if (io && professionalUser) {
+      const { notifyBookingCreated } = require('../utils/socketManager')
+      notifyBookingCreated(io, professionalUser._id.toString(), {
+        bookingId: booking._id,
+        patientName: patient?.name || 'Patient',
+        serviceType,
+        providerType,
+        isSubscriptionBooking: true
+      })
+    }
+
+    res.status(201).json({ message: 'Subscription booking created', booking })
+  } catch (err) {
+    console.error('Subscription booking error:', err)
+    res.status(500).json({ message: 'Server error', error: err.message })
+  }
+})
+
+// Get subscription patients for a professional (core team only)
+router.get('/subscription-patients', auth, async (req, res) => {
+  try {
+    let query = { isSubscriptionBooking: true }
+
+    if (req.user.role === 'pharmacist') {
+      const p = await Pharmacist.findOne({ userId: req.user.userId })
+      if (!p) return res.json([])
+      query.pharmacistId = p._id
+    } else if (req.user.role === 'doctor') {
+      const d = await Doctor.findOne({ userId: req.user.userId })
+      if (!d) return res.json([])
+      query.doctorId = d._id
+    } else if (req.user.role === 'nutritionist') {
+      const Nutritionist = require('../models/Nutritionist')
+      const n = await Nutritionist.findOne({ userId: req.user.userId })
+      if (!n) return res.json([])
+      query.nutritionistId = n._id
+    } else {
+      return res.status(403).json({ message: 'Access denied' })
+    }
+
+    const bookings = await Booking.find(query)
+      .populate('patientId', 'name email phone profilePicture')
+      .sort({ createdAt: -1 })
+
+    res.json(bookings)
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message })
+  }
+})
+
+// Get subscription booking status for patient (check if already booked this month)
+router.get('/subscription-status', auth, async (req, res) => {
+  try {
+    const now = new Date()
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+
+    const bookings = await Booking.find({
+      patientId: req.user.userId,
+      isSubscriptionBooking: true,
+      status: { $in: ['confirmed', 'pending'] },
+      createdAt: { $gte: startOfMonth }
+    }).select('pharmacistId doctorId nutritionistId providerType createdAt')
+
+    res.json({ bookings })
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message })
+  }
+})
+
+// Get chat messages for a subscription booking
+router.get('/:bookingId/chat', auth, async (req, res) => {
+  try {
+    const BookingChat = require('../models/BookingChat')
+    const booking = await Booking.findById(req.params.bookingId)
+    if (!booking) return res.status(404).json({ message: 'Booking not found' })
+
+    const messages = await BookingChat.find({ bookingId: req.params.bookingId })
+      .populate('senderId', 'name profilePicture')
+      .sort({ createdAt: 1 })
+
+    // Mark unread messages as read
+    await BookingChat.updateMany(
+      { bookingId: req.params.bookingId, senderId: { $ne: req.user.userId }, isRead: false },
+      { isRead: true }
+    )
+
+    res.json(messages)
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message })
+  }
+})
+
+// Send chat message for a subscription booking
+router.post('/:bookingId/chat', auth, async (req, res) => {
+  try {
+    const BookingChat = require('../models/BookingChat')
+    const { message } = req.body
+    if (!message?.trim()) return res.status(400).json({ message: 'Message is required' })
+
+    const booking = await Booking.findById(req.params.bookingId)
+    if (!booking) return res.status(404).json({ message: 'Booking not found' })
+
+    // Determine sender type
+    const senderType = req.user.role === 'patient' ? 'patient' : 'professional'
+
+    const chat = await BookingChat.create({
+      bookingId: req.params.bookingId,
+      senderId: req.user.userId,
+      senderType,
+      message: message.trim()
+    })
+
+    await chat.populate('senderId', 'name profilePicture')
+
+    // Emit via socket to the booking room
+    const io = req.app.get('io')
+    if (io) {
+      io.to(`booking:${req.params.bookingId}`).emit('new-booking-message', chat)
+    }
+
+    res.status(201).json(chat)
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message })
+  }
+})
+
+// Save patient subscription health data (diet + progress)
+router.put('/subscription-health', auth, async (req, res) => {
+  try {
+    const SubscriptionHealthData = require('../models/SubscriptionHealthData')
+    const { weekKey, diet, progress, stepTarget } = req.body
+    if (!weekKey) return res.status(400).json({ message: 'weekKey is required' })
+
+    const doc = await SubscriptionHealthData.findOneAndUpdate(
+      { patientId: req.user.userId, weekKey },
+      { $set: { diet, progress, stepTarget, updatedAt: new Date() } },
+      { upsert: true, new: true }
+    )
+    res.json(doc)
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message })
+  }
+})
+
+// Get patient's own health data
+router.get('/subscription-health', auth, async (req, res) => {
+  try {
+    const SubscriptionHealthData = require('../models/SubscriptionHealthData')
+    const { weekKey } = req.query
+    const query = { patientId: req.user.userId }
+    if (weekKey) query.weekKey = weekKey
+    const docs = await SubscriptionHealthData.find(query).sort({ weekKey: -1 }).limit(4)
+    res.json(docs)
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message })
+  }
+})
+
+// Get a patient's health data — for professionals (must have active subscription booking with this patient)
+router.get('/subscription-health/:patientId', auth, async (req, res) => {
+  try {
+    const SubscriptionHealthData = require('../models/SubscriptionHealthData')
+
+    // Verify the professional has a subscription booking with this patient
+    let professionalQuery = { isSubscriptionBooking: true, patientId: req.params.patientId }
+    if (req.user.role === 'pharmacist') {
+      const p = await Pharmacist.findOne({ userId: req.user.userId })
+      if (!p) return res.status(403).json({ message: 'Access denied' })
+      professionalQuery.pharmacistId = p._id
+    } else if (req.user.role === 'doctor') {
+      const d = await Doctor.findOne({ userId: req.user.userId })
+      if (!d) return res.status(403).json({ message: 'Access denied' })
+      professionalQuery.doctorId = d._id
+    } else if (req.user.role === 'nutritionist') {
+      const Nutritionist = require('../models/Nutritionist')
+      const n = await Nutritionist.findOne({ userId: req.user.userId })
+      if (!n) return res.status(403).json({ message: 'Access denied' })
+      professionalQuery.nutritionistId = n._id
+    } else {
+      return res.status(403).json({ message: 'Access denied' })
+    }
+
+    const booking = await Booking.findOne(professionalQuery)
+    if (!booking) return res.status(403).json({ message: 'No subscription booking found with this patient' })
+
+    const docs = await SubscriptionHealthData.find({ patientId: req.params.patientId })
+      .sort({ weekKey: -1 }).limit(4)
+    res.json(docs)
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message })
+  }
+})
+
 module.exports = router;
