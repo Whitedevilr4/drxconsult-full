@@ -7,6 +7,7 @@ import PdfUploader from '@/components/EnhancedUploader'
 import PdfViewer from '@/components/PdfViewer'
 import SimplePdfViewer from '@/components/SimplePdfViewer'
 import { toast } from 'react-toastify'
+import SubscriptionPatientsTab from '@/components/SubscriptionPatientsTab'
 
 export default function PharmacistDashboard() {
   const router = useRouter()
@@ -37,6 +38,11 @@ export default function PharmacistDashboard() {
   const [isOnline, setIsOnline] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [accessDenied, setAccessDenied] = useState(false)
+  const [isCoreTeam, setIsCoreTeam] = useState(false)
+  const [subscriptionPatients, setSubscriptionPatients] = useState([])
+  const [subscriptionPatientsLoading, setSubscriptionPatientsLoading] = useState(false)
+  const [incentives, setIncentives] = useState([])
+  const [incentivesTotal, setIncentivesTotal] = useState(0)
 
   useEffect(() => {
     setMounted(true)
@@ -87,6 +93,7 @@ export default function PharmacistDashboard() {
     if (token) {
       fetchBookings(token) // This will also fetch payment stats
       fetchReviews(token)
+      fetchIncentives(token)
     } else {
       setBookings(dummyBookings)
       setLoading(false)
@@ -98,9 +105,9 @@ export default function PharmacistDashboard() {
     const completedBookings = bookings.filter(b => b.status === 'completed')
     
     if (completedBookings.length > 0) {
-      const totalEarned = completedBookings.reduce((sum, b) => sum + (b.pharmacistShare || 225), 0)
+      const totalEarned = completedBookings.reduce((sum, b) => sum + (b.pharmacistShare || Math.round((b.paymentAmount || 449) * 0.7)), 0)
       const paidBookingsArray = completedBookings.filter(b => b.pharmacistPaid)
-      const totalPaid = paidBookingsArray.reduce((sum, b) => sum + (b.pharmacistShare || 225), 0)
+      const totalPaid = paidBookingsArray.reduce((sum, b) => sum + (b.pharmacistShare || Math.round((b.paymentAmount || 449) * 0.7)), 0)
       const outstanding = totalEarned - totalPaid
       
       const newStats = {
@@ -133,6 +140,10 @@ export default function PharmacistDashboard() {
         
         if (profileRes.data && profileRes.data.status) {
           setIsOnline(profileRes.data.status === 'online')
+          if (profileRes.data.coreTeam) {
+            setIsCoreTeam(true)
+            fetchSubscriptionPatients(token)
+          }
         }
       } catch (err) {
         console.error('Error fetching pharmacist profile:', err)
@@ -145,7 +156,7 @@ export default function PharmacistDashboard() {
       }, 0)
       
       const paidBookingsArray = completedBookings.filter(b => b.pharmacistPaid)
-      const totalPaid = paidBookingsArray.reduce((sum, b) => sum + (b.pharmacistShare || 225), 0)
+      const totalPaid = paidBookingsArray.reduce((sum, b) => sum + (b.pharmacistShare || Math.round((b.paymentAmount || 449) * 0.7)), 0)
       const outstanding = totalEarned - totalPaid
       const paidBookings = paidBookingsArray.length
       const unpaidBookings = completedBookings.length - paidBookings
@@ -217,6 +228,32 @@ export default function PharmacistDashboard() {
       }
     } catch (err) {
       console.error('Error fetching reviews:', err)
+    }
+  }
+
+  const fetchSubscriptionPatients = async (token) => {
+    setSubscriptionPatientsLoading(true)
+    try {
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/bookings/subscription-patients`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setSubscriptionPatients(res.data)
+    } catch (err) {
+      console.error('Error fetching subscription patients:', err)
+    } finally {
+      setSubscriptionPatientsLoading(false)
+    }
+  }
+
+  const fetchIncentives = async (token) => {
+    try {
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/incentives/my`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setIncentives(res.data)
+      setIncentivesTotal(res.data.reduce((s, i) => s + i.amount, 0))
+    } catch (err) {
+      console.error('Error fetching incentives:', err)
     }
   }
 
@@ -433,9 +470,9 @@ export default function PharmacistDashboard() {
 
     const completedBookings = bookings.filter(b => b.status === 'completed')
 
-    const totalEarned = completedBookings.reduce((sum, b) => sum + (b.pharmacistShare || 225), 0)
+    const totalEarned = completedBookings.reduce((sum, b) => sum + (b.pharmacistShare || Math.round((b.paymentAmount || 449) * 0.7)), 0)
     const paidBookingsArray = completedBookings.filter(b => b.pharmacistPaid)
-    const totalPaid = paidBookingsArray.reduce((sum, b) => sum + (b.pharmacistShare || 225), 0)
+    const totalPaid = paidBookingsArray.reduce((sum, b) => sum + (b.pharmacistShare || Math.round((b.paymentAmount || 449) * 0.7)), 0)
     const outstanding = totalEarned - totalPaid
     
     const result = {
@@ -746,6 +783,7 @@ export default function PharmacistDashboard() {
                   <option value="payments">💰 Payments</option>
                   <option value="reviews">⭐ Reviews</option>
                   <option value="medical-forms">📋 Medical Forms</option>
+                  {isCoreTeam && <option value="subscription">💳 Subscription Patients</option>}
                 </select>
               </div>
 
@@ -852,6 +890,18 @@ export default function PharmacistDashboard() {
                 >
                   📋 Medical Forms
                 </button>
+                {isCoreTeam && (
+                  <button
+                    onClick={() => setActiveTab('subscription')}
+                    className={`py-4 px-6 font-medium text-sm ${
+                      activeTab === 'subscription'
+                        ? 'border-b-2 border-yellow-600 text-yellow-600'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    💳 Subscription
+                  </button>
+                )}
               </nav>
             </div>
           </div>
@@ -1025,11 +1075,34 @@ export default function PharmacistDashboard() {
                   </div>
                   <div className="ml-3">
                     <p className="text-sm text-blue-700">
-                      <strong>Payment Information:</strong> You receive 50% (₹225) from each ₹449 consultation. 
+                      <strong>Payment Information:</strong> You receive 70% from each consultation. 
                       Outstanding payments are processed by the admin and will be credited to your account soon.
                     </p>
                   </div>
                 </div>
+              </div>
+
+              {/* Incentives Section */}
+              <div className="mt-6 bg-emerald-50 border border-emerald-200 rounded-xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-emerald-800">🎁 Incentives & Bonuses</h3>
+                  <span className="text-2xl font-bold text-emerald-700">₹{incentivesTotal.toLocaleString()}</span>
+                </div>
+                {incentives.length === 0 ? (
+                  <p className="text-sm text-emerald-600">No incentives received yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {incentives.map(inc => (
+                      <div key={inc._id} className="bg-white rounded-lg px-4 py-3 flex items-center justify-between shadow-sm">
+                        <div>
+                          <p className="text-sm font-medium text-gray-800">"{inc.reason}"</p>
+                          <p className="text-xs text-gray-400">{new Date(inc.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                        </div>
+                        <span className="text-lg font-bold text-emerald-600">+₹{inc.amount.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1129,8 +1202,18 @@ export default function PharmacistDashboard() {
             <MedicalFormsTabContent />
           )}
 
+          {/* Subscription Patients Tab */}
+          {activeTab === 'subscription' && (
+            <SubscriptionPatientsTab
+              patients={subscriptionPatients}
+              loading={subscriptionPatientsLoading}
+              currentUserId={user?._id || user?.id}
+              onRefresh={() => fetchSubscriptionPatients(localStorage.getItem('token'))}
+            />
+          )}
+
           {/* Date Filter - Only show for booking tabs */}
-          {activeTab !== 'slots' && activeTab !== 'payments' && activeTab !== 'reviews' && activeTab !== 'medical-forms' && (
+          {activeTab !== 'slots' && activeTab !== 'payments' && activeTab !== 'reviews' && activeTab !== 'medical-forms' && activeTab !== 'subscription' && (
             <div className="bg-white rounded-lg shadow p-4 mb-6">
               <div className="flex items-center space-x-2">
                 <span className="text-sm font-medium text-gray-700">Filter by Date:</span>
@@ -1184,8 +1267,8 @@ export default function PharmacistDashboard() {
           )}
 
           {/* Bookings List */}
-          {activeTab !== 'slots' && activeTab !== 'payments' && activeTab !== 'reviews' && activeTab !== 'medical-forms' && <h2 className="text-2xl font-bold mb-4">Sessions</h2>}
-          {activeTab !== 'slots' && activeTab !== 'payments' && activeTab !== 'reviews' && activeTab !== 'medical-forms' && loading ? (
+          {activeTab !== 'slots' && activeTab !== 'payments' && activeTab !== 'reviews' && activeTab !== 'medical-forms' && activeTab !== 'subscription' && <h2 className="text-2xl font-bold mb-4">Sessions</h2>}
+          {activeTab !== 'slots' && activeTab !== 'payments' && activeTab !== 'reviews' && activeTab !== 'medical-forms' && activeTab !== 'subscription' && loading ? (
             <div className="text-center py-8">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
@@ -1278,7 +1361,7 @@ export default function PharmacistDashboard() {
                       {/* Payment Amount Display */}
                       {booking.status === 'completed' && (
                         <p className="text-sm text-gray-600 mt-1">
-                          Your share: <span className="font-semibold text-gray-800">₹{booking.pharmacistShare || (booking.serviceType === 'prescription_review' ? 75 : booking.serviceType === 'doctor_consultation' ? 250 : 225)}</span>
+                          Your share: <span className="font-semibold text-gray-800">₹{booking.pharmacistShare || Math.round((booking.paymentAmount || 449) * 0.7)}</span>
                           <span className="text-xs text-gray-500 ml-1">
                             (from ₹{booking.paymentAmount || (booking.serviceType === 'prescription_review' ? 149 : booking.serviceType === 'doctor_consultation' ? 499 : 449)} {booking.serviceType === 'prescription_review' ? 'prescription review' : 'consultation'})
                           </span>
