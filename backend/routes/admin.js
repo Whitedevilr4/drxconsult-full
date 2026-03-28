@@ -1740,4 +1740,24 @@ router.get('/incentives/my', auth, async (req, res) => {
   }
 });
 
+// Get all subscription bookings with patient + professional details (admin only)
+router.get('/subscription-bookings', auth, isAdmin, async (req, res) => {
+  try {
+    const Booking = require('../models/Booking');
+    const Doctor = require('../models/Doctor');
+    const Nutritionist = require('../models/Nutritionist');
+
+    const bookings = await Booking.find({ isSubscriptionBooking: true })
+      .populate('patientId', 'name email phone profilePicture')
+      .populate({ path: 'pharmacistId', populate: { path: 'userId', select: 'name email' } })
+      .populate({ path: 'doctorId',     populate: { path: 'userId', select: 'name email' } })
+      .populate({ path: 'nutritionistId', populate: { path: 'userId', select: 'name email' } })
+      .sort({ createdAt: -1 });
+
+    res.json(bookings);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 module.exports = router;
