@@ -260,6 +260,7 @@ export default function AdminDashboard() {
                   <option value="doctor-payments">💰 Doctor Payments</option>
                   <option value="nutritionist-payments">💰 Nutritionist Payments</option>
                   <option value="incentives">🎁 Incentives</option>
+                  <option value="subscription-bookings">💳 Subscription Bookings</option>
                   <option value="complaints">📝 Complaints</option>
                   <option value="live-chat">💬 Live Chat</option>
                   <option value="website">🌐 Website</option>
@@ -432,6 +433,16 @@ export default function AdminDashboard() {
                   🎁 Incentives
                 </button>
                 <button
+                  onClick={() => setActiveTab('subscription-bookings')}
+                  className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
+                    activeTab === 'subscription-bookings'
+                      ? 'border-b-2 border-blue-600 text-blue-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  💳 Subscription Bookings
+                </button>
+                <button
                   onClick={() => setActiveTab('reviews')}
                   className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
                     activeTab === 'reviews'
@@ -532,6 +543,7 @@ export default function AdminDashboard() {
               {activeTab === 'doctor-payments' && <DoctorPaymentsTab />}
               {activeTab === 'nutritionist-payments' && <NutritionistPaymentsTab />}
               {activeTab === 'incentives' && <IncentivesTab />}
+              {activeTab === 'subscription-bookings' && <SubscriptionBookingsTab />}
               {activeTab === 'reviews' && <ReviewsTab pharmacists={pharmacists} doctors={doctors} />}
               {activeTab === 'manage' && <ManageUsersTab users={users} pharmacists={pharmacists} onUpdate={() => fetchData(localStorage.getItem('token'))} />}
               {activeTab === 'complaints' && <ComplaintsTab complaints={complaints} loading={complaintsLoading} onComplaintClick={handleComplaintClick} onRefresh={() => fetchComplaints(localStorage.getItem('token'))} />}
@@ -6574,6 +6586,185 @@ function IncentivesTab() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// Subscription Bookings Tab Component
+function SubscriptionBookingsTab() {
+  const [bookings, setBookings] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [typeFilter, setTypeFilter] = useState('all')
+
+  useEffect(() => {
+    const fetch = async () => {
+      try {
+        const token = localStorage.getItem('token')
+        const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/subscription-bookings`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        setBookings(res.data)
+      } catch (err) {
+        toast.error('Failed to load subscription bookings')
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetch()
+  }, [])
+
+  const getProfessional = (b) => {
+    if (b.pharmacistId) return { name: b.pharmacistId?.userId?.name, email: b.pharmacistId?.userId?.email, type: 'Pharmacist', emoji: '💊' }
+    if (b.doctorId)     return { name: b.doctorId?.userId?.name,     email: b.doctorId?.userId?.email,     type: 'Doctor',      emoji: '🩺' }
+    if (b.nutritionistId) return { name: b.nutritionistId?.userId?.name, email: b.nutritionistId?.userId?.email, type: 'Nutritionist', emoji: '🥗' }
+    return { name: 'Unknown', email: '', type: 'Unknown', emoji: '❓' }
+  }
+
+  const filtered = bookings.filter(b => {
+    const prof = getProfessional(b)
+    const q = search.toLowerCase()
+    const matchSearch = !q ||
+      b.patientId?.name?.toLowerCase().includes(q) ||
+      b.patientId?.email?.toLowerCase().includes(q) ||
+      prof.name?.toLowerCase().includes(q)
+    const matchType = typeFilter === 'all' || b.providerType === typeFilter
+    return matchSearch && matchType
+  })
+
+  if (loading) return (
+    <div className="text-center py-8">
+      <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    </div>
+  )
+
+  return (
+    <div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-3">
+        <div>
+          <h2 className="text-2xl font-bold">💳 Subscription Bookings</h2>
+          <p className="text-sm text-gray-500 mt-1">Patients booked via subscription plan and their designated professionals</p>
+        </div>
+        <div className="flex items-center gap-2 text-sm font-semibold bg-blue-50 text-blue-700 px-4 py-2 rounded-xl">
+          Total: {bookings.length}
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <input
+          type="text"
+          placeholder="Search patient or professional..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
+        <select
+          value={typeFilter}
+          onChange={e => setTypeFilter(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+        >
+          <option value="all">All Types</option>
+          <option value="pharmacist">Pharmacist</option>
+          <option value="doctor">Doctor</option>
+          <option value="nutritionist">Nutritionist</option>
+        </select>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="text-center py-12 text-gray-400">No subscription bookings found.</div>
+      ) : (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-100">
+              <thead className="bg-gray-50">
+                <tr>
+                  {['Patient', 'Professional', 'Type', 'Status', 'Booked On'].map(h => (
+                    <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filtered.map(b => {
+                  const prof = getProfessional(b)
+                  return (
+                    <tr key={b._id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={b.patientId?.profilePicture || `https://ui-avatars.com/api/?name=${encodeURIComponent(b.patientId?.name || 'P')}&size=36&background=3b82f6&color=fff`}
+                            className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                            alt=""
+                            onError={e => { e.target.src = `https://ui-avatars.com/api/?name=P&size=36` }}
+                          />
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">{b.patientId?.name}</p>
+                            <p className="text-xs text-gray-400">{b.patientId?.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3">
+                        <p className="text-sm font-semibold text-gray-900">{prof.name}</p>
+                        <p className="text-xs text-gray-400">{prof.email}</p>
+                      </td>
+                      <td className="px-5 py-3">
+                        <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
+                          {prof.emoji} {prof.type}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3">
+                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
+                          b.status === 'confirmed' ? 'bg-green-100 text-green-700' :
+                          b.status === 'completed' ? 'bg-gray-100 text-gray-600' :
+                          'bg-red-100 text-red-600'
+                        }`}>
+                          {b.status}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-xs text-gray-500">
+                        {new Date(b.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden divide-y divide-gray-100">
+            {filtered.map(b => {
+              const prof = getProfessional(b)
+              return (
+                <div key={b._id} className="p-4 space-y-2">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={b.patientId?.profilePicture || `https://ui-avatars.com/api/?name=${encodeURIComponent(b.patientId?.name || 'P')}&size=40&background=3b82f6&color=fff`}
+                      className="w-10 h-10 rounded-full object-cover"
+                      alt=""
+                      onError={e => { e.target.src = `https://ui-avatars.com/api/?name=P&size=40` }}
+                    />
+                    <div>
+                      <p className="font-semibold text-gray-900 text-sm">{b.patientId?.name}</p>
+                      <p className="text-xs text-gray-400">{b.patientId?.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">{prof.emoji} {prof.name} <span className="text-xs text-gray-400">({prof.type})</span></span>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      b.status === 'confirmed' ? 'bg-green-100 text-green-700' :
+                      b.status === 'completed' ? 'bg-gray-100 text-gray-600' :
+                      'bg-red-100 text-red-600'
+                    }`}>{b.status}</span>
+                  </div>
+                  <p className="text-xs text-gray-400">{new Date(b.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
