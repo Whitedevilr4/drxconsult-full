@@ -1562,4 +1562,182 @@ router.delete('/hospitals/:id', auth, isAdmin, async (req, res) => {
   }
 });
 
+// Toggle core team status for pharmacist (admin only)
+router.patch('/pharmacists/:id/core-team', auth, isAdmin, async (req, res) => {
+  try {
+    const { coreTeam } = req.body;
+    const pharmacist = await Pharmacist.findByIdAndUpdate(
+      req.params.id,
+      { coreTeam },
+      { new: true }
+    ).populate('userId', 'name email');
+    if (!pharmacist) return res.status(404).json({ message: 'Pharmacist not found' });
+    res.json({ message: 'Core team status updated', pharmacist });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Toggle core team status for doctor (admin only)
+router.patch('/doctors/:id/core-team', auth, isAdmin, async (req, res) => {
+  try {
+    const Doctor = require('../models/Doctor');
+    const { coreTeam } = req.body;
+    const doctor = await Doctor.findByIdAndUpdate(
+      req.params.id,
+      { coreTeam },
+      { new: true }
+    ).populate('userId', 'name email');
+    if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
+    res.json({ message: 'Core team status updated', doctor });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Toggle core team status for nutritionist (admin only)
+router.patch('/nutritionists/:id/core-team', auth, isAdmin, async (req, res) => {
+  try {
+    const Nutritionist = require('../models/Nutritionist');
+    const { coreTeam } = req.body;
+    const nutritionist = await Nutritionist.findByIdAndUpdate(
+      req.params.id,
+      { coreTeam },
+      { new: true }
+    ).populate('userId', 'name email');
+    if (!nutritionist) return res.status(404).json({ message: 'Nutritionist not found' });
+    res.json({ message: 'Core team status updated', nutritionist });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Get all core team professionals (public — used in patient subscription tab)
+router.get('/core-team', auth, async (req, res) => {
+  try {
+    const Doctor = require('../models/Doctor');
+    const Nutritionist = require('../models/Nutritionist');
+
+    const [pharmacists, doctors, nutritionists] = await Promise.all([
+      Pharmacist.find({ coreTeam: true, adminDisabled: false })
+        .populate('userId', 'name email profilePicture'),
+      Doctor.find({ coreTeam: true, adminDisabled: false })
+        .populate('userId', 'name email profilePicture'),
+      Nutritionist.find({ coreTeam: true, adminDisabled: false })
+        .populate('userId', 'name email profilePicture'),
+    ]);
+
+    res.json({
+      pharmacists: pharmacists.map(p => ({ ...p.toObject(), type: 'pharmacist' })),
+      doctors: doctors.map(d => ({ ...d.toObject(), type: 'doctor' })),
+      nutritionists: nutritionists.map(n => ({ ...n.toObject(), type: 'nutritionist' })),
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Send incentive payment to a professional (admin only)
+router.post('/incentive', auth, isAdmin, async (req, res) => {
+  try {
+    const Incentive = require('../models/Incentive');
+    const { professionalId, professionalType, amount, reason } = req.body;
+
+    if (!professionalId || !professionalType || !amount || !reason) {
+      return res.status(400).json({ message: 'professionalId, professionalType, amount and reason are required' });
+    }
+    if (amount <= 0) return res.status(400).json({ message: 'Amount must be greater than 0' });
+
+    // Resolve professionalUserId
+    let professionalUserId;
+    if (professionalType === 'pharmacist') {
+      const p = await Pharmacist.findById(professionalId);
+      if (!p) return res.status(404).json({ message: 'Pharmacist not found' });
+      professionalUserId = p.userId;
+    } else if (professionalType === 'doctor') {
+      const Doctor = require('../models/Doctor');
+      const d = await Doctor.findById(professionalId);
+      if (!d) return res.status(404).json({ message: 'Doctor not found' });
+      professionalUserId = d.userId;
+    } else {
+      const Nutritionist = require('../models/Nutritionist');
+      const n = await Nutritionist.findById(professionalId);
+      if (!n) return res.status(404).json({ message: 'Nutritionist not found' });
+      professionalUserId = n.userId;
+    }
+
+    const incentive = await Incentive.create({
+      professionalId,
+      professionalUserId,
+      professionalType,
+      amount,
+      reason,
+      paidBy: req.user.userId,
+    });
+
+    // Notify professional
+    const { notifyPaymentApproved } = require('../utils/notificationHelper');
+    const professional = await User.findById(professionalUserId).select('name email');
+    await notifyPaymentApproved({
+      professionalUserId: professionalUserId.toString(),
+      professionalName: professional?.name || 'Professional',
+      amount,
+      bookingCount: 0,
+      professionalType,
+    });
+
+    res.status(201).json({ message: 'Incentive sent successfully', incentive });
+  } catch (err) {
+    console.error('Error sending incentive:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Get all incentives (admin only)
+router.get('/incentives', auth, isAdmin, async (req, res) => {
+  try {
+    const Incentive = require('../models/Incentive');
+    const incentives = await Incentive.find()
+      .populate('professionalUserId', 'name email')
+      .populate('paidBy', 'name')
+      .sort({ createdAt: -1 });
+    res.json(incentives);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Get incentives for a specific professional (used by professional dashboards)
+router.get('/incentives/my', auth, async (req, res) => {
+  try {
+    const Incentive = require('../models/Incentive');
+    let professionalId;
+
+    if (req.user.role === 'pharmacist') {
+      const p = await Pharmacist.findOne({ userId: req.user.userId });
+      if (!p) return res.json([]);
+      professionalId = p._id;
+    } else if (req.user.role === 'doctor') {
+      const Doctor = require('../models/Doctor');
+      const d = await Doctor.findOne({ userId: req.user.userId });
+      if (!d) return res.json([]);
+      professionalId = d._id;
+    } else if (req.user.role === 'nutritionist') {
+      const Nutritionist = require('../models/Nutritionist');
+      const n = await Nutritionist.findOne({ userId: req.user.userId });
+      if (!n) return res.json([]);
+      professionalId = n._id;
+    } else {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const incentives = await Incentive.find({ professionalId })
+      .populate('paidBy', 'name')
+      .sort({ createdAt: -1 });
+    res.json(incentives);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 module.exports = router;
