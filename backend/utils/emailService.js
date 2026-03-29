@@ -642,6 +642,66 @@ const emailTemplates = {
   },
 
   // Medical Form Email Templates
+  subscriptionCancelled: (userName, subscription) => {
+    const billingLabel = {
+      threeMonths: '3-Month Plan', sixMonths: '6-Month Plan', twelveMonths: '12-Month Plan',
+      monthly: 'Monthly Plan', yearly: 'Yearly Plan',
+    }[subscription.billingCycle] || subscription.billingCycle;
+    return {
+      subject: `Your ${subscription.planName} has been cancelled - DrX Consult`,
+      html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background-color: #fdecea; padding: 30px; border-radius: 10px; margin-bottom: 20px; text-align: center; border-left: 4px solid #e74c3c;">
+          <div style="font-size: 40px; margin-bottom: 10px;">❌</div>
+          <h1 style="color: #c0392b; margin: 0 0 8px 0;">Subscription Cancelled</h1>
+          <p style="color: #721c24; margin: 0; font-size: 16px;">Your ${subscription.planName} has been cancelled</p>
+        </div>
+
+        <p style="font-size: 16px;">Hello ${userName},</p>
+        <p>We've received your cancellation request. Your <strong>${subscription.planName}</strong> (${billingLabel}) has been cancelled as requested.</p>
+
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #2c3e50;">📋 Cancellation Details</h3>
+          <p style="margin: 6px 0;"><strong>Plan:</strong> ${subscription.planName} — ${billingLabel}</p>
+          <p style="margin: 6px 0;"><strong>Cancelled On:</strong> ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+          <p style="margin: 6px 0;"><strong>Status:</strong> <span style="color: #e74c3c; font-weight: bold;">Cancelled</span></p>
+        </div>
+
+        <div style="background-color: #fff3cd; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #856404;">📋 What happens now?</h3>
+          <ul style="color: #856404; line-height: 1.8; margin: 0; padding-left: 20px;">
+            <li>Your plan benefits are no longer active</li>
+            <li>Your consultation history remains accessible</li>
+            <li>You can subscribe again at any time</li>
+          </ul>
+        </div>
+
+        <div style="background-color: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+          <h3 style="margin-top: 0; color: #155724;">🔄 Changed your mind?</h3>
+          <p style="color: #155724; margin-bottom: 15px;">You can reactivate your subscription anytime from our plans page.</p>
+          <a href="${process.env.FRONTEND_URL}/subscription-plans"
+             style="background-color: #28a745; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block; margin-right: 10px;">
+            View Plans
+          </a>
+          <a href="${process.env.FRONTEND_URL}/patient/dashboard"
+             style="background-color: #17a2b8; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block;">
+            Dashboard
+          </a>
+        </div>
+
+        <p>We're sorry to see you go. If there's anything we could have done better, please reach out to us at support@drxconsult.com.</p>
+        <p>Best regards,<br/>The DrX Consult Team</p>
+
+        <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+        <p style="color: #666; font-size: 12px; text-align: center;">
+          Questions? Contact us at support@drxconsult.com<br/>
+          Visit your <a href="${process.env.FRONTEND_URL}/patient/dashboard">dashboard</a> anytime
+        </p>
+      </div>
+      `
+    };
+  },
+
   medicalFormSubmitted: (patientName, patientEmail, formId) => ({
     subject: 'Medical Form Submitted Successfully - Drx Consult',
     html: `
@@ -1010,6 +1070,10 @@ const sendSubscriptionExpiredEmail = async (userEmail, userName, subscription) =
   return await sendEmail(userEmail, emailTemplates.subscriptionExpired, userName, subscription);
 };
 
+const sendSubscriptionCancelledEmail = async (userEmail, userName, subscription) => {
+  return await sendEmail(userEmail, emailTemplates.subscriptionCancelled, userName, subscription);
+};
+
 const sendPaymentReceivedEmail = async (professionalEmail, professionalName, amount, bookingCount, professionalType = 'pharmacist') => {
   return await sendEmail(professionalEmail, emailTemplates.paymentReceived, professionalName, amount, bookingCount, professionalType);
 };
@@ -1117,6 +1181,7 @@ module.exports = {
   sendSubscriptionWelcomeEmail,
   sendSubscriptionExpiringEmail,
   sendSubscriptionExpiredEmail,
+  sendSubscriptionCancelledEmail,
   sendPaymentReceivedEmail,
   sendOTPEmail,
   sendEmail,
