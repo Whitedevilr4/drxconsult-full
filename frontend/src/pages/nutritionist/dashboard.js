@@ -1201,7 +1201,7 @@ export default function NutritionistDashboard() {
                       <div className="space-x-2">
                         {booking.meetLink && booking.status === 'confirmed' && (
                           <a 
-                            href={booking.meetLink} 
+                            href={booking.meetLink?.startsWith('http') ? booking.meetLink : `https://${booking.meetLink}`} 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="inline-block bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
@@ -1276,7 +1276,7 @@ export default function NutritionistDashboard() {
                         <div className="bg-green-50 p-3 rounded">
                           <p className="text-sm text-green-800 font-medium mb-2">✓ Meeting Link Added</p>
                           <a
-                            href={booking.meetLink}
+                            href={booking.meetLink?.startsWith('http') ? booking.meetLink : `https://${booking.meetLink}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-sm text-green-600 hover:underline break-all"
