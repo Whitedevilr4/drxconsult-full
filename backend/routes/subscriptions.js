@@ -3,7 +3,7 @@ const { body, validationResult } = require('express-validator');
 const Subscription = require('../models/Subscription');
 const User = require('../models/User');
 const { auth, isAdmin } = require('../middleware/auth');
-const { sendSubscriptionWelcomeEmail } = require('../utils/emailService');
+const { sendSubscriptionWelcomeEmail, sendSubscriptionCancelledEmail } = require('../utils/emailService');
 
 const router = express.Router();
 
@@ -27,7 +27,7 @@ const SUBSCRIPTION_PLANS = {
       familyMembersLimit: 1
     },
     twelveMonths: {
-      price: 54998,
+      price: 54999,
       sessionsLimit: 0,
       doctorConsultationsLimit: 1,
       nutritionistConsultationsLimit: 1,
@@ -73,7 +73,7 @@ const SUBSCRIPTION_PLANS = {
       familyMembersLimit: 1
     },
     twelveMonths: {
-      price: 75999,
+      price: 73999,
       sessionsLimit: 0,
       doctorConsultationsLimit: 1,
       nutritionistConsultationsLimit: 1,
@@ -356,6 +356,16 @@ router.post('/cancel', auth, async (req, res) => {
     subscription.updatedAt = new Date();
     
     await subscription.save();
+
+    // Send cancellation email
+    try {
+      const user = await User.findById(req.user.userId);
+      if (user?.email) {
+        await sendSubscriptionCancelledEmail(user.email, user.name, subscription);
+      }
+    } catch (emailErr) {
+      console.error('Error sending cancellation email:', emailErr.message);
+    }
 
     res.json({
       message: 'Subscription cancelled successfully',
