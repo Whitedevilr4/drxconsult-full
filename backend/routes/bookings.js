@@ -684,7 +684,10 @@ router.patch('/:id/meeting-link', auth, async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to update this booking' });
     }
     
-    booking.meetLink = meetLink.trim();
+    const trimmedLink = meetLink.trim();
+    booking.meetLink = trimmedLink.startsWith('http://') || trimmedLink.startsWith('https://')
+      ? trimmedLink
+      : `https://${trimmedLink}`;
     await booking.save();
     
     // Determine professional type
