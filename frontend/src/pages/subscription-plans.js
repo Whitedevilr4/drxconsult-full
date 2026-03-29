@@ -402,7 +402,7 @@ export default function SubscriptionPlans() {
                     <span className="text-gray-700 font-medium">12 Months</span>
                     <div className="text-right">
                       <span className="text-sm text-gray-400 line-through block">₹69,999</span>
-                      <span className="text-2xl font-bold text-pink-600">₹54,998</span>
+                      <span className="text-2xl font-bold text-pink-600">₹54,999</span>
                     </div>
                   </div>
                 </div>
@@ -442,7 +442,7 @@ export default function SubscriptionPlans() {
                         {subscribing ? 'Processing...' : 'Start 6-Month Plan — ₹27,499'}
                       </button>
                       <button onClick={() => currentSubscription ? handleUpgrade('womensCare', 'twelveMonths') : handleSubscribe('womensCare', 'twelveMonths')} disabled={subscribing} className="w-full bg-rose-600 text-white py-2 rounded-lg font-semibold hover:bg-rose-700 disabled:opacity-50 text-sm">
-                        {subscribing ? 'Processing...' : 'Start 12-Month Plan — ₹54,998'}
+                        {subscribing ? 'Processing...' : 'Start 12-Month Plan — ₹54,999'}
                       </button>
                     </>
                   ) : (
@@ -456,7 +456,7 @@ export default function SubscriptionPlans() {
                       {isCurrentTier('womensCare', 'sixMonths') && <div className="text-center py-2 bg-pink-100 rounded-lg text-pink-800 text-sm font-semibold">✅ Current Plan — 6 Months</div>}
                       {!isCurrentTier('womensCare', 'twelveMonths') && (
                         <button onClick={() => handleUpgrade('womensCare', 'twelveMonths')} disabled={subscribing} className="w-full bg-rose-600 text-white py-2 rounded-lg font-semibold hover:bg-rose-700 disabled:opacity-50 text-sm">
-                          {subscribing ? 'Processing...' : '⬆ Upgrade to 12-Month — ₹54,998'}
+                          {subscribing ? 'Processing...' : '⬆ Upgrade to 12-Month — ₹54,999'}
                         </button>
                       )}
                       {isCurrentTier('womensCare', 'twelveMonths') && <div className="text-center py-2 bg-pink-100 rounded-lg text-pink-800 text-sm font-semibold">✅ Current Plan — 12 Months</div>}
@@ -501,7 +501,7 @@ export default function SubscriptionPlans() {
                     <span className="text-gray-700 font-medium">12 Months</span>
                     <div className="text-right">
                       <span className="text-sm text-gray-400 line-through block">₹94,999</span>
-                      <span className="text-2xl font-bold text-blue-600">₹75,999</span>
+                      <span className="text-2xl font-bold text-blue-600">₹73,999</span>
                     </div>
                   </div>
                 </div>
@@ -542,7 +542,7 @@ export default function SubscriptionPlans() {
                         {subscribing ? 'Processing...' : 'Start 6-Month Plan — ₹37,499'}
                       </button>
                       <button onClick={() => currentSubscription ? handleUpgrade('chronic', 'twelveMonths') : handleSubscribe('chronic', 'twelveMonths')} disabled={subscribing} className="w-full bg-cyan-600 text-white py-2 rounded-lg font-semibold hover:bg-cyan-700 disabled:opacity-50 text-sm">
-                        {subscribing ? 'Processing...' : 'Start 12-Month Plan — ₹75,999'}
+                        {subscribing ? 'Processing...' : 'Start 12-Month Plan — ₹73,999'}
                       </button>
                     </>
                   ) : (
@@ -556,7 +556,7 @@ export default function SubscriptionPlans() {
                       {isCurrentTier('chronic', 'sixMonths') && <div className="text-center py-2 bg-blue-100 rounded-lg text-blue-800 text-sm font-semibold">✅ Current Plan — 6 Months</div>}
                       {!isCurrentTier('chronic', 'twelveMonths') && (
                         <button onClick={() => handleUpgrade('chronic', 'twelveMonths')} disabled={subscribing} className="w-full bg-cyan-600 text-white py-2 rounded-lg font-semibold hover:bg-cyan-700 disabled:opacity-50 text-sm">
-                          {subscribing ? 'Processing...' : '⬆ Upgrade to 12-Month — ₹75,999'}
+                          {subscribing ? 'Processing...' : '⬆ Upgrade to 12-Month — ₹73,999'}
                         </button>
                       )}
                       {isCurrentTier('chronic', 'twelveMonths') && <div className="text-center py-2 bg-blue-100 rounded-lg text-blue-800 text-sm font-semibold">✅ Current Plan — 12 Months</div>}
