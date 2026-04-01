@@ -198,4 +198,27 @@ router.patch('/status', auth, isPharmacist, async (req, res) => {
   }
 });
 
+// Update pharmacist profile (pharmacist only)
+router.put('/profile', auth, isPharmacist, async (req, res) => {
+  try {
+    const pharmacist = await Pharmacist.findOne({ userId: req.user.userId });
+    if (!pharmacist) {
+      return res.status(404).json({ message: 'Pharmacist profile not found' });
+    }
+
+    const allowedUpdates = ['designation', 'description', 'photo', 'languages'];
+    allowedUpdates.forEach(field => {
+      if (req.body[field] !== undefined) {
+        pharmacist[field] = req.body[field];
+      }
+    });
+
+    await pharmacist.save();
+    res.json(pharmacist);
+  } catch (err) {
+    console.error('Error updating pharmacist profile:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 module.exports = router;
