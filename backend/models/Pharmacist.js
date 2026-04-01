@@ -5,6 +5,7 @@ const pharmacistSchema = new mongoose.Schema({
   photo: String,
   designation: String,
   description: { type: String, default: '' },
+  languages: [{ type: String }],
   status: { type: String, enum: ['online', 'offline'], default: 'online' },
   adminDisabled: { type: Boolean, default: false },
   coreTeam: { type: Boolean, default: false },
