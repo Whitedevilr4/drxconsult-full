@@ -38,9 +38,9 @@ app.use(express.urlencoded({ extended: true }));
 const mongooseOptions = {
   serverSelectionTimeoutMS: 8000,
   socketTimeoutMS: 45000,
-  maxPoolSize: 1,
-  minPoolSize: 0,
-  maxIdleTimeMS: 10000,
+  maxPoolSize: 10,
+  minPoolSize: 2,
+  maxIdleTimeMS: 30000,
   family: 4,
   bufferCommands: false
 };
@@ -85,16 +85,11 @@ const connectDB = async () => {
 };
 
 // =====================
-// Ensure DB before routes (FIXED)
+// ✅ CONNECT DB ONCE (FIXED)
 // =====================
-app.use(async (req, res, next) => {
-  try {
-    await connectDB();
-    next();
-  } catch (err) {
-    next(err);
-  }
-});
+connectDB()
+  .then(() => console.log('🚀 DB Ready'))
+  .catch(err => console.error(err));
 
 // =====================
 // Routes (UNCHANGED)
