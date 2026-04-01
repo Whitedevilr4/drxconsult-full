@@ -38,9 +38,9 @@ app.use(express.urlencoded({ extended: true }));
 const mongooseOptions = {
   serverSelectionTimeoutMS: 8000,
   socketTimeoutMS: 45000,
-  maxPoolSize: 10,
+  maxPoolSize: 5,
   minPoolSize: 2,
-  maxIdleTimeMS: 30000,
+  maxIdleTimeMS: 10000,
   family: 4,
   bufferCommands: false
 };
@@ -85,11 +85,16 @@ const connectDB = async () => {
 };
 
 // =====================
-// ✅ CONNECT DB ONCE (FIXED)
+// Ensure DB before routes (FIXED)
 // =====================
-connectDB()
-  .then(() => console.log('🚀 DB Ready'))
-  .catch(err => console.error(err));
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
 
 // =====================
 // Routes (UNCHANGED)
@@ -184,15 +189,29 @@ app.listen(PORT, async () => {
     console.warn('⚠️ Supabase initialization error:', error.message);
   }
 
+  // Ensure MongoDB is connected before running any scheduled jobs
+  try {
+    await connectDB();
+  } catch (err) {
+    console.error('❌ Could not connect to MongoDB, skipping scheduled jobs:', err.message);
+    return;
+  }
+
   // Initial cleanup
   cleanupExpiredSlots().catch(console.error);
   cleanupExpiredOTPs().catch(console.error);
 
-  // Scheduled cleanup (STRUCTURE KEPT)
-  setInterval(() => {
-    cleanupExpiredSlots();
-    cleanupExpiredOTPs();
+  // Scheduled cleanup every hour
+  setInterval(async () => {
+    try {
+      await connectDB();
+      cleanupExpiredSlots().catch(console.error);
+      cleanupExpiredOTPs().catch(console.error);
+    } catch (err) {
+      console.error('❌ Scheduled cleanup skipped, DB not ready:', err.message);
+    }
   }, 60 * 60 * 1000);
+  
   // Initialize medicine scheduler
   try {
     console.log('🏥 Initializing medicine scheduler...');
