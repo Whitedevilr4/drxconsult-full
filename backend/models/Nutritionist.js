@@ -7,6 +7,7 @@ const nutritionistSchema = new mongoose.Schema({
   experience: { type: Number, required: true },
   description: { type: String, default: '' },
   photo: { type: String, default: '' },
+  languages: [{ type: String }],
   status: { type: String, enum: ['online', 'offline', 'busy'], default: 'offline' },
   adminDisabled: { type: Boolean, default: false },
   coreTeam: { type: Boolean, default: false },
