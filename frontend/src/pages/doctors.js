@@ -12,7 +12,8 @@ export default function DoctorsPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedSpecialization, setSelectedSpecialization] = useState('all')
-  const [sortBy, setSortBy] = useState('name')
+  const [selectedLanguage, setSelectedLanguage] = useState('all')
+  const [sortBy, setSortBy] = useState('smart')
 
   const specializations = [
     { id: 'all', name: 'All Specializations', icon: '🩺' },
@@ -34,7 +35,7 @@ export default function DoctorsPage() {
 
   useEffect(() => {
     filterAndSortDoctors()
-  }, [doctors, searchQuery, selectedSpecialization, sortBy])
+  }, [doctors, searchQuery, selectedSpecialization, selectedLanguage, sortBy])
 
   const fetchDoctors = async () => {
     try {
@@ -49,41 +50,61 @@ export default function DoctorsPage() {
     }
   }
 
+  const allLanguages = ['all', ...new Set(
+    doctors.flatMap(d => d.languages || []).filter(Boolean)
+  )].sort((a, b) => a === 'all' ? -1 : a.localeCompare(b))
+
+  const smartScore = (d) => {
+    const sessions = d.completedSessions || 0
+    const reviews = d.totalReviews || 0
+    const rating = d.averageRating || d.rating || 0
+    return sessions * 1 + reviews * 2 + rating * 10
+  }
+
   const filterAndSortDoctors = () => {
     let filtered = [...doctors]
 
-    // Filter out admin-disabled professionals
     filtered = filtered.filter(d => !d.adminDisabled)
 
-    // Filter by search query
     if (searchQuery) {
       filtered = filtered.filter(d =>
         d.userId?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         d.specialization?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        d.qualifications?.toLowerCase().includes(searchQuery.toLowerCase())
+        d.qualifications?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (d.languages || []).some(l => l.toLowerCase().includes(searchQuery.toLowerCase()))
       )
     }
 
-    // Filter by specialization
     if (selectedSpecialization !== 'all') {
       filtered = filtered.filter(d =>
         d.specialization?.toLowerCase().includes(selectedSpecialization.toLowerCase())
       )
     }
 
-    // Sort
+    if (selectedLanguage !== 'all') {
+      filtered = filtered.filter(d =>
+        (d.languages || []).some(l => l.toLowerCase() === selectedLanguage.toLowerCase())
+      )
+    }
+
     filtered.sort((a, b) => {
+      const aOnline = a.status === 'online' ? 1 : 0
+      const bOnline = b.status === 'online' ? 1 : 0
+      if (bOnline !== aOnline) return bOnline - aOnline
+
       switch (sortBy) {
+        case 'smart':
+          return smartScore(b) - smartScore(a)
         case 'name':
           return (a.userId?.name || '').localeCompare(b.userId?.name || '')
         case 'experience':
-          return (b.yearsOfExperience || 0) - (a.yearsOfExperience || 0)
+          return (b.experience || b.yearsOfExperience || 0) - (a.experience || a.yearsOfExperience || 0)
         case 'fee':
           return (a.consultationFee || 0) - (b.consultationFee || 0)
         case 'rating':
-          return (b.rating || 0) - (a.rating || 0)
+          return (b.averageRating || b.rating || 0) - (a.averageRating || a.rating || 0)
         default:
-          return 0
+          return smartScore(b) - smartScore(a)
       }
     })
 
@@ -166,7 +187,7 @@ export default function DoctorsPage() {
                   <div className="relative">
                     <input
                       type="text"
-                      placeholder="Search by name, specialization, or qualifications..."
+                      placeholder="Search by name, specialization, or language..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="w-full px-4 py-3 pl-12 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
@@ -185,6 +206,7 @@ export default function DoctorsPage() {
                     onChange={(e) => setSortBy(e.target.value)}
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
                   >
+                    <option value="smart">Best Match (Online + Popular)</option>
                     <option value="name">Name (A-Z)</option>
                     <option value="experience">Most Experienced</option>
                     <option value="fee">Lowest Fee</option>
@@ -193,6 +215,28 @@ export default function DoctorsPage() {
                 </div>
               </div>
 
+              {/* Language Filter */}
+              {allLanguages.length > 1 && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Language</label>
+                  <div className="flex flex-wrap gap-2">
+                    {allLanguages.map(lang => (
+                      <button
+                        key={lang}
+                        onClick={() => setSelectedLanguage(lang)}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                          selectedLanguage === lang
+                            ? 'bg-green-600 text-white shadow'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {lang === 'all' ? '🌐 All Languages' : `🗣 ${lang}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Mobile: Sort Dropdown */}
               <div className="md:hidden mb-4">
                 <select
@@ -200,6 +244,7 @@ export default function DoctorsPage() {
                   onChange={(e) => setSortBy(e.target.value)}
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm"
                 >
+                  <option value="smart">Sort: Best Match</option>
                   <option value="name">Sort: Name (A-Z)</option>
                   <option value="experience">Sort: Most Experienced</option>
                   <option value="fee">Sort: Lowest Fee</option>
@@ -269,6 +314,7 @@ export default function DoctorsPage() {
                   onClick={() => {
                     setSearchQuery('')
                     setSelectedSpecialization('all')
+                    setSelectedLanguage('all')
                   }}
                   className="bg-green-600 text-white px-6 py-3 rounded-xl hover:bg-green-700 transition-colors font-medium"
                 >
