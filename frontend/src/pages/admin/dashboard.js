@@ -1078,8 +1078,10 @@ function AddPharmacistTab({ onSuccess }) {
     phone: '',
     designation: '',
     description: '',
-    photo: ''
+    photo: '',
+    languages: []
   })
+  const [langInput, setLangInput] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [generatedCredentials, setGeneratedCredentials] = useState(null)
@@ -1117,8 +1119,10 @@ function AddPharmacistTab({ onSuccess }) {
         phone: '',
         designation: '',
         description: '',
-        photo: ''
+        photo: '',
+        languages: []
       })
+      setLangInput('')
       
       onSuccess()
     } catch (err) {
@@ -1229,6 +1233,49 @@ function AddPharmacistTab({ onSuccess }) {
             value={formData.description}
             onChange={(e) => setFormData({...formData, description: e.target.value})}
           />
+        </div>
+
+        <div>
+          <label className="block text-gray-700 mb-2">Languages Spoken</label>
+          <div className="flex gap-2 mb-2">
+            <input
+              type="text"
+              className="flex-1 px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600"
+              placeholder="e.g. Hindi, English, Tamil"
+              value={langInput}
+              onChange={(e) => setLangInput(e.target.value)}
+              onKeyDown={(e) => {
+                if ((e.key === 'Enter' || e.key === ',') && langInput.trim()) {
+                  e.preventDefault()
+                  const lang = langInput.trim()
+                  if (!formData.languages.includes(lang)) {
+                    setFormData({...formData, languages: [...formData.languages, lang]})
+                  }
+                  setLangInput('')
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const lang = langInput.trim()
+                if (lang && !formData.languages.includes(lang)) {
+                  setFormData({...formData, languages: [...formData.languages, lang]})
+                }
+                setLangInput('')
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >Add</button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {formData.languages.map(lang => (
+              <span key={lang} className="flex items-center gap-1 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
+                🗣 {lang}
+                <button type="button" onClick={() => setFormData({...formData, languages: formData.languages.filter(l => l !== lang)})} className="ml-1 text-blue-500 hover:text-red-500 font-bold">×</button>
+              </span>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 mt-1">Press Enter or comma to add. Click × to remove.</p>
         </div>
 
         <button
@@ -1360,6 +1407,7 @@ function UploadResultsTab({ patients }) {
 function ManageUsersTab({ users, pharmacists, onUpdate }) {
   const [editingPharmacist, setEditingPharmacist] = useState(null)
   const [editForm, setEditForm] = useState({})
+  const [editLangInput, setEditLangInput] = useState('')
 
   const handleToggleCoreTeam = async (pharmacistId, current) => {
     try {
@@ -1397,11 +1445,13 @@ function ManageUsersTab({ users, pharmacists, onUpdate }) {
 
   const handleEdit = (pharmacist) => {
     setEditingPharmacist(pharmacist._id)
+    setEditLangInput('')
     setEditForm({
       designation: pharmacist.designation,
       description: pharmacist.description || '',
       status: pharmacist.status,
-      photo: pharmacist.photo || ''
+      photo: pharmacist.photo || '',
+      languages: pharmacist.languages || []
     })
   }
 
@@ -1476,6 +1526,55 @@ function ManageUsersTab({ users, pharmacists, onUpdate }) {
                   value={editForm.description}
                   onChange={(e) => setEditForm({...editForm, description: e.target.value})}
                 />
+
+                {/* Languages */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Languages Spoken</label>
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      className="flex-1 px-3 py-2 border rounded text-sm"
+                      placeholder="e.g. Hindi, English"
+                      value={editLangInput}
+                      onChange={(e) => setEditLangInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if ((e.key === 'Enter' || e.key === ',') && editLangInput.trim()) {
+                          e.preventDefault()
+                          const lang = editLangInput.trim()
+                          if (!(editForm.languages || []).includes(lang)) {
+                            setEditForm({...editForm, languages: [...(editForm.languages || []), lang]})
+                          }
+                          setEditLangInput('')
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const lang = editLangInput.trim()
+                        if (lang && !(editForm.languages || []).includes(lang)) {
+                          setEditForm({...editForm, languages: [...(editForm.languages || []), lang]})
+                        }
+                        setEditLangInput('')
+                      }}
+                      className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                    >Add</button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(editForm.languages || []).map(lang => (
+                      <span key={lang} className="flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                        🗣 {lang}
+                        <button
+                          type="button"
+                          onClick={() => setEditForm({...editForm, languages: editForm.languages.filter(l => l !== lang)})}
+                          className="ml-1 text-blue-500 hover:text-red-500 font-bold"
+                        >×</button>
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Press Enter or comma to add.</p>
+                </div>
+
                 <div className="flex space-x-2">
                   <button
                     onClick={() => handleSaveEdit(pharmacist._id)}
@@ -5195,8 +5294,10 @@ function AddDoctorTab({ onSuccess }) {
     description: '',
     photo: '',
     consultationFee: '500',
-    licenseNumber: ''
+    licenseNumber: '',
+    languages: []
   })
+  const [langInput, setLangInput] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [generatedCredentials, setGeneratedCredentials] = useState(null)
@@ -5238,8 +5339,10 @@ function AddDoctorTab({ onSuccess }) {
         description: '',
         photo: '',
         consultationFee: '500',
-        licenseNumber: ''
+        licenseNumber: '',
+        languages: []
       })
+      setLangInput('')
       
       onSuccess()
     } catch (err) {
@@ -5401,6 +5504,49 @@ function AddDoctorTab({ onSuccess }) {
           />
         </div>
 
+        <div>
+          <label className="block text-gray-700 mb-2">Languages Spoken</label>
+          <div className="flex gap-2 mb-2">
+            <input
+              type="text"
+              className="flex-1 px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600"
+              placeholder="e.g. Hindi, English, Tamil"
+              value={langInput}
+              onChange={(e) => setLangInput(e.target.value)}
+              onKeyDown={(e) => {
+                if ((e.key === 'Enter' || e.key === ',') && langInput.trim()) {
+                  e.preventDefault()
+                  const lang = langInput.trim()
+                  if (!formData.languages.includes(lang)) {
+                    setFormData({...formData, languages: [...formData.languages, lang]})
+                  }
+                  setLangInput('')
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const lang = langInput.trim()
+                if (lang && !formData.languages.includes(lang)) {
+                  setFormData({...formData, languages: [...formData.languages, lang]})
+                }
+                setLangInput('')
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >Add</button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {formData.languages.map(lang => (
+              <span key={lang} className="flex items-center gap-1 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
+                🗣 {lang}
+                <button type="button" onClick={() => setFormData({...formData, languages: formData.languages.filter(l => l !== lang)})} className="ml-1 text-blue-500 hover:text-red-500 font-bold">×</button>
+              </span>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 mt-1">Press Enter or comma to add. Click × to remove.</p>
+        </div>
+
         <button
           type="submit"
           className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
@@ -5418,6 +5564,7 @@ function ManageDoctorsTab({ onUpdate }) {
   const [loading, setLoading] = useState(true)
   const [editingDoctor, setEditingDoctor] = useState(null)
   const [editForm, setEditForm] = useState({})
+  const [editLangInput, setEditLangInput] = useState('')
 
   useEffect(() => {
     fetchDoctors()
@@ -5473,6 +5620,7 @@ function ManageDoctorsTab({ onUpdate }) {
 
   const handleEdit = (doctor) => {
     setEditingDoctor(doctor._id)
+    setEditLangInput('')
     setEditForm({
       specialization: doctor.specialization,
       qualification: doctor.qualification,
@@ -5481,7 +5629,8 @@ function ManageDoctorsTab({ onUpdate }) {
       status: doctor.status,
       photo: doctor.photo || '',
       consultationFee: doctor.consultationFee,
-      licenseNumber: doctor.licenseNumber
+      licenseNumber: doctor.licenseNumber,
+      languages: doctor.languages || []
     })
   }
 
@@ -5595,6 +5744,51 @@ function ManageDoctorsTab({ onUpdate }) {
                   value={editForm.description}
                   onChange={(e) => setEditForm({...editForm, description: e.target.value})}
                 />
+
+                {/* Languages */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Languages Spoken</label>
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      className="flex-1 px-3 py-2 border rounded text-sm"
+                      placeholder="e.g. Hindi, English"
+                      value={editLangInput}
+                      onChange={(e) => setEditLangInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if ((e.key === 'Enter' || e.key === ',') && editLangInput.trim()) {
+                          e.preventDefault()
+                          const lang = editLangInput.trim()
+                          if (!(editForm.languages || []).includes(lang)) {
+                            setEditForm({...editForm, languages: [...(editForm.languages || []), lang]})
+                          }
+                          setEditLangInput('')
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const lang = editLangInput.trim()
+                        if (lang && !(editForm.languages || []).includes(lang)) {
+                          setEditForm({...editForm, languages: [...(editForm.languages || []), lang]})
+                        }
+                        setEditLangInput('')
+                      }}
+                      className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                    >Add</button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(editForm.languages || []).map(lang => (
+                      <span key={lang} className="flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                        🗣 {lang}
+                        <button type="button" onClick={() => setEditForm({...editForm, languages: editForm.languages.filter(l => l !== lang)})} className="ml-1 text-blue-500 hover:text-red-500 font-bold">×</button>
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Press Enter or comma to add.</p>
+                </div>
+
                 <div className="flex space-x-2">
                   <button
                     onClick={() => handleSaveEdit(doctor._id)}
@@ -5979,8 +6173,10 @@ function AddNutritionistTab({ onSuccess }) {
     description: '',
     photo: '',
     consultationFee: '500',
-    licenseNumber: ''
+    licenseNumber: '',
+    languages: []
   })
+  const [langInput, setLangInput] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [generatedCredentials, setGeneratedCredentials] = useState(null)
@@ -6021,8 +6217,10 @@ function AddNutritionistTab({ onSuccess }) {
         description: '',
         photo: '',
         consultationFee: '500',
-        licenseNumber: ''
+        licenseNumber: '',
+        languages: []
       })
+      setLangInput('')
       
       onSuccess()
     } catch (err) {
@@ -6111,6 +6309,49 @@ function AddNutritionistTab({ onSuccess }) {
           <textarea className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-600" placeholder="Brief description..." rows="3" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} />
         </div>
 
+        <div>
+          <label className="block text-gray-700 mb-2">Languages Spoken</label>
+          <div className="flex gap-2 mb-2">
+            <input
+              type="text"
+              className="flex-1 px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-600"
+              placeholder="e.g. Hindi, English, Tamil"
+              value={langInput}
+              onChange={(e) => setLangInput(e.target.value)}
+              onKeyDown={(e) => {
+                if ((e.key === 'Enter' || e.key === ',') && langInput.trim()) {
+                  e.preventDefault()
+                  const lang = langInput.trim()
+                  if (!formData.languages.includes(lang)) {
+                    setFormData({...formData, languages: [...formData.languages, lang]})
+                  }
+                  setLangInput('')
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const lang = langInput.trim()
+                if (lang && !formData.languages.includes(lang)) {
+                  setFormData({...formData, languages: [...formData.languages, lang]})
+                }
+                setLangInput('')
+              }}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+            >Add</button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {formData.languages.map(lang => (
+              <span key={lang} className="flex items-center gap-1 bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
+                🗣 {lang}
+                <button type="button" onClick={() => setFormData({...formData, languages: formData.languages.filter(l => l !== lang)})} className="ml-1 text-green-500 hover:text-red-500 font-bold">×</button>
+              </span>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 mt-1">Press Enter or comma to add. Click × to remove.</p>
+        </div>
+
         <button type="submit" className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Create Nutritionist</button>
       </form>
     </div>
@@ -6123,6 +6364,7 @@ function ManageNutritionistsTab({ onUpdate }) {
   const [loading, setLoading] = useState(true)
   const [editingNutritionist, setEditingNutritionist] = useState(null)
   const [editForm, setEditForm] = useState({})
+  const [editLangInput, setEditLangInput] = useState('')
 
   useEffect(() => {
     fetchNutritionists()
@@ -6172,6 +6414,7 @@ function ManageNutritionistsTab({ onUpdate }) {
 
   const handleEdit = (nutritionist) => {
     setEditingNutritionist(nutritionist._id)
+    setEditLangInput('')
     setEditForm({
       specialization: nutritionist.specialization,
       qualification: nutritionist.qualification,
@@ -6180,7 +6423,8 @@ function ManageNutritionistsTab({ onUpdate }) {
       status: nutritionist.status,
       photo: nutritionist.photo || '',
       consultationFee: nutritionist.consultationFee,
-      licenseNumber: nutritionist.licenseNumber
+      licenseNumber: nutritionist.licenseNumber,
+      languages: nutritionist.languages || []
     })
   }
 
@@ -6240,6 +6484,41 @@ function ManageNutritionistsTab({ onUpdate }) {
                 <input type="number" className="w-full px-3 py-2 border rounded" placeholder="Fee" value={editForm.consultationFee} onChange={(e) => setEditForm({...editForm, consultationFee: e.target.value})} />
                 <input type="text" className="w-full px-3 py-2 border rounded" placeholder="License" value={editForm.licenseNumber} onChange={(e) => setEditForm({...editForm, licenseNumber: e.target.value})} />
                 <textarea className="w-full px-3 py-2 border rounded" placeholder="Description" rows="2" value={editForm.description} onChange={(e) => setEditForm({...editForm, description: e.target.value})} />
+
+                {/* Languages */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Languages Spoken</label>
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      className="flex-1 px-3 py-2 border rounded text-sm"
+                      placeholder="e.g. Hindi, English"
+                      value={editLangInput}
+                      onChange={(e) => setEditLangInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if ((e.key === 'Enter' || e.key === ',') && editLangInput.trim()) {
+                          e.preventDefault()
+                          const lang = editLangInput.trim()
+                          if (!(editForm.languages || []).includes(lang)) {
+                            setEditForm({...editForm, languages: [...(editForm.languages || []), lang]})
+                          }
+                          setEditLangInput('')
+                        }
+                      }}
+                    />
+                    <button type="button" onClick={() => { const lang = editLangInput.trim(); if (lang && !(editForm.languages || []).includes(lang)) { setEditForm({...editForm, languages: [...(editForm.languages || []), lang]}) } setEditLangInput('') }} className="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">Add</button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(editForm.languages || []).map(lang => (
+                      <span key={lang} className="flex items-center gap-1 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
+                        🗣 {lang}
+                        <button type="button" onClick={() => setEditForm({...editForm, languages: editForm.languages.filter(l => l !== lang)})} className="ml-1 text-green-500 hover:text-red-500 font-bold">×</button>
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Press Enter or comma to add.</p>
+                </div>
+
                 <div className="flex space-x-2">
                   <button onClick={() => handleSaveEdit(nutritionist._id)} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Save</button>
                   <button onClick={() => setEditingNutritionist(null)} className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500">Cancel</button>
