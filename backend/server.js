@@ -52,7 +52,14 @@ if (!cached) {
 }
 
 const connectDB = async () => {
-  if (cached.conn) return cached.conn;
+ // Already connected
+  if (cached.conn && mongoose.connection.readyState === 1) return cached.conn;
+
+  // Reset if connection dropped
+  if (mongoose.connection.readyState === 0) {
+    cached.conn = null;
+    cached.promise = null;
+  }
 
   if (!cached.promise) {
     cached.promise = mongoose
