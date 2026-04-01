@@ -12,7 +12,8 @@ export default function PharmacistsPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
-  const [sortBy, setSortBy] = useState('name')
+  const [selectedLanguage, setSelectedLanguage] = useState('all')
+  const [sortBy, setSortBy] = useState('smart')
 
   const categories = [
     { id: 'all', name: 'All Pharmacists', icon: '💊' },
@@ -29,7 +30,7 @@ export default function PharmacistsPage() {
 
   useEffect(() => {
     filterAndSortPharmacists()
-  }, [pharmacists, searchQuery, selectedCategory, sortBy])
+  }, [pharmacists, searchQuery, selectedCategory, selectedLanguage, sortBy])
 
   const fetchPharmacists = async () => {
     try {
@@ -44,38 +45,60 @@ export default function PharmacistsPage() {
     }
   }
 
+  // Collect all unique languages from loaded professionals
+  const allLanguages = ['all', ...new Set(
+    pharmacists.flatMap(p => p.languages || []).filter(Boolean)
+  )].sort((a, b) => a === 'all' ? -1 : a.localeCompare(b))
+
+  const smartScore = (p) => {
+    const sessions = p.completedSessions || p.totalPatientsCounselled || 0
+    const reviews = p.totalReviews || 0
+    const rating = p.averageRating || p.rating || 0
+    return sessions * 1 + reviews * 2 + rating * 10
+  }
+
   const filterAndSortPharmacists = () => {
     let filtered = [...pharmacists]
 
-    // Filter out admin-disabled professionals
     filtered = filtered.filter(p => !p.adminDisabled)
 
-    // Filter by search query
     if (searchQuery) {
       filtered = filtered.filter(p =>
         p.userId?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.designation?.toLowerCase().includes(searchQuery.toLowerCase())
+        p.designation?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (p.languages || []).some(l => l.toLowerCase().includes(searchQuery.toLowerCase()))
       )
     }
 
-    // Filter by category
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(p =>
         p.designation?.toLowerCase().includes(selectedCategory.toLowerCase())
       )
     }
 
-    // Sort
+    if (selectedLanguage !== 'all') {
+      filtered = filtered.filter(p =>
+        (p.languages || []).some(l => l.toLowerCase() === selectedLanguage.toLowerCase())
+      )
+    }
+
     filtered.sort((a, b) => {
+      // Online always first
+      const aOnline = a.status === 'online' ? 1 : 0
+      const bOnline = b.status === 'online' ? 1 : 0
+      if (bOnline !== aOnline) return bOnline - aOnline
+
       switch (sortBy) {
+        case 'smart':
+          return smartScore(b) - smartScore(a)
         case 'name':
           return (a.userId?.name || '').localeCompare(b.userId?.name || '')
         case 'experience':
           return (b.totalPatientsCounselled || 0) - (a.totalPatientsCounselled || 0)
         case 'rating':
-          return (b.rating || 0) - (a.rating || 0)
+          return (b.averageRating || b.rating || 0) - (a.averageRating || a.rating || 0)
         default:
-          return 0
+          return smartScore(b) - smartScore(a)
       }
     })
 
@@ -158,7 +181,7 @@ export default function PharmacistsPage() {
                   <div className="relative">
                     <input
                       type="text"
-                      placeholder="Search by name or specialization..."
+                      placeholder="Search by name, specialization, or language..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="w-full px-4 py-3 pl-12 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -177,12 +200,35 @@ export default function PharmacistsPage() {
                     onChange={(e) => setSortBy(e.target.value)}
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   >
+                    <option value="smart">Best Match (Online + Popular)</option>
                     <option value="name">Name (A-Z)</option>
-                    <option value="experience">Most Experienced</option>
+                    <option value="experience">Most Consultations</option>
                     <option value="rating">Highest Rated</option>
                   </select>
                 </div>
               </div>
+
+              {/* Language Filter */}
+              {allLanguages.length > 1 && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Language</label>
+                  <div className="flex flex-wrap gap-2">
+                    {allLanguages.map(lang => (
+                      <button
+                        key={lang}
+                        onClick={() => setSelectedLanguage(lang)}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                          selectedLanguage === lang
+                            ? 'bg-blue-600 text-white shadow'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {lang === 'all' ? '🌐 All Languages' : `🗣 ${lang}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Mobile: Sort Dropdown */}
               <div className="md:hidden mb-4">
@@ -191,8 +237,9 @@ export default function PharmacistsPage() {
                   onChange={(e) => setSortBy(e.target.value)}
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
                 >
+                  <option value="smart">Sort: Best Match</option>
                   <option value="name">Sort: Name (A-Z)</option>
-                  <option value="experience">Sort: Most Experienced</option>
+                  <option value="experience">Sort: Most Consultations</option>
                   <option value="rating">Sort: Highest Rated</option>
                 </select>
               </div>
@@ -259,6 +306,7 @@ export default function PharmacistsPage() {
                   onClick={() => {
                     setSearchQuery('')
                     setSelectedCategory('all')
+                    setSelectedLanguage('all')
                   }}
                   className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors font-medium"
                 >
