@@ -261,7 +261,7 @@ router.post('/pharmacists', [
   }
 
   try {
-    const { name, email, password, phone, designation, photo, description } = req.body;
+    const { name, email, password, phone, designation, photo, description, languages } = req.body;
 
     // Check if user already exists
     let user = await User.findOne({ email });
@@ -290,6 +290,7 @@ router.post('/pharmacists', [
       designation,
       description: description || '',
       photo: pharmacistPhoto,
+      languages: Array.isArray(languages) ? languages : [],
       totalPatientsCounselled: 0,
       availableSlots: []
     });
@@ -374,7 +375,7 @@ router.get('/patients/:id/medical-history', auth, isAdmin, async (req, res) => {
 // Update pharmacist details (admin only)
 router.put('/pharmacists/:id', auth, isAdmin, async (req, res) => {
   try {
-    const { designation, description, status, photo } = req.body;
+    const { designation, description, status, photo, languages } = req.body;
     
     const pharmacist = await Pharmacist.findById(req.params.id);
     if (!pharmacist) {
@@ -385,6 +386,7 @@ router.put('/pharmacists/:id', auth, isAdmin, async (req, res) => {
     if (description !== undefined) pharmacist.description = description;
     if (status) pharmacist.status = status;
     if (photo) pharmacist.photo = photo;
+    if (Array.isArray(languages)) pharmacist.languages = languages;
 
     await pharmacist.save();
 
@@ -733,7 +735,8 @@ router.post('/doctors', [
       description, 
       photo, 
       consultationFee,
-      licenseNumber 
+      licenseNumber,
+      languages
     } = req.body;
 
     // Check if user already exists
@@ -768,7 +771,8 @@ router.post('/doctors', [
       description: description || '',
       photo: photo || '',
       consultationFee: consultationFee || 500,
-      licenseNumber
+      licenseNumber,
+      languages: Array.isArray(languages) ? languages : []
     });
 
     await doctor.save();
@@ -795,7 +799,7 @@ router.post('/doctors', [
 router.put('/doctors/:id', auth, isAdmin, async (req, res) => {
   try {
     const Doctor = require('../models/Doctor');
-    const { specialization, qualification, experience, description, photo, status, consultationFee, licenseNumber } = req.body;
+    const { specialization, qualification, experience, description, photo, status, consultationFee, licenseNumber, languages } = req.body;
     
     const doctor = await Doctor.findByIdAndUpdate(
       req.params.id,
@@ -808,6 +812,7 @@ router.put('/doctors/:id', auth, isAdmin, async (req, res) => {
         status,
         consultationFee,
         licenseNumber,
+        ...(Array.isArray(languages) && { languages }),
         updatedAt: Date.now()
       },
       { new: true }
@@ -1061,7 +1066,8 @@ router.post('/nutritionists', [
       description, 
       photo, 
       consultationFee,
-      licenseNumber 
+      licenseNumber,
+      languages
     } = req.body;
 
     // Check if user already exists
@@ -1096,7 +1102,8 @@ router.post('/nutritionists', [
       description: description || '',
       photo: photo || '',
       consultationFee: consultationFee || 500,
-      licenseNumber
+      licenseNumber,
+      languages: Array.isArray(languages) ? languages : []
     });
 
     await nutritionist.save();
@@ -1123,7 +1130,7 @@ router.post('/nutritionists', [
 router.put('/nutritionists/:id', auth, isAdmin, async (req, res) => {
   try {
     const Nutritionist = require('../models/Nutritionist');
-    const { specialization, qualification, experience, description, photo, status, consultationFee, licenseNumber } = req.body;
+    const { specialization, qualification, experience, description, photo, status, consultationFee, licenseNumber, languages } = req.body;
     
     const nutritionist = await Nutritionist.findByIdAndUpdate(
       req.params.id,
@@ -1136,6 +1143,7 @@ router.put('/nutritionists/:id', auth, isAdmin, async (req, res) => {
         status,
         consultationFee,
         licenseNumber,
+        ...(Array.isArray(languages) && { languages }),
         updatedAt: Date.now()
       },
       { new: true }
