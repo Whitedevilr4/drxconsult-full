@@ -271,7 +271,8 @@ router.put('/:id', auth, async (req, res) => {
       'status',
       'consultationFee',
       'licenseNumber',
-      'isVerified'
+      'isVerified',
+      'languages'
     ];
 
     allowedUpdates.forEach(field => {
