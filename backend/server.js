@@ -38,7 +38,9 @@ app.use(express.urlencoded({ extended: true }));
 const mongooseOptions = {
   serverSelectionTimeoutMS: 8000,
   socketTimeoutMS: 45000,
-  maxPoolSize: 5,
+  maxPoolSize: 1,
+  minPoolSize: 0,
+  maxIdleTimeMS: 10000,
   family: 4,
   bufferCommands: false
 };
