@@ -235,7 +235,7 @@ router.get('/:id', async (req, res) => {
 // Update doctor profile
 router.put('/:id', auth, async (req, res) => {
   try {
-    const { specialization, qualification, experience, description, photo, consultationFee, licenseNumber } = req.body;
+    const { specialization, qualification, experience, description, photo, consultationFee, licenseNumber, languages } = req.body;
     
     const doctor = await Doctor.findByIdAndUpdate(
       req.params.id,
@@ -247,6 +247,7 @@ router.put('/:id', auth, async (req, res) => {
         photo,
         consultationFee,
         licenseNumber,
+        ...(languages !== undefined && { languages }),
         updatedAt: Date.now()
       },
       { new: true }
