@@ -20,84 +20,54 @@ const io = new Server(server, {
   }
 });
 
-
-
 // Make io accessible to routes
 app.set('io', io);
+
 // =====================
 // Middleware
 // =====================
-// Middleware
-// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
 // =====================
-// MongoDB connection (FIXED, SAME STRUCTURE)
+// MongoDB connection (OPTIMIZED FOR EXPRESS)
 // =====================
 const mongooseOptions = {
   serverSelectionTimeoutMS: 8000,
   socketTimeoutMS: 45000,
-  maxPoolSize: 5,
+  maxPoolSize: 10, // Limits connections per server instance
   minPoolSize: 2,
   maxIdleTimeMS: 10000,
   family: 4,
   bufferCommands: false
 };
 
-// ✅ GLOBAL CACHE (critical fix)
-let cached = global.mongoose;
-if (!cached) {
-  cached = global.mongoose = { conn: null, promise: null };
-}
-
 const connectDB = async () => {
- // Already connected
-  if (cached.conn && mongoose.connection.readyState === 1) return cached.conn;
-
-  // Reset if connection dropped
-  if (mongoose.connection.readyState === 0) {
-    cached.conn = null;
-    cached.promise = null;
-  }
-
-  if (!cached.promise) {
-    cached.promise = mongoose
-      .connect(process.env.MONGODB_URI, mongooseOptions)
-      .then((mongooseInstance) => {
-        console.log('✅ MongoDB connected successfully');
-        return mongooseInstance;
-      });
+  // Check if we are already connected
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
   }
 
   try {
-    cached.conn = await cached.promise;
+    const conn = await mongoose.connect(process.env.MONGODB_URI, mongooseOptions);
+    console.log('✅ MongoDB connected successfully');
+    return conn;
   } catch (err) {
-    cached.promise = null;
     console.error('❌ MongoDB connection error:', err);
+    // In standard Express, if DB fails at startup, we usually want to know immediately
     if (process.env.NODE_ENV !== 'production') {
       process.exit(1);
     }
     throw err;
   }
-
-  return cached.conn;
 };
 
-// =====================
-// Ensure DB before routes (FIXED)
-// =====================
-app.use(async (req, res, next) => {
-  try {
-    await connectDB();
-    next();
-  } catch (err) {
-    next(err);
-  }
-});
+// NOTE: The app.use middleware that called connectDB on every request has been REMOVED.
+// This prevents connection spikes during high traffic.
 
 // =====================
-// Routes (UNCHANGED)
+// Routes
 // =====================
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/pharmacists', require('./routes/pharmacists'));
@@ -106,7 +76,7 @@ app.use('/api/nutritionists', require('./routes/nutritionists'));
 app.use('/api/bookings', require('./routes/bookings'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/medical-history', require('./routes/medicalHistory'));
-app.use('/api/medical-forms', require('./routes/medicalForms')); // New medical forms route
+app.use('/api/medical-forms', require('./routes/medicalForms'));
 app.use('/api/uploads', require('./routes/uploads'));
 app.use('/api/uploads-v2', require('./routes/uploads-v2'));
 app.use('/api/admin', require('./routes/admin'));
@@ -134,22 +104,17 @@ app.get('/', (req, res) => {
 });
 
 // =====================
-// Global error handler (UNCHANGED)
+// Error Handlers
 // =====================
 app.use((err, req, res, next) => {
   console.error('❌ Global error handler:', err);
-
   const isDevelopment = process.env.NODE_ENV === 'development';
-
   res.status(err.status || 500).json({
     message: err.message || 'Internal Server Error',
     ...(isDevelopment && { stack: err.stack })
   });
 });
 
-// =====================
-// 404 handler (UNCHANGED)
-// =====================
 app.use('*', (req, res) => {
   res.status(404).json({
     message: 'Route not found',
@@ -159,67 +124,58 @@ app.use('*', (req, res) => {
 });
 
 // =====================
-// Server start (STRUCTURE KEPT)
+// Server Start Sequence
 // =====================
 const PORT = process.env.PORT || 5000;
-// Initialize Socket.IO
 const { initializeSocket } = require('./utils/socketManager');
 initializeSocket(io);
 
-app.listen(PORT, async () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-
-  // Supabase init
-  try {
-    console.log('🔍 Testing Supabase connection...');
-    const supabaseTest = await Promise.race([
-      testSupabaseConnection(),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Supabase connection timeout')), 10000)
-      )
-    ]);
-
-    if (supabaseTest.success) {
-      console.log('✅ Supabase connected successfully');
-      await initializeStorageBuckets();
-    } else {
-      console.warn('⚠️ Supabase connection failed:', supabaseTest.error);
-    }
-  } catch (error) {
-    console.warn('⚠️ Supabase initialization error:', error.message);
-  }
-
-  // Ensure MongoDB is connected before running any scheduled jobs
+// 🔥 The Fix: Connect to DB FIRST, then start listening
+const startServer = async () => {
   try {
     await connectDB();
-  } catch (err) {
-    console.error('❌ Could not connect to MongoDB, skipping scheduled jobs:', err.message);
-    return;
-  }
+    
+    server.listen(PORT, async () => {
+      console.log(`🚀 Server running on port ${PORT}`);
 
-  // Initial cleanup
-  cleanupExpiredSlots().catch(console.error);
-  cleanupExpiredOTPs().catch(console.error);
+      // Supabase init
+      try {
+        const supabaseTest = await Promise.race([
+          testSupabaseConnection(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 10000))
+        ]);
+        if (supabaseTest.success) {
+          await initializeStorageBuckets();
+          console.log('✅ Supabase initialized');
+        }
+      } catch (e) {
+        console.warn('⚠️ Supabase skip:', e.message);
+      }
 
-  // Scheduled cleanup every hour
-  setInterval(async () => {
-    try {
-      await connectDB();
+      // Initial cleanups
       cleanupExpiredSlots().catch(console.error);
       cleanupExpiredOTPs().catch(console.error);
-    } catch (err) {
-      console.error('❌ Scheduled cleanup skipped, DB not ready:', err.message);
-    }
-  }, 60 * 60 * 1000);
-  
-  // Initialize medicine scheduler
-  try {
-    console.log('🏥 Initializing medicine scheduler...');
-    medicineScheduler.start();
-    console.log('✅ Medicine scheduler started successfully');
-  } catch (error) {
-    console.error('❌ Medicine scheduler initialization error:', error);
-  }
 
-  console.log('✅ Server initialization complete');
-});
+      // Hourly cleanup (Removed connectDB call here since we are already connected)
+      setInterval(() => {
+        cleanupExpiredSlots().catch(console.error);
+        cleanupExpiredOTPs().catch(console.error);
+      }, 60 * 60 * 1000);
+      
+      // Medicine scheduler
+      try {
+        medicineScheduler.start();
+        console.log('✅ Medicine scheduler started');
+      } catch (error) {
+        console.error('❌ Scheduler error:', error);
+      }
+
+      console.log('✅ Server initialization complete');
+    });
+  } catch (error) {
+    console.error('❌ Critical Startup Error:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
