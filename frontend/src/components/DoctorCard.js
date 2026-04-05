@@ -1,6 +1,8 @@
 import Link from 'next/link'
+import { useState } from 'react'
 
 export default function DoctorCard({ doctor }) {
+  const [showFullDesc, setShowFullDesc] = useState(false)
   const defaultPhoto = `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.userId?.name || 'Doctor')}&size=200&background=e74c3c&color=fff&bold=true`
   
   // Calculate rating and sessions from doctor data
@@ -80,9 +82,19 @@ export default function DoctorCard({ doctor }) {
           {doctor.qualification} • {doctor.experience} years exp
         </p>
         {doctor.description && (
-          <p className="text-gray-600 text-xs mb-3 line-clamp-2">
-            {doctor.description}
-          </p>
+          <div className="text-gray-600 text-xs mb-3">
+            <p className={showFullDesc ? '' : 'line-clamp-2'}>
+              {doctor.description}
+            </p>
+            {doctor.description.length > 100 && (
+              <button
+                onClick={() => setShowFullDesc(!showFullDesc)}
+                className="text-red-500 hover:text-red-700 font-medium mt-1 focus:outline-none"
+              >
+                {showFullDesc ? 'Read less' : 'Read more'}
+              </button>
+            )}
+          </div>
         )}
 
         {/* Stats */}
