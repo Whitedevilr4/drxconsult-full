@@ -13,6 +13,7 @@ import MedicalFormSubmission from '@/components/MedicalFormSubmission'
 import MedicalFormsList from '@/components/MedicalFormsList'
 import AmbulanceTracker from '@/components/AmbulanceTracker'
 import BedReservationTimer from '@/components/BedReservationTimer'
+import SubscriptionChatWindow from '@/components/SubscriptionChatWindow'
 import { useSocket } from '@/hooks/useSocket'
 import { toast } from 'react-toastify'
 import { showNotification } from '@/utils/browserNotification'
@@ -38,6 +39,10 @@ export default function PatientDashboard() {
   
   // Medical Forms state
   const [medicalFormsRefresh, setMedicalFormsRefresh] = useState(0)
+  
+  // Chat state
+  const [chatBookingId, setChatBookingId] = useState(null)
+  const [unreadCounts, setUnreadCounts] = useState({}) // bookingId -> unread count
   
   // Hospital Queries state
   const [hospitalQueries, setHospitalQueries] = useState([])
@@ -126,11 +131,29 @@ export default function PatientDashboard() {
       })
       setBookings(res.data)
       setLoading(false)
+      // Fetch unread counts for all non-cancelled bookings
+      fetchUnreadCounts(res.data, token)
     } catch (err) {
       console.error(err)
       setBookings(dummyBookings)
       setLoading(false)
     }
+  }
+
+  const fetchUnreadCounts = async (bookingsList, token) => {
+    const t = token || localStorage.getItem('token')
+    const active = bookingsList.filter(b => b.status !== 'cancelled')
+    const counts = {}
+    await Promise.all(active.map(async (b) => {
+      try {
+        const res = await axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL}/bookings/${b._id}/chat/unread`,
+          { headers: { Authorization: `Bearer ${t}` } }
+        )
+        counts[b._id] = res.data.unread || 0
+      } catch { counts[b._id] = 0 }
+    }))
+    setUnreadCounts(counts)
   }
 
   const fetchMedicalHistory = async (token) => {
@@ -297,6 +320,9 @@ export default function PatientDashboard() {
         io.on('booking-initiated', handleBookingInitiated);
         io.on('ambulance-booking-created', handleBookingInitiated);
         io.on('payment-confirmed', handlePaymentConfirmed);
+        io.on('chat-unread-update', ({ bookingId, unread }) => {
+          setUnreadCounts(prev => ({ ...prev, [bookingId]: unread }))
+        })
       }
 
       console.log('✅ Query listeners attached');
@@ -310,6 +336,7 @@ export default function PatientDashboard() {
           io.off('booking-initiated', handleBookingInitiated);
           io.off('ambulance-booking-created', handleBookingInitiated);
           io.off('payment-confirmed', handlePaymentConfirmed);
+          io.off('chat-unread-update');
         }
       };
     } else {
@@ -802,6 +829,24 @@ export default function PatientDashboard() {
                             ⭐ Write a Review
                           </button>
                         )}
+
+                        {/* Chat button for completed bookings (48hr window) */}
+                        {!booking.isSubscriptionBooking && (
+                          <button
+                            onClick={() => {
+                              setChatBookingId(chatBookingId === booking._id ? null : booking._id)
+                              setUnreadCounts(prev => ({ ...prev, [booking._id]: 0 }))
+                            }}
+                            className="inline-block relative bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
+                          >
+                            💬 Chat
+                            {unreadCounts[booking._id] > 0 && (
+                              <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                                {unreadCounts[booking._id] > 99 ? '99+' : unreadCounts[booking._id]}
+                              </span>
+                            )}
+                          </button>
+                        )}
                       </div>
                     )}
 
@@ -836,6 +881,22 @@ export default function PatientDashboard() {
                           className="inline-block bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
                         >
                           Cancel Booking
+                        </button>
+
+                        {/* Chat Button */}
+                        <button
+                          onClick={() => {
+                            setChatBookingId(chatBookingId === booking._id ? null : booking._id)
+                            setUnreadCounts(prev => ({ ...prev, [booking._id]: 0 }))
+                          }}
+                          className="inline-block ml-2 relative bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                        >
+                          💬 Chat
+                          {unreadCounts[booking._id] > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                              {unreadCounts[booking._id] > 99 ? '99+' : unreadCounts[booking._id]}
+                            </span>
+                          )}
                         </button>
                       </div>
                     )}
@@ -1452,6 +1513,26 @@ export default function PatientDashboard() {
         )}
         </div>
       </div>
+      )}
+
+      {/* Booking Chat Window */}
+      {chatBookingId && (
+        <SubscriptionChatWindow
+          bookingId={chatBookingId}
+          currentUserId={user?._id || user?.id}
+          otherUserId={
+            bookings.find(b => b._id === chatBookingId)?.doctorId?.userId?._id ||
+            bookings.find(b => b._id === chatBookingId)?.nutritionistId?.userId?._id ||
+            bookings.find(b => b._id === chatBookingId)?.pharmacistId?.userId?._id
+          }
+          otherName={
+            bookings.find(b => b._id === chatBookingId)?.doctorId?.userId?.name ||
+            bookings.find(b => b._id === chatBookingId)?.nutritionistId?.userId?.name ||
+            bookings.find(b => b._id === chatBookingId)?.pharmacistId?.userId?.name ||
+            'Consultant'
+          }
+          onClose={() => setChatBookingId(null)}
+        />
       )}
     </Layout>
   )
