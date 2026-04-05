@@ -8,10 +8,13 @@ import PdfViewer from '@/components/PdfViewer'
 import SimplePdfViewer from '@/components/SimplePdfViewer'
 import { toast } from 'react-toastify'
 import SubscriptionPatientsTab from '@/components/SubscriptionPatientsTab'
+import SubscriptionChatWindow from '@/components/SubscriptionChatWindow'
 
 export default function NutritionistDashboard() {
   const router = useRouter()
   const [bookings, setBookings] = useState([])
+  const [chatBookingId, setChatBookingId] = useState(null)
+  const [unreadCounts, setUnreadCounts] = useState({})
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [accessDenied, setAccessDenied] = useState(false)
@@ -98,6 +101,22 @@ export default function NutritionistDashboard() {
     }
   }, [bookings])
 
+  const fetchUnreadCounts = async (bookingsList, token) => {
+    const t = token || localStorage.getItem('token')
+    const active = bookingsList.filter(b => b.status !== 'cancelled')
+    const counts = {}
+    await Promise.all(active.map(async (b) => {
+      try {
+        const res = await axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL}/bookings/${b._id}/chat/unread`,
+          { headers: { Authorization: `Bearer ${t}` } }
+        )
+        counts[b._id] = res.data.unread || 0
+      } catch { counts[b._id] = 0 }
+    }))
+    setUnreadCounts(counts)
+  }
+
   const fetchBookings = async (token) => {
     try {
       const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/nutritionists/my-bookings`, {
@@ -147,6 +166,7 @@ export default function NutritionistDashboard() {
       // Set bookings first
       setBookings(res.data)
       setLoading(false)
+      fetchUnreadCounts(res.data, token)
       
       // Set payment stats immediately
       setPaymentStats(calculatedStats)
@@ -1219,6 +1239,22 @@ export default function NutritionistDashboard() {
                         <div className="bg-green-50 p-3 rounded">
                           <p className="text-green-800 font-medium">✓ Treatment Completed</p>
                           <p className="text-sm text-green-600">This booking is closed. No further actions available.</p>
+                          {!booking.isSubscriptionBooking && (
+                            <button
+                              onClick={() => {
+                                setChatBookingId(chatBookingId === booking._id ? null : booking._id)
+                                setUnreadCounts(prev => ({ ...prev, [booking._id]: 0 }))
+                              }}
+                              className="mt-2 relative bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
+                            >
+                              💬 Chat
+                              {unreadCounts[booking._id] > 0 && (
+                                <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                                  {unreadCounts[booking._id] > 99 ? '99+' : unreadCounts[booking._id]}
+                                </span>
+                              )}
+                            </button>
+                          )}
                         </div>
                       )}
 
@@ -1397,6 +1433,20 @@ export default function NutritionistDashboard() {
                           >
                             📅 Reschedule
                           </button>
+                          <button
+                            onClick={() => {
+                              setChatBookingId(chatBookingId === booking._id ? null : booking._id)
+                              setUnreadCounts(prev => ({ ...prev, [booking._id]: 0 }))
+                            }}
+                            className="relative bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
+                          >
+                            💬 Chat
+                            {unreadCounts[booking._id] > 0 && (
+                              <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                                {unreadCounts[booking._id] > 99 ? '99+' : unreadCounts[booking._id]}
+                              </span>
+                            )}
+                          </button>
                         </div>
                       )}
 
@@ -1492,6 +1542,20 @@ export default function NutritionistDashboard() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Booking Chat Window */}
+      {chatBookingId && (
+        <SubscriptionChatWindow
+          bookingId={chatBookingId}
+          currentUserId={user?._id || user?.id}
+          otherUserId={bookings.find(b => b._id === chatBookingId)?.patientId?._id || bookings.find(b => b._id === chatBookingId)?.patientId}
+          otherName={
+            bookings.find(b => b._id === chatBookingId)?.patientId?.name ||
+            'Patient'
+          }
+          onClose={() => setChatBookingId(null)}
+        />
       )}
     </Layout>
   )
