@@ -1,6 +1,8 @@
 import Link from 'next/link'
+import { useState } from 'react'
 
 export default function NutritionistCard({ nutritionist }) {
+  const [showFullDesc, setShowFullDesc] = useState(false)
   const defaultPhoto = `https://ui-avatars.com/api/?name=${encodeURIComponent(nutritionist.userId?.name || 'Nutritionist')}&size=200&background=10b981&color=fff&bold=true`
   
   // Calculate rating and sessions from nutritionist data
@@ -80,9 +82,19 @@ export default function NutritionistCard({ nutritionist }) {
           {nutritionist.qualification} • {nutritionist.experience} years exp
         </p>
         {nutritionist.description && (
-          <p className="text-gray-600 text-xs mb-3 line-clamp-2">
-            {nutritionist.description}
-          </p>
+          <div className="text-gray-600 text-xs mb-3">
+            <p className={showFullDesc ? '' : 'line-clamp-2'}>
+              {nutritionist.description}
+            </p>
+            {nutritionist.description.length > 100 && (
+              <button
+                onClick={() => setShowFullDesc(!showFullDesc)}
+                className="text-green-600 hover:text-green-800 font-medium mt-1 focus:outline-none"
+              >
+                {showFullDesc ? 'Read less' : 'Read more'}
+              </button>
+            )}
+          </div>
         )}
 
         {/* Stats */}
