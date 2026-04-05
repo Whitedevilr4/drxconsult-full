@@ -91,6 +91,43 @@ const initializeSocket = (io) => {
       console.log(`User left booking chat: ${bookingId}`);
     });
 
+    // ── WebRTC Call Signaling ──────────────────────────────────────────────
+
+    // Caller sends offer to recipient
+    socket.on('call-offer', ({ to, offer, bookingId, callerName, callType }) => {
+      console.log(`📞 call-offer from ${socket.userId} to ${to}`);
+      io.to(`user:${to}`).emit('call-offer', {
+        from: socket.userId,
+        offer,
+        bookingId,
+        callerName,
+        callType // 'audio' | 'video'
+      });
+    });
+
+    // Recipient answers the call
+    socket.on('call-answer', ({ to, answer, bookingId }) => {
+      console.log(`✅ call-answer from ${socket.userId} to ${to}`);
+      io.to(`user:${to}`).emit('call-answer', { from: socket.userId, answer, bookingId });
+    });
+
+    // ICE candidate exchange
+    socket.on('call-ice-candidate', ({ to, candidate, bookingId }) => {
+      io.to(`user:${to}`).emit('call-ice-candidate', { from: socket.userId, candidate, bookingId });
+    });
+
+    // Either party ends the call
+    socket.on('call-end', ({ to, bookingId }) => {
+      console.log(`📵 call-end from ${socket.userId} to ${to}`);
+      io.to(`user:${to}`).emit('call-end', { from: socket.userId, bookingId });
+    });
+
+    // Recipient rejects the call
+    socket.on('call-reject', ({ to, bookingId }) => {
+      console.log(`❌ call-reject from ${socket.userId} to ${to}`);
+      io.to(`user:${to}`).emit('call-reject', { from: socket.userId, bookingId });
+    });
+
     // Handle chat message
     socket.on('send-message', async (data) => {
       const { queryId, message, senderType } = data;
