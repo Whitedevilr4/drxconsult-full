@@ -93,6 +93,7 @@ const bookingSchema = new mongoose.Schema({
   },
   // Subscription booking flag
   isSubscriptionBooking: { type: Boolean, default: false },
+  completedAt: { type: Date, default: null },
   createdAt: { type: Date, default: Date.now }
 });
 
