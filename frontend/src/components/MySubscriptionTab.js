@@ -56,7 +56,15 @@ const FEATURE_LABELS = {
 
 function ConsultantGroup({ title, icon, professionals, providerType, existingBookings, currentUserId, onBooked }) {
   const [booking, setBooking] = useState({})
-  const [openChat, setOpenChat] = useState(null) // { bookingId, name }
+  const [openChat, setOpenChat] = useState(null)
+  const [unreadCounts, setUnreadCounts] = useState({})
+
+  // Modal state
+  const [bookingModal, setBookingModal] = useState(null) // professionalId when open
+  const [form, setForm] = useState({ age: '', sex: '', additionalNotes: '' })
+  const [prescriptionFile, setPrescriptionFile] = useState(null)
+  const [uploading, setUploading] = useState(false)
+  const [formError, setFormError] = useState('')
 
   // On mount, mark already-booked professionals (any status this month = booked)
   useEffect(() => {
@@ -71,21 +79,90 @@ function ConsultantGroup({ title, icon, professionals, providerType, existingBoo
     setBooking(initial)
   }, [existingBookings, providerType])
 
-  const handleBook = async (professionalId) => {
-    setBooking(prev => ({ ...prev, [professionalId]: { state: 'loading' } }))
+  // Fetch unread counts for all booked bookings
+  useEffect(() => {
+    if (!existingBookings?.length) return
+    const token = localStorage.getItem('token')
+    const counts = {}
+    Promise.all(
+      existingBookings.map(async (b) => {
+        try {
+          const res = await axios.get(
+            `${process.env.NEXT_PUBLIC_API_URL}/bookings/${b._id}/chat/unread`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          )
+          counts[b._id] = res.data.unread || 0
+        } catch { counts[b._id] = 0 }
+      })
+    ).then(() => setUnreadCounts({ ...counts }))
+  }, [existingBookings])
+
+  // Listen for real-time unread updates
+  useEffect(() => {
+    const io = window.io
+    if (!io) return
+    const handler = ({ bookingId, unread }) => {
+      setUnreadCounts(prev => ({ ...prev, [bookingId]: unread }))
+    }
+    io.on('chat-unread-update', handler)
+    return () => io.off('chat-unread-update', handler)
+  }, [])
+
+  const handleBook = (professionalId) => {
+    setFormError('')
+    setForm({ age: '', sex: '', additionalNotes: '' })
+    setPrescriptionFile(null)
+    setBookingModal(professionalId)
+  }
+
+  const handleSubmitBooking = async () => {
+    if (!form.age || !form.sex) {
+      setFormError('Age and sex are required.')
+      return
+    }
+    const token = localStorage.getItem('token')
+    setUploading(true)
+    setFormError('')
+
     try {
-      const token = localStorage.getItem('token')
+      let prescriptionUrl = ''
+
+      // Upload prescription file if provided
+      if (prescriptionFile) {
+        const isPdf = prescriptionFile.type === 'application/pdf'
+        const endpoint = isPdf
+          ? `${process.env.NEXT_PUBLIC_API_URL}/uploads-v2/pdf`
+          : `${process.env.NEXT_PUBLIC_API_URL}/uploads-v2/prescription`
+        const fd = new FormData()
+        fd.append('file', prescriptionFile)
+        const uploadRes = await axios.post(endpoint, fd, {
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
+        })
+        prescriptionUrl = uploadRes.data?.url || uploadRes.data?.data?.publicUrl || ''
+      }
+
       const fieldMap = { pharmacist: 'pharmacistId', doctor: 'doctorId', nutritionist: 'nutritionistId' }
       const res = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/bookings/subscription`,
-        { [fieldMap[providerType]]: professionalId },
+        {
+          [fieldMap[providerType]]: bookingModal,
+          patientDetails: {
+            age: Number(form.age),
+            sex: form.sex,
+            prescriptionUrl,
+            additionalNotes: form.additionalNotes
+          }
+        },
         { headers: { Authorization: `Bearer ${token}` } }
       )
-      setBooking(prev => ({ ...prev, [professionalId]: { state: 'done', bookingId: res.data.booking._id, status: res.data.booking.status } }))
+
+      setBooking(prev => ({ ...prev, [bookingModal]: { state: 'done', bookingId: res.data.booking._id, status: res.data.booking.status } }))
+      setBookingModal(null)
       if (onBooked) onBooked()
     } catch (err) {
-      const msg = err.response?.data?.message || 'Booking failed'
-      setBooking(prev => ({ ...prev, [professionalId]: { state: 'error', msg } }))
+      setFormError(err.response?.data?.message || 'Booking failed. Please try again.')
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -97,11 +174,14 @@ function ConsultantGroup({ title, icon, professionals, providerType, existingBoo
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {professionals.map((p) => {
           const info = booking[p._id] || {}
-          const isBooked = info.state === 'done'   // booked this month (any status)
-          const isLoading = info.state === 'loading'
+          const isBooked = info.state === 'done'
           const isError = info.state === 'error'
           const bookingId = info.bookingId
-          const bookingStatus = info.status        // 'confirmed' | 'completed' | etc.
+          const bookingStatus = info.status
+
+          // If any professional in this category is already booked this month, block all others
+          const categoryBooked = Object.values(booking).some(b => b.state === 'done')
+          const isBlockedByCategory = !isBooked && categoryBooked
           return (
             <div key={p._id} className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-xl p-3">
               <img
@@ -126,26 +206,37 @@ function ConsultantGroup({ title, icon, professionals, providerType, existingBoo
                 {isBooked && bookingStatus === 'completed' && (
                   <p className="text-xs text-gray-400 mt-1">Session completed · chat open till month end</p>
                 )}
+                {isBlockedByCategory && (
+                  <p className="text-xs text-amber-600 mt-1">Already booked a {providerType} this month</p>
+                )}
               </div>
               <div className="flex flex-col gap-1 flex-shrink-0">
                 <button
-                  onClick={() => !isBooked && !isLoading && handleBook(p._id)}
-                  disabled={isBooked || isLoading}
+                  onClick={() => !isBooked && !isBlockedByCategory && handleBook(p._id)}
+                  disabled={isBooked || isBlockedByCategory}
                   className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
                     isBooked ? 'bg-green-100 text-green-700 cursor-default' :
-                    isLoading ? 'bg-gray-100 text-gray-400 cursor-wait' :
+                    isBlockedByCategory ? 'bg-gray-100 text-gray-400 cursor-not-allowed' :
                     'bg-blue-600 hover:bg-blue-700 text-white'
                   }`}
                 >
-                  {isBooked ? '✓ Booked' : isLoading ? '...' : 'Book'}
+                  {isBooked ? '✓ Booked' : isBlockedByCategory ? 'Unavailable' : 'Book'}
                 </button>
                 {/* Chat always available once booked this month, even after completion */}
                 {isBooked && bookingId && (
                   <button
-                    onClick={() => setOpenChat({ bookingId, name: p.userId?.name })}
-                    className="text-xs font-medium px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
+                    onClick={() => {
+                      setOpenChat({ bookingId, name: p.userId?.name, userId: p.userId?._id || p.userId?.id })
+                      setUnreadCounts(prev => ({ ...prev, [bookingId]: 0 }))
+                    }}
+                    className="relative text-xs font-medium px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
                   >
                     💬 Chat
+                    {unreadCounts[bookingId] > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                        {unreadCounts[bookingId] > 99 ? '99+' : unreadCounts[bookingId]}
+                      </span>
+                    )}
                   </button>
                 )}
               </div>
@@ -154,11 +245,112 @@ function ConsultantGroup({ title, icon, professionals, providerType, existingBoo
         })}
       </div>
 
+      {/* Booking details modal */}
+      {bookingModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <h3 className="text-lg font-bold text-gray-800">Book Consultation</h3>
+              <button onClick={() => setBookingModal(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              {/* Age */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Age <span className="text-red-500">*</span></label>
+                <input
+                  type="number"
+                  min="1" max="120"
+                  value={form.age}
+                  onChange={e => setForm(f => ({ ...f, age: e.target.value }))}
+                  placeholder="Enter your age"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+              </div>
+
+              {/* Sex */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Sex <span className="text-red-500">*</span></label>
+                <select
+                  value={form.sex}
+                  onChange={e => setForm(f => ({ ...f, sex: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                >
+                  <option value="">Select</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              {/* Prescription upload */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Prescription <span className="text-gray-400 text-xs">(optional — image or PDF)</span>
+                </label>
+                <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                  <input
+                    type="file"
+                    accept="image/*,.pdf,application/pdf"
+                    className="hidden"
+                    onChange={e => setPrescriptionFile(e.target.files[0] || null)}
+                  />
+                  {prescriptionFile ? (
+                    <div className="text-center px-3">
+                      <p className="text-sm font-medium text-blue-700 truncate max-w-xs">{prescriptionFile.name}</p>
+                      <p className="text-xs text-gray-400 mt-1">{(prescriptionFile.size / 1024).toFixed(0)} KB</p>
+                      <p className="text-xs text-blue-500 mt-1">Click to change</p>
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                      <p className="text-2xl mb-1">📎</p>
+                      <p className="text-sm text-gray-500">Click to upload prescription</p>
+                      <p className="text-xs text-gray-400">JPG, PNG, PDF — max 10MB</p>
+                    </div>
+                  )}
+                </label>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Additional Notes <span className="text-gray-400 text-xs">(optional)</span></label>
+                <textarea
+                  rows={2}
+                  value={form.additionalNotes}
+                  onChange={e => setForm(f => ({ ...f, additionalNotes: e.target.value }))}
+                  placeholder="Any specific concerns or information..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+                />
+              </div>
+
+              {formError && <p className="text-sm text-red-500">{formError}</p>}
+            </div>
+
+            <div className="px-6 pb-5 flex gap-3">
+              <button
+                onClick={() => setBookingModal(null)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitBooking}
+                disabled={uploading}
+                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                {uploading ? 'Booking...' : 'Confirm Booking'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Chat window */}
       {openChat && (
         <SubscriptionChatWindow
           bookingId={openChat.bookingId}
           currentUserId={currentUserId}
+          otherUserId={openChat.userId}
           otherName={openChat.name}
           onClose={() => setOpenChat(null)}
         />
