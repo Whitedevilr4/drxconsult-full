@@ -1,11 +1,42 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import axios from 'axios'
 import SubscriptionChatWindow from '@/components/SubscriptionChatWindow'
 import PatientHealthDataView from '@/components/PatientHealthDataView'
 
 export default function SubscriptionPatientsTab({ patients, loading, onRefresh, currentUserId }) {
   const [search, setSearch] = useState('')
   const [openChat, setOpenChat] = useState(null)
-  const [expandedHealth, setExpandedHealth] = useState(null) // bookingId
+  const [expandedHealth, setExpandedHealth] = useState(null)
+  const [unreadCounts, setUnreadCounts] = useState({})
+
+  // Fetch unread counts whenever patients list changes
+  useEffect(() => {
+    if (!patients?.length) return
+    const token = localStorage.getItem('token')
+    const counts = {}
+    Promise.all(
+      patients.map(async (b) => {
+        try {
+          const res = await axios.get(
+            `${process.env.NEXT_PUBLIC_API_URL}/bookings/${b._id}/chat/unread`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          )
+          counts[b._id] = res.data.unread || 0
+        } catch { counts[b._id] = 0 }
+      })
+    ).then(() => setUnreadCounts({ ...counts }))
+  }, [patients])
+
+  // Listen for real-time unread updates
+  useEffect(() => {
+    const io = window.io
+    if (!io) return
+    const handler = ({ bookingId, unread }) => {
+      setUnreadCounts(prev => ({ ...prev, [bookingId]: unread }))
+    }
+    io.on('chat-unread-update', handler)
+    return () => io.off('chat-unread-update', handler)
+  }, [])
 
   const filtered = patients.filter(b => {
     const name = b.patientId?.name?.toLowerCase() || ''
@@ -100,10 +131,18 @@ export default function SubscriptionPatientsTab({ patients, loading, onRefresh, 
                           {isHealthOpen ? '▲ Health' : '▼ Health'}
                         </button>
                         <button
-                          onClick={() => setOpenChat({ bookingId: booking._id, name: patient?.name })}
-                          className="text-xs font-medium px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
+                          onClick={() => {
+                            setOpenChat({ bookingId: booking._id, name: patient?.name, patientId: patient?._id || patient?.id })
+                            setUnreadCounts(prev => ({ ...prev, [booking._id]: 0 }))
+                          }}
+                          className="relative text-xs font-medium px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
                         >
                           💬 Chat
+                          {unreadCounts[booking._id] > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                              {unreadCounts[booking._id] > 99 ? '99+' : unreadCounts[booking._id]}
+                            </span>
+                          )}
                         </button>
                       </div>
                     </div>
@@ -133,6 +172,7 @@ export default function SubscriptionPatientsTab({ patients, loading, onRefresh, 
         <SubscriptionChatWindow
           bookingId={openChat.bookingId}
           currentUserId={currentUserId}
+          otherUserId={openChat.patientId}
           otherName={openChat.name}
           onClose={() => setOpenChat(null)}
         />
