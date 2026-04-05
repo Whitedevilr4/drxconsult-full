@@ -13,7 +13,7 @@ const {
   sendPharmacistBookingNotification, 
   sendMeetingLinkEmail, 
   sendReportSubmittedEmail, 
-  sendTestResultEmail 
+  sendTestResultEmail
 } = require('../utils/emailService');
 
 const router = express.Router();
@@ -766,6 +766,7 @@ router.patch('/:id/treatment-status', auth, async (req, res) => {
     // If marked as treated, automatically complete the booking
     if (req.body.treatmentStatus === 'treated') {
       booking.status = 'completed';
+      booking.completedAt = new Date();
     }
     
     await booking.save();
@@ -1021,7 +1022,12 @@ router.get('/reviews/:professionalId', async (req, res) => {
 // Create subscription booking — no payment, no slot required
 router.post('/subscription', auth, async (req, res) => {
   try {
-    const { pharmacistId, doctorId, nutritionistId } = req.body
+    const { pharmacistId, doctorId, nutritionistId, patientDetails } = req.body
+
+    // Validate required patient details
+    if (!patientDetails?.age || !patientDetails?.sex) {
+      return res.status(400).json({ message: 'Age and sex are required' })
+    }
 
     // Exactly one professional
     const ids = [pharmacistId, doctorId, nutritionistId].filter(Boolean)
@@ -1090,7 +1096,12 @@ router.post('/subscription', auth, async (req, res) => {
       serviceType,
       providerType,
       isSubscriptionBooking: true,
-      patientDetails: { age: 1, sex: 'other', prescriptionUrl: 'subscription' },
+      patientDetails: {
+        age: patientDetails.age,
+        sex: patientDetails.sex,
+        prescriptionUrl: patientDetails.prescriptionUrl || '',
+        additionalNotes: patientDetails.additionalNotes || ''
+      },
       ...professionalField
     })
 
@@ -1108,6 +1119,17 @@ router.post('/subscription', auth, async (req, res) => {
         providerType,
         isSubscriptionBooking: true
       })
+    }
+
+    // Email the professional about the new subscription booking
+    if (professionalUser?.email) {
+      sendPharmacistBookingNotification(
+        professionalUser.email,
+        booking,
+        patient?.name || 'Patient',
+        patient?.email || '',
+        patient?.phone || ''
+      ).catch(e => console.error('Subscription booking email error:', e))
     }
 
     res.status(201).json({ message: 'Subscription booking created', booking })
@@ -1169,12 +1191,32 @@ router.get('/subscription-status', auth, async (req, res) => {
   }
 })
 
-// Get chat messages for a subscription booking
+// Get unread message count for a booking for the current user
+router.get('/:bookingId/chat/unread', auth, async (req, res) => {
+  try {
+    const BookingChat = require('../models/BookingChat')
+    const count = await BookingChat.countDocuments({
+      bookingId: req.params.bookingId,
+      senderId: { $ne: req.user.userId },
+      isRead: false
+    })
+    res.json({ unread: count })
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message })
+  }
+})
+
+// Get chat messages for a booking
 router.get('/:bookingId/chat', auth, async (req, res) => {
   try {
     const BookingChat = require('../models/BookingChat')
     const booking = await Booking.findById(req.params.bookingId)
     if (!booking) return res.status(404).json({ message: 'Booking not found' })
+
+    // Cancelled bookings: no chat access at all
+    if (booking.status === 'cancelled') {
+      return res.status(403).json({ message: 'Chat is not available for cancelled bookings.' })
+    }
 
     const messages = await BookingChat.find({ bookingId: req.params.bookingId })
       .populate('senderId', 'name profilePicture')
@@ -1186,13 +1228,30 @@ router.get('/:bookingId/chat', auth, async (req, res) => {
       { isRead: true }
     )
 
-    res.json(messages)
+    // Subscription bookings: no 48hr limit
+    if (booking.isSubscriptionBooking) {
+      return res.json({ messages, isChatOpen: true, chatExpiry: null })
+    }
+
+    // Regular bookings: 48hr window starts when professional marks as completed
+    // Before completion → chat is open (confirmed state)
+    // After completion → 48hr countdown from completedAt
+    let isChatOpen = true
+    let chatExpiry = null
+
+    if (booking.completedAt) {
+      const chatWindowMs = 48 * 60 * 60 * 1000
+      chatExpiry = new Date(booking.completedAt.getTime() + chatWindowMs)
+      isChatOpen = new Date() < chatExpiry
+    }
+
+    res.json({ messages, isChatOpen, chatExpiry })
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message })
   }
 })
 
-// Send chat message for a subscription booking
+// Send chat message for a booking (48hr window enforced after completion, cancelled = blocked)
 router.post('/:bookingId/chat', auth, async (req, res) => {
   try {
     const BookingChat = require('../models/BookingChat')
@@ -1201,6 +1260,20 @@ router.post('/:bookingId/chat', auth, async (req, res) => {
 
     const booking = await Booking.findById(req.params.bookingId)
     if (!booking) return res.status(404).json({ message: 'Booking not found' })
+
+    // Cancelled bookings: no chat at all
+    if (booking.status === 'cancelled') {
+      return res.status(403).json({ message: 'Chat is disabled for cancelled bookings.' })
+    }
+
+    // Regular bookings only: enforce 48hr window after completion
+    if (!booking.isSubscriptionBooking && booking.completedAt) {
+      const chatWindowMs = 48 * 60 * 60 * 1000
+      const chatExpiry = new Date(booking.completedAt.getTime() + chatWindowMs)
+      if (new Date() > chatExpiry) {
+        return res.status(403).json({ message: 'Chat window has expired. The 48-hour period after consultation has ended.' })
+      }
+    }
 
     // Determine sender type
     const senderType = req.user.role === 'patient' ? 'patient' : 'professional'
@@ -1218,6 +1291,33 @@ router.post('/:bookingId/chat', auth, async (req, res) => {
     const io = req.app.get('io')
     if (io) {
       io.to(`booking:${req.params.bookingId}`).emit('new-booking-message', chat)
+    }
+
+    // Emit updated unread count to the recipient's personal room so badge updates in real-time
+    if (io) {
+      // Populate booking to find recipient userId
+      const populatedBooking = await Booking.findById(req.params.bookingId)
+        .populate('patientId', '_id')
+        .populate({ path: 'doctorId', populate: { path: 'userId', select: '_id' } })
+        .populate({ path: 'pharmacistId', populate: { path: 'userId', select: '_id' } })
+        .populate({ path: 'nutritionistId', populate: { path: 'userId', select: '_id' } })
+
+      const recipientUserId = req.user.role === 'patient'
+        ? (populatedBooking.doctorId?.userId?._id || populatedBooking.pharmacistId?.userId?._id || populatedBooking.nutritionistId?.userId?._id)
+        : populatedBooking.patientId?._id
+
+      if (recipientUserId) {
+        const BookingChat = require('../models/BookingChat')
+        const unread = await BookingChat.countDocuments({
+          bookingId: req.params.bookingId,
+          senderId: { $ne: recipientUserId },
+          isRead: false
+        })
+        io.to(`user:${recipientUserId}`).emit('chat-unread-update', {
+          bookingId: req.params.bookingId,
+          unread
+        })
+      }
     }
 
     res.status(201).json(chat)
