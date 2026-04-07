@@ -61,31 +61,50 @@ const emailTemplates = {
         
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <h3 style="margin-top: 0; color: #2c3e50;">Booking Details:</h3>
-          <p><strong>Service:</strong> ${booking.serviceType === 'prescription_review' ? 'Know Your Prescription (₹149)' : booking.serviceType === 'doctor_consultation' ? 'Doctor Consultation (₹499)' : 'Full Consultation (₹449)'}</p>
+          <p><strong>Service:</strong> ${booking.serviceType === 'prescription_review' ? 'Know Your Prescription' : booking.serviceType === 'doctor_consultation' ? 'Doctor Consultation' : booking.serviceType === 'nutritionist_consultation' ? 'Nutritionist Consultation' : 'Full Consultation'}</p>
           <p><strong>Professional:</strong> ${professionalName}</p>
           <p><strong>Date:</strong> ${new Date(booking.slotDate).toLocaleDateString()}</p>
           <p><strong>Time:</strong> ${booking.slotTime}</p>
           <p><strong>Status:</strong> ${booking.status}</p>
-          <p><strong>Patient Age:</strong> ${booking.patientDetails?.age || 'N/A'}</p>
-          <p><strong>Patient Sex:</strong> ${booking.patientDetails?.sex || 'N/A'}</p>
           ${booking.meetLink ? `<p><strong>Meeting Link:</strong> <a href="${booking.meetLink}">Join Meeting</a></p>` : '<p><em>Meeting link will be provided by the professional before the session.</em></p>'}
         </div>
-        
-        <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0;">
-          <h4 style="margin-top: 0; color: #856404;">Service Details:</h4>
-          ${booking.serviceType === 'prescription_review' 
-            ? '<p>📋 <strong>Prescription Review:</strong> Our professional will review your uploaded prescription and provide guidance on medication usage, side effects, and interactions.</p>'
-            : booking.serviceType === 'doctor_consultation'
-            ? '<p>🩺 <strong>Doctor Consultation:</strong> Comprehensive medical consultation with a qualified doctor including diagnosis, treatment plan, and prescription if required.</p>'
-            : '<p>💊 <strong>Full Consultation:</strong> Comprehensive consultation including prescription review, health assessment, and personalized medication counseling.</p>'
-          }
+
+        <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin: 20px 0;">
+          <h4 style="margin-top: 0; color: #166534;">💳 Payment Breakdown</h4>
+          ${(() => {
+            const total = booking.paymentAmount || 0;
+            const base  = total / 1.054;
+            const prof  = Math.ceil(base * 0.70 * 100) / 100;
+            const plat  = Math.ceil(base * 0.30 * 100) / 100;
+            const gst   = Math.ceil(base * 0.054 * 100) / 100;
+            const drift = parseFloat((total - (prof + plat + gst)).toFixed(2));
+            const profAdj = parseFloat((prof + drift).toFixed(2));
+            return `
+            <table style="width:100%;border-collapse:collapse;font-size:14px;">
+              <tr style="border-bottom:1px solid #d1fae5;">
+                <td style="padding:6px 0;color:#374151;">Professional Fee (${professionalName})<br><span style="font-size:11px;color:#6b7280;">70% of base amount</span></td>
+                <td style="padding:6px 0;text-align:right;color:#374151;">₹${profAdj.toFixed(2)}</td>
+              </tr>
+              <tr style="border-bottom:1px solid #d1fae5;">
+                <td style="padding:6px 0;color:#374151;">Platform Service Fee<br><span style="font-size:11px;color:#6b7280;">30% of base amount (excl. GST)</span></td>
+                <td style="padding:6px 0;text-align:right;color:#374151;">₹${plat.toFixed(2)}</td>
+              </tr>
+              <tr style="border-bottom:1px solid #d1fae5;">
+                <td style="padding:6px 0;color:#374151;">GST @ 18%<br><span style="font-size:11px;color:#6b7280;">18% on platform service fee (₹${plat.toFixed(2)})</span></td>
+                <td style="padding:6px 0;text-align:right;color:#374151;">₹${gst.toFixed(2)}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px;background:#166534;color:#fff;font-weight:bold;border-radius:4px 0 0 4px;">Total Amount Charged</td>
+                <td style="padding:8px;background:#166534;color:#fff;font-weight:bold;text-align:right;border-radius:0 4px 4px 0;">₹${total.toFixed(2)}</td>
+              </tr>
+            </table>
+            <p style="margin:8px 0 0;font-size:11px;color:#6b7280;">Invoice attached. Base = Professional fee + Platform fee. GST @ 18% is on platform fee only. Rounding applied upward.</p>
+            `;
+          })()}
         </div>
         
         <p>Please be available at the scheduled time. You will receive the meeting link from your professional before the session begins.</p>
-        
-        <p>If you need to cancel or reschedule, please contact us as soon as possible.</p>
-        
-        <p>Thank you for choosing our Patient Counselling service!</p>
+        <p>Thank you for choosing Drx Consult!</p>
       </div>
     `
   }),
@@ -370,7 +389,7 @@ const emailTemplates = {
         <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0;">
           <h4 style="margin-top: 0; color: #495057;">📞 Need Help?</h4>
           <p style="margin-bottom: 10px;">Our support team is here to help:</p>
-          <p style="margin: 5px 0;"><strong>Email:</strong> support@drxconsult.com</p>
+          <p style="margin: 5px 0;"><strong>Email:</strong> support@drxconsult.in</p>
           <p style="margin: 5px 0;"><strong>Dashboard:</strong> <a href="${process.env.FRONTEND_URL}/patient/dashboard">Patient Dashboard</a></p>
         </div>
         
@@ -381,7 +400,7 @@ const emailTemplates = {
         <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
         <p style="color: #666; font-size: 12px; text-align: center;">
           You received this email because you created an account at Drx Consult.<br/>
-          If you have any questions, please contact us at support@drxconsult.com
+          If you have any questions, please contact us at support@drxconsult.in
         </p>
       </div>
     `
@@ -501,7 +520,7 @@ const emailTemplates = {
         <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
         <p style="color: #666; font-size: 12px; text-align: center;">
           Manage your subscription from your <a href="${process.env.FRONTEND_URL}/patient/dashboard">dashboard</a><br/>
-          Questions? Contact us at support@drxconsult.com
+          Questions? Contact us at support@drxconsult.in
         </p>
       </div>
     `
@@ -569,7 +588,7 @@ const emailTemplates = {
         
         <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
         <p style="color: #666; font-size: 12px; text-align: center;">
-          Questions about renewal? Contact us at support@drxconsult.com<br/>
+          Questions about renewal? Contact us at support@drxconsult.in<br/>
           Manage your subscription from your <a href="${process.env.FRONTEND_URL}/patient/dashboard">dashboard</a>
         </p>
       </div>
@@ -633,7 +652,7 @@ const emailTemplates = {
         
         <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
         <p style="color: #666; font-size: 12px; text-align: center;">
-          Questions? Contact us at support@drxconsult.com<br/>
+          Questions? Contact us at support@drxconsult.in<br/>
           Visit your <a href="${process.env.FRONTEND_URL}/patient/dashboard">dashboard</a> anytime
         </p>
       </div>
@@ -689,12 +708,12 @@ const emailTemplates = {
           </a>
         </div>
 
-        <p>We're sorry to see you go. If there's anything we could have done better, please reach out to us at support@drxconsult.com.</p>
+        <p>We're sorry to see you go. If there's anything we could have done better, please reach out to us at support@drxconsult.in.</p>
         <p>Best regards,<br/>The DrX Consult Team</p>
 
         <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
         <p style="color: #666; font-size: 12px; text-align: center;">
-          Questions? Contact us at support@drxconsult.com<br/>
+          Questions? Contact us at support@drxconsult.in<br/>
           Visit your <a href="${process.env.FRONTEND_URL}/patient/dashboard">dashboard</a> anytime
         </p>
       </div>
@@ -961,7 +980,7 @@ const emailTemplates = {
         
         <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
         <p style="color: #666; font-size: 12px; text-align: center;">
-          Questions about payments? Contact us at support@drxconsult.com<br/>
+          Questions about payments? Contact us at support@drxconsult.in<br/>
           View your earnings anytime from your <a href="${process.env.FRONTEND_URL}/${professionalType}/dashboard">dashboard</a>
         </p>
       </div>
