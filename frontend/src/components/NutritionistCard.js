@@ -3,6 +3,7 @@ import { useState } from 'react'
 
 export default function NutritionistCard({ nutritionist }) {
   const [showFullDesc, setShowFullDesc] = useState(false)
+  const [showFullSpec, setShowFullSpec] = useState(false)
   const defaultPhoto = `https://ui-avatars.com/api/?name=${encodeURIComponent(nutritionist.userId?.name || 'Nutritionist')}&size=200&background=10b981&color=fff&bold=true`
   
   // Calculate rating and sessions from nutritionist data
@@ -75,9 +76,17 @@ export default function NutritionistCard({ nutritionist }) {
         <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-1">
           {nutritionist.userId?.name}
         </h3>
-        <p className="text-green-600 font-medium text-xs sm:text-sm mb-1">
+        <p className={`text-green-600 font-medium text-xs sm:text-sm mb-1 ${showFullSpec ? '' : 'line-clamp-1'}`}>
           {nutritionist.specialization}
         </p>
+        {nutritionist.specialization?.length > 40 && (
+          <button
+            onClick={() => setShowFullSpec(!showFullSpec)}
+            className="text-green-500 hover:text-green-700 text-xs font-medium -mt-1 mb-1 focus:outline-none"
+          >
+            {showFullSpec ? 'Show less' : 'Read more'}
+          </button>
+        )}
         <p className="text-gray-500 text-xs mb-2">
           {nutritionist.qualification} • {nutritionist.experience} years exp
         </p>
