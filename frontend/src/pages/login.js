@@ -52,6 +52,8 @@ export default function Login() {
         router.push('/doctor/dashboard')
       } else if (res.data.user.role === 'nutritionist') {
         router.push('/nutritionist/dashboard')
+      } else if (res.data.user.role === 'hospital') {
+        router.push('/hospital/dashboard')
       } else {
         router.push('/patient/dashboard')
       }
@@ -102,6 +104,8 @@ export default function Login() {
       router.push('/doctor/dashboard')
     } else if (data.user.role === 'nutritionist') {
       router.push('/nutritionist/dashboard')
+    } else if (data.user.role === 'hospital') {
+      router.push('/hospital/dashboard')
     } else {
       router.push('/patient/dashboard')
     }
