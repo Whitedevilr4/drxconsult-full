@@ -233,8 +233,8 @@ export default function Home() {
         }
       },
       {
-        enableHighAccuracy: true,
-        timeout: 10000,
+        enableHighAccuracy: false,
+        timeout: 20000,
         maximumAge: 300000 // 5 minutes
       }
     )
