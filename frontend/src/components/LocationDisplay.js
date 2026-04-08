@@ -11,17 +11,33 @@ export default function LocationDisplay() {
   const [status, setStatus] = useState('prompt')
   const [cityName, setCityName] = useState('')
   const [hospitalCount, setHospitalCount] = useState(null)
+  const [hospitalRadius, setHospitalRadius] = useState(5)
 
   if (typeof window !== 'undefined' && !navigator.geolocation) return null
 
   const fetchNearbyHospitals = async (lat, lng) => {
     try {
-      const res = await fetch(
+      // Try 5km first, fall back to 10km if none found — never exceed 10km
+      let res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/hospitals/nearby?latitude=${lat}&longitude=${lng}&radius=5`
       )
       if (res.ok) {
         const data = await res.json()
+        const hospitals = data.hospitals || []
+        if (hospitals.length > 0) {
+          setHospitalCount(hospitals.length)
+          setHospitalRadius(5)
+          return
+        }
+      }
+      // No results within 5km — try 10km
+      res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/hospitals/nearby?latitude=${lat}&longitude=${lng}&radius=10`
+      )
+      if (res.ok) {
+        const data = await res.json()
         setHospitalCount((data.hospitals || []).length)
+        setHospitalRadius(10)
       }
     } catch {
       // silently ignore — hospital count is optional
@@ -103,8 +119,8 @@ export default function LocationDisplay() {
             </svg>
             <span>
               {hospitalCount > 0
-                ? `${hospitalCount} hospital${hospitalCount > 1 ? 's' : ''} nearby`
-                : 'No hospitals within 5km'}
+                ? `${hospitalCount} hospital${hospitalCount > 1 ? 's' : ''} within ${hospitalRadius}km`
+                : 'No hospitals within 10km'}
             </span>
           </Link>
         )}
