@@ -88,25 +88,11 @@ export default function LocationDisplay() {
   useEffect(() => {
     if (!navigator.geolocation) {
       setStatus('unsupported')
-      return
     }
-
-    // Android Chrome often misreports permission state as 'prompt' even when granted.
-    // So we check permissions API first, but always fall back to just showing the button
-    // and letting the user trigger it — which is the most reliable cross-platform approach.
-    if (navigator.permissions) {
-      navigator.permissions.query({ name: 'geolocation' }).then((result) => {
-        if (result.state === 'granted') {
-          requestLocation()
-        }
-        // 'prompt' or 'denied' — stay idle, show the button
-        // On Android, 'prompt' is returned even after granting, so we don't auto-request
-      }).catch(() => {
-        // permissions API threw (some Android WebViews) — stay idle, show button
-      })
-    }
-    // No permissions API (older Android) — stay idle, show button
-  }, [requestLocation])
+    // Never auto-request location on mount — always require a user tap.
+    // Auto-requesting causes Android Chrome to silently deny or show "blocked"
+    // because the request isn't tied to a direct user gesture.
+  }, [])
 
   const toRad = (d) => d * (Math.PI / 180)
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
