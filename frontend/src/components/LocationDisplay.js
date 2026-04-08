@@ -1,23 +1,54 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 
-// Compact top-bar location component
-// prompt  → shows "📍 Enable location" button
-// loading → shows spinner
-// success → shows city name pill + nearby hospital count (tappable → /locate-hospital)
-// hidden  → returns null (denied / any error)
+const CACHE_KEY = 'drx_location_cache'
+const CACHE_TTL = 10 * 60 * 1000 // 10 minutes
 
+function readCache() {
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY)
+    if (!raw) return null
+    const cached = JSON.parse(raw)
+    if (Date.now() - cached.ts > CACHE_TTL) {
+      sessionStorage.removeItem(CACHE_KEY)
+      return null
+    }
+    return cached
+  } catch {
+    return null
+  }
+}
+
+function writeCache(data) {
+  try {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ...data, ts: Date.now() }))
+  } catch {}
+}
+
+// States: 'prompt' | 'loading' | 'success' | 'hidden'
 export default function LocationDisplay() {
   const [status, setStatus] = useState('prompt')
   const [cityName, setCityName] = useState('')
   const [hospitalCount, setHospitalCount] = useState(null)
   const [hospitalRadius, setHospitalRadius] = useState(5)
 
-  if (typeof window !== 'undefined' && !navigator.geolocation) return null
+  // On mount: restore from cache so page navigation doesn't re-ask
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setStatus('hidden')
+      return
+    }
+    const cached = readCache()
+    if (cached) {
+      setCityName(cached.cityName)
+      setHospitalCount(cached.hospitalCount)
+      setHospitalRadius(cached.hospitalRadius || 5)
+      setStatus('success')
+    }
+  }, [])
 
   const fetchNearbyHospitals = async (lat, lng) => {
     try {
-      // Try 5km first, fall back to 10km if none found — never exceed 10km
       let res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/hospitals/nearby?latitude=${lat}&longitude=${lng}&radius=5`
       )
@@ -25,57 +56,54 @@ export default function LocationDisplay() {
         const data = await res.json()
         const hospitals = data.hospitals || []
         if (hospitals.length > 0) {
-          setHospitalCount(hospitals.length)
-          setHospitalRadius(5)
-          return
+          return { count: hospitals.length, radius: 5 }
         }
       }
-      // No results within 5km — try 10km
       res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/hospitals/nearby?latitude=${lat}&longitude=${lng}&radius=10`
       )
       if (res.ok) {
         const data = await res.json()
-        setHospitalCount((data.hospitals || []).length)
-        setHospitalRadius(10)
+        return { count: (data.hospitals || []).length, radius: 10 }
       }
-    } catch {
-      // silently ignore — hospital count is optional
-    }
+    } catch {}
+    return { count: 0, radius: 10 }
   }
 
-  // Direct user gesture handler — browser popup fires from this click
+  // Direct user gesture — browser popup fires from this click
   const handleEnableClick = () => {
     setStatus('loading')
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords
-        console.log('Location:', latitude, longitude)
 
-        // Reverse geocode for city name
+        let city = `${latitude.toFixed(2)}°, ${longitude.toFixed(2)}°`
         try {
           const res = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`
           )
           const data = await res.json()
-          const city =
+          city =
             data.address?.city ||
             data.address?.town ||
             data.address?.village ||
             data.address?.county ||
             data.address?.state ||
-            'Your Location'
-          setCityName(city)
-        } catch {
-          setCityName(`${latitude.toFixed(2)}°, ${longitude.toFixed(2)}°`)
-        }
+            city
+        } catch {}
 
+        const { count, radius } = await fetchNearbyHospitals(latitude, longitude)
+
+        // Save to cache so page navigations don't re-ask
+        writeCache({ cityName: city, hospitalCount: count, hospitalRadius: radius })
+
+        setCityName(city)
+        setHospitalCount(count)
+        setHospitalRadius(radius)
         setStatus('success')
-        fetchNearbyHospitals(latitude, longitude)
       },
       (error) => {
         console.log('Geolocation error — code:', error.code, '| message:', error.message)
-        // Any error → hide the component entirely
         setStatus('hidden')
       },
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
@@ -99,7 +127,6 @@ export default function LocationDisplay() {
   if (status === 'success') {
     return (
       <div className="flex items-center justify-center gap-3 flex-wrap py-1">
-        {/* Location pill */}
         <div className="flex items-center gap-1.5 text-xs text-gray-700 bg-blue-50 border border-blue-100 px-3 py-1 rounded-full">
           <svg className="w-3 h-3 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -108,7 +135,6 @@ export default function LocationDisplay() {
           <span className="font-medium">{cityName}</span>
         </div>
 
-        {/* Hospital count pill — only shown if hospitals found */}
         {hospitalCount !== null && (
           <Link
             href="/locate-hospital"
@@ -128,7 +154,7 @@ export default function LocationDisplay() {
     )
   }
 
-  // prompt — compact inline button
+  // prompt
   return (
     <div className="flex items-center justify-center py-1">
       <button
