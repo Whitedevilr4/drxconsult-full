@@ -33,6 +33,11 @@ export default function LocateHospital() {
         (error) => {
           console.error('Error getting location:', error);
           fetchNearbyHospitals();
+        },
+        {
+          enableHighAccuracy: false,
+          timeout: 20000,
+          maximumAge: 300000
         }
       );
     } else {
