@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
 import SEO from '../components/SEO';
@@ -11,6 +11,29 @@ export default function LocateHospital() {
   const [locating, setLocating] = useState(false);
   const [hospitals, setHospitals] = useState([]);
   const [hospitalRadius, setHospitalRadius] = useState(null);
+
+  // On mount: if permission already granted, silently get position — no popup, no button needed
+  useEffect(() => {
+    if (!navigator.geolocation || !navigator.permissions) return;
+    navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+      if (result.state === 'granted') {
+        setLocating(true);
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            setLocation({ latitude, longitude });
+            setLocating(false);
+            fetchNearbyHospitals(latitude, longitude);
+          },
+          (err) => {
+            console.log('Silent location error:', err.code, err.message);
+            setLocating(false);
+          },
+          { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 }
+        );
+      }
+    }).catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [formData, setFormData] = useState({
     queryType: 'bed_availability',
     bedType: 'any',
