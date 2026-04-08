@@ -133,7 +133,7 @@ router.get('/:queryId', auth, async (req, res) => {
 // Get nearby hospitals
 router.post('/nearby-hospitals', auth, async (req, res) => {
   try {
-    const { latitude, longitude, radius = 50 } = req.body;
+    const { latitude, longitude, radius = 10 } = req.body;
 
     const hospitals = await Hospital.find({
       isActive: true,
