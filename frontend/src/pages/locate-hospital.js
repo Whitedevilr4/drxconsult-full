@@ -17,32 +17,35 @@ export default function LocateHospital() {
   });
 
   useEffect(() => {
-    getUserLocation();
+    // Load hospitals without location on mount — don't auto-request geolocation.
+    // Android Chrome silently blocks/denies any geolocation call not tied to a direct user gesture.
+    fetchNearbyHospitals();
   }, []);
 
   const getUserLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-          });
-          fetchNearbyHospitals(position.coords.latitude, position.coords.longitude);
-        },
-        (error) => {
-          console.error('Error getting location:', error);
-          fetchNearbyHospitals();
-        },
-        {
-          enableHighAccuracy: false,
-          timeout: 20000,
-          maximumAge: 300000
-        }
-      );
-    } else {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
       fetchNearbyHospitals();
+      return;
     }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        });
+        fetchNearbyHospitals(position.coords.latitude, position.coords.longitude);
+      },
+      (error) => {
+        console.error('Error getting location:', error);
+        fetchNearbyHospitals();
+      },
+      {
+        enableHighAccuracy: true, // false can cause "Position Unavailable" on Android when GPS is needed
+        timeout: 20000,
+        maximumAge: 300000
+      }
+    );
   };
 
   const fetchNearbyHospitals = async (lat, lng) => {
@@ -164,7 +167,15 @@ export default function LocateHospital() {
                 />
               </div>
 
-              {location && (
+              {!location ? (
+                <button
+                  type="button"
+                  onClick={getUserLocation}
+                  className="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-700 py-2 px-4 rounded-md hover:bg-blue-50 hover:text-blue-700 border border-gray-300 transition-colors"
+                >
+                  📍 Locate Me (find nearby hospitals)
+                </button>
+              ) : (
                 <div className="bg-blue-50 p-3 rounded-md">
                   <p className="text-sm text-blue-800">
                     📍 Your location detected. Hospitals within 50km will be notified.
