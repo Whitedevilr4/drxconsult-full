@@ -33,7 +33,7 @@ export default function HospitalChat() {
   const [bedBookingForm, setBedBookingForm] = useState({
     bedType: 'general',
     numberOfBeds: 1,
-    paymentAmount: 5000
+    paymentAmount: 49
   });
   const [ambulanceForm, setAmbulanceForm] = useState({
     patientName: '',
@@ -49,7 +49,7 @@ export default function HospitalChat() {
     ambulanceNumber: '',
     driverName: '',
     driverContact: '',
-    paymentAmount: 2000
+    paymentAmount: 49
   });
   const [showOTPModal, setShowOTPModal] = useState(false);
   const [selectedBookingForOTP, setSelectedBookingForOTP] = useState(null);
@@ -424,7 +424,7 @@ export default function HospitalChat() {
       setBedBookingForm({
         bedType: 'general',
         numberOfBeds: 1,
-        paymentAmount: 5000
+        paymentAmount: 49
       });
     } catch (error) {
       console.error('Error creating bed booking:', error);
@@ -547,7 +547,7 @@ export default function HospitalChat() {
         ambulanceNumber: '',
         driverName: '',
         driverContact: '',
-        paymentAmount: 2000
+        paymentAmount: 49
       });
     } catch (error) {
       console.error('Error creating ambulance booking:', error);
