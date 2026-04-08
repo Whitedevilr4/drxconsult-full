@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 
 const LocationIcon = () => (
@@ -20,6 +20,7 @@ export default function LocationDisplay() {
   const [location, setLocation] = useState(null)
   const [nearbyHospitals, setNearbyHospitals] = useState([])
   const [userCoords, setUserCoords] = useState(null)
+  const watchIdRef = useRef(null)
 
   const fetchNearbyHospitals = async (latitude, longitude) => {
     try {
@@ -35,87 +36,122 @@ export default function LocationDisplay() {
     }
   }
 
-  const requestLocation = useCallback(() => {
-    if (!navigator.geolocation) {
+  const handlePosition = async (position) => {
+    const { latitude, longitude } = position.coords
+    setUserCoords({ latitude, longitude })
+
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`
+      )
+      const data = await response.json()
+      const city = data.address?.city || data.address?.town || data.address?.village || data.address?.county
+      const state = data.address?.state
+      const country = data.address?.country
+
+      let locationText = ''
+      if (city && state) locationText = `${city}, ${state}`
+      else if (city && country) locationText = `${city}, ${country}`
+      else if (state && country) locationText = `${state}, ${country}`
+      else locationText = country || 'Your Location'
+
+      setLocation(locationText)
+    } catch (err) {
+      setLocation(`${latitude.toFixed(2)}°, ${longitude.toFixed(2)}°`)
+    }
+
+    setStatus('success')
+    await fetchNearbyHospitals(latitude, longitude)
+  }
+
+  const handleError = (err) => {
+    // Fix 3: explicit debug log so you can see exact code/message in DevTools
+    console.log('Geolocation error — code:', err.code, '| message:', err.message)
+    // code 1 = Permission denied, code 2 = Position unavailable, code 3 = Timeout
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current)
+      watchIdRef.current = null
+    }
+    setStatus(err.code === 1 ? 'denied' : 'unavailable')
+  }
+
+  // On mount: check if permission is already granted via Permissions API.
+  // If granted, use watchPosition (works without a user gesture, unlike getCurrentPosition in async context).
+  // If prompt/denied, just show the button — wait for user tap.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
       setStatus('unsupported')
       return
     }
 
-    setStatus('loading')
+    if (!navigator.permissions) return
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords
-        setUserCoords({ latitude, longitude })
+    let permissionResult = null
 
-        try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`
-          )
-          const data = await response.json()
-          const city = data.address?.city || data.address?.town || data.address?.village || data.address?.county
-          const state = data.address?.state
-          const country = data.address?.country
+    navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+      permissionResult = result
 
-          let locationText = ''
-          if (city && state) locationText = `${city}, ${state}`
-          else if (city && country) locationText = `${city}, ${country}`
-          else if (state && country) locationText = `${state}, ${country}`
-          else locationText = country || 'Your Location'
+      // Fix 1: DO NOTHING on mount — always wait for user button click.
+      // Calling startWatch() or getCurrentPosition() here (even if 'granted')
+      // is treated as a non-gesture call on Android and gets blocked.
 
-          setLocation(locationText)
-          setStatus('success')
-          await fetchNearbyHospitals(latitude, longitude)
-        } catch (err) {
-          console.error('Reverse geocode error:', err)
-          setLocation(`${latitude.toFixed(2)}°, ${longitude.toFixed(2)}°`)
-          setStatus('success')
-          await fetchNearbyHospitals(latitude, longitude)
-        }
-      },
-      (err) => {
-        console.error('Geolocation error code:', err.code, err.message)
-        if (err.code === 1) {
+      // Watch for permission changes while page is open (e.g. user revokes in settings)
+      result.addEventListener('change', () => {
+        if (result.state === 'denied') {
+          if (watchIdRef.current !== null) {
+            navigator.geolocation.clearWatch(watchIdRef.current)
+            watchIdRef.current = null
+          }
           setStatus('denied')
-        } else {
-          setStatus('unavailable')
+        } else if (result.state === 'prompt') {
+          setStatus('idle')
         }
+        // 'granted' change — still don't auto-call, user must tap
+      })
+    }).catch(() => {
+      // Permissions API unavailable — rely on manual button
+    })
+
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current)
+        watchIdRef.current = null
+      }
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const startWatch = () => {
+    if (watchIdRef.current !== null) return // already watching
+    setStatus('loading')
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      handlePosition,
+      handleError,
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+    )
+  }
+
+  // Fix 2 + Fix 4: ONLY entry point for location — always tied to a user tap.
+  // Force-resets status to 'loading' and uses maximumAge: 0 to avoid stale cache.
+  const requestLocation = () => {
+    if (!navigator.geolocation) {
+      setStatus('unsupported')
+      return
+    }
+    // Clear any stale watch
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current)
+      watchIdRef.current = null
+    }
+    setStatus('loading')
+    navigator.geolocation.getCurrentPosition(
+      handlePosition,
+      (err) => {
+        console.log('Retry error — code:', err.code, '| message:', err.message)
+        handleError(err)
       },
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
     )
-  }, [])
-
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      setStatus('unsupported')
-      return
-    }
-
-    // Use Permissions API to watch for state changes.
-    // If the user previously denied but then grants in settings, we auto-retry.
-    // If already granted, we can safely auto-request (no prompt shown, no Android block).
-    if (navigator.permissions) {
-      navigator.permissions.query({ name: 'geolocation' }).then((result) => {
-        if (result.state === 'granted') {
-          // Permission already granted — safe to auto-request, no dialog will appear
-          requestLocation()
-        }
-        // Watch for changes (e.g. user goes to settings and grants/revokes)
-        result.onchange = () => {
-          if (result.state === 'granted') {
-            requestLocation()
-          } else if (result.state === 'denied') {
-            setStatus('denied')
-          } else {
-            // 'prompt' — reset to idle so the button shows again
-            setStatus('idle')
-          }
-        }
-      }).catch(() => {
-        // Permissions API not supported — fall through to manual button
-      })
-    }
-  }, [requestLocation])
+  }
 
   const toRad = (d) => d * (Math.PI / 180)
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -155,14 +191,12 @@ export default function LocationDisplay() {
         >
           <LocationIcon />
           <span>
-            {status === 'denied'
-              ? 'Location blocked — tap to retry'
-              : 'Location unavailable — tap to retry'}
+            {status === 'denied' ? 'Location blocked — tap to retry' : 'Location unavailable — tap to retry'}
           </span>
         </button>
         {status === 'denied' && (
           <p className="text-xs text-gray-400 text-center px-2">
-            If you already granted permission in settings, tap retry above — it will update automatically.
+            Go to browser site settings → allow location → then tap retry.
           </p>
         )}
       </div>
