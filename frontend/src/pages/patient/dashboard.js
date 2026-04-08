@@ -830,23 +830,28 @@ export default function PatientDashboard() {
                           </button>
                         )}
 
-                        {/* Chat button for completed bookings (48hr window) */}
-                        {!booking.isSubscriptionBooking && (
-                          <button
-                            onClick={() => {
-                              setChatBookingId(chatBookingId === booking._id ? null : booking._id)
-                              setUnreadCounts(prev => ({ ...prev, [booking._id]: 0 }))
-                            }}
-                            className="inline-block relative bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
-                          >
-                            💬 Chat
-                            {unreadCounts[booking._id] > 0 && (
-                              <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                                {unreadCounts[booking._id] > 99 ? '99+' : unreadCounts[booking._id]}
-                              </span>
-                            )}
-                          </button>
-                        )}
+                        {/* Chat button for completed bookings (48hr window from completedAt) */}
+                        {!booking.isSubscriptionBooking && (() => {
+                          const chatOpen = booking.completedAt
+                            ? new Date() < new Date(new Date(booking.completedAt).getTime() + 48 * 60 * 60 * 1000)
+                            : true
+                          return (
+                            <button
+                              onClick={() => {
+                                setChatBookingId(chatBookingId === booking._id ? null : booking._id)
+                                setUnreadCounts(prev => ({ ...prev, [booking._id]: 0 }))
+                              }}
+                              className={`inline-block relative px-4 py-2 rounded text-sm ${chatOpen ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-600'}`}
+                            >
+                              {chatOpen ? '💬 Chat' : '💬 View Chat'}
+                              {unreadCounts[booking._id] > 0 && (
+                                <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                                  {unreadCounts[booking._id] > 99 ? '99+' : unreadCounts[booking._id]}
+                                </span>
+                              )}
+                            </button>
+                          )
+                        })()}
                       </div>
                     )}
 
@@ -1356,7 +1361,7 @@ export default function PatientDashboard() {
                                         <p className="text-gray-600">Pickup: <span className="text-gray-900 font-medium">{booking.ambulanceDetails.pickupLocation}</span></p>
                                       </div>
                                     </div>
-                                    {booking.paymentStatus === 'completed' && booking.status === 'confirmed' && (
+                                    {booking.paymentStatus === 'completed' && ['confirmed', 'in_progress', 'in progress'].includes(booking.status) && (
                                       <button
                                         onClick={() => setTrackingBooking(booking)}
                                         className="mt-3 w-full bg-gradient-to-r from-orange-500 to-red-500 text-white px-4 py-2 rounded-lg hover:from-orange-600 hover:to-red-600 transition-all shadow-md flex items-center justify-center space-x-2 text-sm font-medium"
