@@ -90,18 +90,22 @@ export default function LocationDisplay() {
       setStatus('unsupported')
       return
     }
-    // Only auto-fetch if permission was already granted before
+
+    // Android Chrome often misreports permission state as 'prompt' even when granted.
+    // So we check permissions API first, but always fall back to just showing the button
+    // and letting the user trigger it — which is the most reliable cross-platform approach.
     if (navigator.permissions) {
       navigator.permissions.query({ name: 'geolocation' }).then((result) => {
         if (result.state === 'granted') {
           requestLocation()
         }
-        // For 'prompt' or 'denied' — show the button, let user decide
+        // 'prompt' or 'denied' — stay idle, show the button
+        // On Android, 'prompt' is returned even after granting, so we don't auto-request
       }).catch(() => {
-        // permissions API failed — show button
+        // permissions API threw (some Android WebViews) — stay idle, show button
       })
     }
-    // No permissions API — show button
+    // No permissions API (older Android) — stay idle, show button
   }, [requestLocation])
 
   const toRad = (d) => d * (Math.PI / 180)
@@ -134,7 +138,15 @@ export default function LocationDisplay() {
   }
 
   if (status === 'denied' || status === 'unavailable') {
-    return null
+    return (
+      <button
+        onClick={requestLocation}
+        className="flex items-center space-x-2 text-sm text-gray-500 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 px-3 py-1.5 rounded-full transition-colors border border-gray-200"
+      >
+        <LocationIcon />
+        <span>{status === 'denied' ? 'Location blocked — tap to retry' : 'Location unavailable — tap to retry'}</span>
+      </button>
+    )
   }
 
   if (status === 'idle') {
