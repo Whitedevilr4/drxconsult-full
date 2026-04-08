@@ -132,6 +132,7 @@ export default function Home() {
 
   useEffect(() => {
     fetchWebsiteSettings()
+    fetchSubscriptionPlans()
     // Delay location check slightly to ensure page is fully loaded
     const timer = setTimeout(() => {
       checkLocationPermission()
@@ -140,24 +141,19 @@ export default function Home() {
   }, [])
 
   const checkLocationPermission = async () => {
-    // Check if geolocation is supported
-    if (!navigator.geolocation) {
-      return
-    }
+    if (!navigator.geolocation) return
 
     // Check if we already have location in localStorage
     const savedLocation = localStorage.getItem('userLocation')
     if (savedLocation) {
       try {
         const parsed = JSON.parse(savedLocation)
-        // Check if location is still valid (less than 5 minutes old)
         const locationAge = new Date() - new Date(parsed.timestamp)
-        if (locationAge < 300000) { // 5 minutes
+        if (locationAge < 300000) {
           setUserLocation(parsed)
           setLocationPermission('granted')
           return
         } else {
-          // Location expired, remove it
           localStorage.removeItem('userLocation')
         }
       } catch (e) {
@@ -166,25 +162,26 @@ export default function Home() {
       }
     }
 
-    // Check if user previously dismissed the prompt
     const dismissed = localStorage.getItem('locationPromptDismissed')
-    
-    // Check permission status if available
+    if (dismissed) return
+
+    // On Android Chrome, navigator.permissions.query often returns 'prompt' even
+    // after the user has granted permission — so we can't rely on it to auto-call
+    // getUserLocation(). Instead, just show the prompt and let the user tap Allow,
+    // which triggers the native Android dialog via getCurrentPosition directly.
     if (navigator.permissions) {
       try {
         const result = await navigator.permissions.query({ name: 'geolocation' })
         setLocationPermission(result.state)
-        
+
         if (result.state === 'granted') {
+          // Only auto-fetch if we're certain permission is already granted
           getUserLocation()
-        } else if (result.state === 'prompt' && !dismissed) {
-          // Show custom prompt after a delay
-          setTimeout(() => {
-            setShowLocationPrompt(true)
-          }, 3000)
+        } else if (result.state !== 'denied') {
+          // 'prompt' state — show our UI prompt
+          setTimeout(() => setShowLocationPrompt(true), 2000)
         }
 
-        // Listen for permission changes
         result.addEventListener('change', () => {
           setLocationPermission(result.state)
           if (result.state === 'granted') {
@@ -192,15 +189,12 @@ export default function Home() {
           }
         })
       } catch (error) {
-        if (!dismissed) {
-          setTimeout(() => setShowLocationPrompt(true), 3000)
-        }
+        // permissions API failed (common on Android WebViews) — show prompt
+        setTimeout(() => setShowLocationPrompt(true), 2000)
       }
     } else {
-      // Show prompt if permissions API not available and not dismissed
-      if (!dismissed) {
-        setTimeout(() => setShowLocationPrompt(true), 3000)
-      }
+      // No permissions API (older Android) — show prompt
+      setTimeout(() => setShowLocationPrompt(true), 2000)
     }
   }
 
@@ -355,16 +349,6 @@ export default function Home() {
       console.error('Error fetching subscription plans:', err)
     }
   }
-
-  useEffect(() => {
-    fetchWebsiteSettings()
-    fetchSubscriptionPlans()
-    // Delay location check slightly to ensure page is fully loaded
-    const timer = setTimeout(() => {
-      checkLocationPermission()
-    }, 500)
-    return () => clearTimeout(timer)
-  }, [])
 
   // Auto-slide for hero section
   useEffect(() => {
