@@ -197,7 +197,7 @@ export default function Home() {
         }
       },
       {
-        enableHighAccuracy: false,
+        enableHighAccuracy: true, // false can cause "Position Unavailable" on Android
         timeout: 20000,
         maximumAge: 300000 // 5 minutes
       }
