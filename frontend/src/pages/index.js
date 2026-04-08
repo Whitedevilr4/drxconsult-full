@@ -143,7 +143,7 @@ export default function Home() {
   const checkLocationPermission = async () => {
     if (!navigator.geolocation) return
 
-    // Check if we already have location in localStorage
+    // Check if we already have location in localStorage (user already granted before)
     const savedLocation = localStorage.getItem('userLocation')
     if (savedLocation) {
       try {
@@ -162,40 +162,10 @@ export default function Home() {
       }
     }
 
-    const dismissed = localStorage.getItem('locationPromptDismissed')
-    if (dismissed) return
-
-    // On Android Chrome, navigator.permissions.query often returns 'prompt' even
-    // after the user has granted permission — so we can't rely on it to auto-call
-    // getUserLocation(). Instead, just show the prompt and let the user tap Allow,
-    // which triggers the native Android dialog via getCurrentPosition directly.
-    if (navigator.permissions) {
-      try {
-        const result = await navigator.permissions.query({ name: 'geolocation' })
-        setLocationPermission(result.state)
-
-        if (result.state === 'granted') {
-          // Only auto-fetch if we're certain permission is already granted
-          getUserLocation()
-        } else if (result.state !== 'denied') {
-          // 'prompt' state — show our UI prompt
-          setTimeout(() => setShowLocationPrompt(true), 2000)
-        }
-
-        result.addEventListener('change', () => {
-          setLocationPermission(result.state)
-          if (result.state === 'granted') {
-            getUserLocation()
-          }
-        })
-      } catch (error) {
-        // permissions API failed (common on Android WebViews) — show prompt
-        setTimeout(() => setShowLocationPrompt(true), 2000)
-      }
-    } else {
-      // No permissions API (older Android) — show prompt
-      setTimeout(() => setShowLocationPrompt(true), 2000)
-    }
+    // Never auto-call getCurrentPosition or show a popup on page load.
+    // On Android, any geolocation call not tied to a direct user tap gets auto-denied.
+    // Just set the state so the UI shows the "Enable Location" button.
+    setLocationPermission('prompt')
   }
 
   const getUserLocation = () => {
@@ -1530,11 +1500,11 @@ export default function Home() {
           </div>
         )}
 
-        {/* Manual Location Enable Button (when not granted and prompt dismissed) */}
+        {/* Manual Location Enable Button (when not granted) */}
         {!userLocation && locationPermission !== 'granted' && !showLocationPrompt && (
           <div className="fixed bottom-24 md:bottom-6 right-4 md:right-6 z-40">
             <button
-              onClick={() => setShowLocationPrompt(true)}
+              onClick={handleLocationRequest}
               className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full shadow-lg px-4 py-2 flex items-center space-x-2 hover:from-blue-700 hover:to-blue-800 transition-all transform hover:scale-105 animate-fade-in"
               title="Enable location to find nearby healthcare professionals"
             >
