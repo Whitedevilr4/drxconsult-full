@@ -1,12 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
-
-const LocationIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-  </svg>
-)
 
 const HospitalIcon = () => (
   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -14,13 +7,16 @@ const HospitalIcon = () => (
   </svg>
 )
 
-// States: 'idle' | 'loading' | 'success' | 'denied' | 'unavailable' | 'unsupported'
+// States: 'prompt' | 'loading' | 'success' | 'hidden'
+// 'hidden' = denied/unavailable → component disappears entirely
 export default function LocationDisplay() {
-  const [status, setStatus] = useState('idle')
+  const [status, setStatus] = useState('prompt')
   const [location, setLocation] = useState(null)
   const [nearbyHospitals, setNearbyHospitals] = useState([])
   const [userCoords, setUserCoords] = useState(null)
-  const watchIdRef = useRef(null)
+
+  // Hide entirely if geolocation not supported
+  if (typeof window !== 'undefined' && !navigator.geolocation) return null
 
   const fetchNearbyHospitals = async (latitude, longitude) => {
     try {
@@ -32,7 +28,7 @@ export default function LocationDisplay() {
         setNearbyHospitals(data.hospitals || [])
       }
     } catch (err) {
-      console.error('Error fetching nearby hospitals:', err)
+      console.log('Nearby hospitals fetch error:', err)
     }
   }
 
@@ -41,22 +37,22 @@ export default function LocationDisplay() {
     setUserCoords({ latitude, longitude })
 
     try {
-      const response = await fetch(
+      const res = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`
       )
-      const data = await response.json()
+      const data = await res.json()
       const city = data.address?.city || data.address?.town || data.address?.village || data.address?.county
       const state = data.address?.state
       const country = data.address?.country
 
-      let locationText = ''
-      if (city && state) locationText = `${city}, ${state}`
-      else if (city && country) locationText = `${city}, ${country}`
-      else if (state && country) locationText = `${state}, ${country}`
-      else locationText = country || 'Your Location'
+      let text = ''
+      if (city && state) text = `${city}, ${state}`
+      else if (city && country) text = `${city}, ${country}`
+      else if (state && country) text = `${state}, ${country}`
+      else text = country || 'Your Location'
 
-      setLocation(locationText)
-    } catch (err) {
+      setLocation(text)
+    } catch {
       setLocation(`${latitude.toFixed(2)}°, ${longitude.toFixed(2)}°`)
     }
 
@@ -64,90 +60,15 @@ export default function LocationDisplay() {
     await fetchNearbyHospitals(latitude, longitude)
   }
 
-  const handleError = (err) => {
-    // Fix 3: explicit debug log so you can see exact code/message in DevTools
-    console.log('Geolocation error — code:', err.code, '| message:', err.message)
-    // code 1 = Permission denied, code 2 = Position unavailable, code 3 = Timeout
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current)
-      watchIdRef.current = null
-    }
-    setStatus(err.code === 1 ? 'denied' : 'unavailable')
-  }
-
-  // On mount: check if permission is already granted via Permissions API.
-  // If granted, use watchPosition (works without a user gesture, unlike getCurrentPosition in async context).
-  // If prompt/denied, just show the button — wait for user tap.
-  useEffect(() => {
-    if (typeof window === 'undefined' || !navigator.geolocation) {
-      setStatus('unsupported')
-      return
-    }
-
-    if (!navigator.permissions) return
-
-    let permissionResult = null
-
-    navigator.permissions.query({ name: 'geolocation' }).then((result) => {
-      permissionResult = result
-
-      // Fix 1: DO NOTHING on mount — always wait for user button click.
-      // Calling startWatch() or getCurrentPosition() here (even if 'granted')
-      // is treated as a non-gesture call on Android and gets blocked.
-
-      // Watch for permission changes while page is open (e.g. user revokes in settings)
-      result.addEventListener('change', () => {
-        if (result.state === 'denied') {
-          if (watchIdRef.current !== null) {
-            navigator.geolocation.clearWatch(watchIdRef.current)
-            watchIdRef.current = null
-          }
-          setStatus('denied')
-        } else if (result.state === 'prompt') {
-          setStatus('idle')
-        }
-        // 'granted' change — still don't auto-call, user must tap
-      })
-    }).catch(() => {
-      // Permissions API unavailable — rely on manual button
-    })
-
-    return () => {
-      if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current)
-        watchIdRef.current = null
-      }
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const startWatch = () => {
-    if (watchIdRef.current !== null) return // already watching
-    setStatus('loading')
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      handlePosition,
-      handleError,
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-    )
-  }
-
-  // Fix 2 + Fix 4: ONLY entry point for location — always tied to a user tap.
-  // Force-resets status to 'loading' and uses maximumAge: 0 to avoid stale cache.
-  const requestLocation = () => {
-    if (!navigator.geolocation) {
-      setStatus('unsupported')
-      return
-    }
-    // Clear any stale watch
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current)
-      watchIdRef.current = null
-    }
+  // User tapped "Enable Location" — this is the direct user gesture
+  const handleEnableClick = () => {
     setStatus('loading')
     navigator.geolocation.getCurrentPosition(
       handlePosition,
       (err) => {
-        console.log('Retry error — code:', err.code, '| message:', err.message)
-        handleError(err)
+        console.log('Geolocation error — code:', err.code, '| message:', err.message)
+        // Any error (denied, unavailable, timeout) → hide the component
+        setStatus('hidden')
       },
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
     )
@@ -162,65 +83,55 @@ export default function LocationDisplay() {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   }
 
-  // --- RENDER ---
+  // Hidden — render nothing
+  if (status === 'hidden') return null
 
-  if (status === 'unsupported') {
-    return (
-      <div className="flex items-center space-x-2 text-gray-400 text-sm">
-        <LocationIcon />
-        <span>Location not supported by your browser</span>
-      </div>
-    )
-  }
-
+  // Loading — waiting for browser GPS response
   if (status === 'loading') {
     return (
-      <div className="flex items-center space-x-2 text-gray-500 text-sm">
-        <LocationIcon />
-        <span className="animate-pulse">Detecting location...</span>
+      <div className="flex items-center justify-center gap-2 text-sm text-gray-500 py-2">
+        <svg className="w-4 h-4 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+        </svg>
+        <span>Detecting your location...</span>
       </div>
     )
   }
 
-  if (status === 'denied' || status === 'unavailable') {
+  // Prompt — Swiggy-style "Enable Location" card
+  if (status === 'prompt') {
     return (
-      <div className="flex flex-col items-center gap-2">
+      <div className="flex items-center justify-center gap-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+        <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+          <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-800">Find hospitals near you</p>
+          <p className="text-xs text-gray-500">Enable location to see nearby hospitals</p>
+        </div>
         <button
-          onClick={requestLocation}
-          className="flex items-center space-x-2 text-sm text-gray-500 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 px-3 py-1.5 rounded-full transition-colors border border-gray-200"
+          onClick={handleEnableClick}
+          className="flex-shrink-0 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
         >
-          <LocationIcon />
-          <span>
-            {status === 'denied' ? 'Location blocked — tap to retry' : 'Location unavailable — tap to retry'}
-          </span>
+          Enable
         </button>
-        {status === 'denied' && (
-          <p className="text-xs text-gray-400 text-center px-2">
-            Go to browser site settings → allow location → then tap retry.
-          </p>
-        )}
       </div>
     )
   }
 
-  if (status === 'idle') {
-    return (
-      <button
-        onClick={requestLocation}
-        className="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors border border-blue-200"
-      >
-        <LocationIcon />
-        <span>Share location for nearby hospitals</span>
-      </button>
-    )
-  }
-
-  // status === 'success'
+  // Success — show location + nearby hospitals
   return (
     <div className="w-full">
       <div className="flex items-center justify-center space-x-3 flex-wrap">
         <div className="flex items-center space-x-2 text-gray-700 text-sm bg-gradient-to-r from-blue-50 to-indigo-50 px-3 py-1.5 rounded-full shadow-sm">
-          <LocationIcon />
+          <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
           <span className="font-medium">{location}</span>
         </div>
         {nearbyHospitals.length > 0 && (
