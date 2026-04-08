@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
 import SEO from '../components/SEO';
@@ -8,7 +8,9 @@ export default function LocateHospital() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [location, setLocation] = useState(null);
+  const [locating, setLocating] = useState(false);
   const [hospitals, setHospitals] = useState([]);
+  const [hospitalRadius, setHospitalRadius] = useState(null);
   const [formData, setFormData] = useState({
     queryType: 'bed_availability',
     bedType: 'any',
@@ -16,65 +18,58 @@ export default function LocateHospital() {
     description: ''
   });
 
-  useEffect(() => {
-    // Load hospitals without location on mount — don't auto-request geolocation.
-    // Android Chrome silently blocks/denies any geolocation call not tied to a direct user gesture.
-    fetchNearbyHospitals();
-  }, []);
-
-  const getUserLocation = () => {
-    if (typeof window === 'undefined' || !navigator.geolocation) {
-      fetchNearbyHospitals();
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude
-        });
-        fetchNearbyHospitals(position.coords.latitude, position.coords.longitude);
-      },
-      (error) => {
-        console.error('Error getting location:', error);
-        fetchNearbyHospitals();
-      },
-      {
-        enableHighAccuracy: true, // false can cause "Position Unavailable" on Android when GPS is needed
-        timeout: 20000,
-        maximumAge: 300000
-      }
-    );
-  };
-
+  // Only called after location is granted — tries 5km then 10km
   const fetchNearbyHospitals = async (lat, lng) => {
     try {
-      const response = await axios.post('/hospital-queries/nearby-hospitals', {
-        latitude: lat,
-        longitude: lng,
-        radius: 50
+      // Try 5km first
+      let res = await axios.post('/hospital-queries/nearby-hospitals', {
+        latitude: lat, longitude: lng, radius: 5
       });
-      setHospitals(response.data);
+      if (res.data && res.data.length > 0) {
+        setHospitals(res.data);
+        setHospitalRadius(5);
+        return;
+      }
+      // Fall back to 10km
+      res = await axios.post('/hospital-queries/nearby-hospitals', {
+        latitude: lat, longitude: lng, radius: 10
+      });
+      setHospitals(res.data || []);
+      setHospitalRadius(10);
     } catch (error) {
       console.error('Error fetching hospitals:', error);
     }
   };
 
+  // Direct user gesture — browser popup fires from this click
+  const getUserLocation = () => {
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setLocation({ latitude, longitude });
+        setLocating(false);
+        fetchNearbyHospitals(latitude, longitude);
+      },
+      (error) => {
+        console.log('Geolocation error — code:', error.code, error.message);
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+    );
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-
     try {
-      const queryData = {
+      await axios.post('/hospital-queries', {
         ...formData,
         userLatitude: location?.latitude,
         userLongitude: location?.longitude,
         userLocation: location ? `${location.latitude}, ${location.longitude}` : 'Unknown'
-      };
-
-      await axios.post('/hospital-queries', queryData);
-      
+      });
       alert('Query submitted successfully! Nearby hospitals will be notified.');
       router.push('/patient/dashboard');
     } catch (error) {
@@ -87,11 +82,11 @@ export default function LocateHospital() {
 
   return (
     <Layout>
-      <SEO 
+      <SEO
         title="Locate Hospital"
         description="Find nearby hospitals for bed availability and doctor consultations"
       />
-      
+
       <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-8">
@@ -103,12 +98,10 @@ export default function LocateHospital() {
 
           <div className="bg-white shadow rounded-lg p-6 mb-8">
             <h2 className="text-xl font-semibold mb-4">Submit Query</h2>
-            
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Query Type
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Query Type</label>
                 <select
                   value={formData.queryType}
                   onChange={(e) => setFormData({ ...formData, queryType: e.target.value })}
@@ -124,9 +117,7 @@ export default function LocateHospital() {
 
               {formData.queryType === 'bed_availability' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Bed Type
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Bed Type</label>
                   <select
                     value={formData.bedType}
                     onChange={(e) => setFormData({ ...formData, bedType: e.target.value })}
@@ -141,9 +132,7 @@ export default function LocateHospital() {
 
               {formData.queryType === 'doctor_availability' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Specialization
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Specialization</label>
                   <input
                     type="text"
                     value={formData.specialization}
@@ -155,9 +144,7 @@ export default function LocateHospital() {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -167,18 +154,30 @@ export default function LocateHospital() {
                 />
               </div>
 
+              {/* Location section — must grant before hospitals show */}
               {!location ? (
                 <button
                   type="button"
                   onClick={getUserLocation}
-                  className="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-700 py-2 px-4 rounded-md hover:bg-blue-50 hover:text-blue-700 border border-gray-300 transition-colors"
+                  disabled={locating}
+                  className="w-full flex items-center justify-center gap-2 bg-blue-50 text-blue-700 py-2 px-4 rounded-md hover:bg-blue-100 border border-blue-200 transition-colors disabled:opacity-60"
                 >
-                  📍 Locate Me (find nearby hospitals)
+                  {locating ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                      </svg>
+                      Detecting location...
+                    </>
+                  ) : (
+                    <>📍 Enable location to find nearby hospitals</>
+                  )}
                 </button>
               ) : (
                 <div className="bg-blue-50 p-3 rounded-md">
                   <p className="text-sm text-blue-800">
-                    📍 Your location detected. Hospitals within 50km will be notified.
+                    📍 Location detected. Hospitals within {hospitalRadius || 10}km will be notified.
                   </p>
                 </div>
               )}
@@ -193,63 +192,67 @@ export default function LocateHospital() {
             </form>
           </div>
 
-          <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">
-              Nearby Hospitals ({hospitals.length})
-            </h2>
-            
-            {hospitals.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">
-                No hospitals found nearby. Your query will be sent to all available hospitals.
-              </p>
-            ) : (
-              <div className="space-y-4">
-                {hospitals.map((hospital) => (
-                  <div key={hospital._id} className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-semibold text-lg">{hospital.hospitalName}</h3>
-                        <p className="text-sm text-gray-600">{hospital.address}, {hospital.city}</p>
-                        <p className="text-sm text-gray-600 mt-1">
-                          📞 {hospital.contactNumber}
-                          {hospital.emergencyNumber && ` | 🚨 ${hospital.emergencyNumber}`}
-                        </p>
-                      </div>
-                      {hospital.distance && (
-                        <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
-                          {hospital.distance} km
-                        </span>
-                      )}
-                    </div>
-                    
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                      <div className="bg-green-50 p-2 rounded">
-                        <span className="text-gray-600">Available Beds:</span>
-                        <span className="font-semibold ml-1">{hospital.availableBeds}/{hospital.totalBeds}</span>
-                      </div>
-                      <div className="bg-red-50 p-2 rounded">
-                        <span className="text-gray-600">ICU Beds:</span>
-                        <span className="font-semibold ml-1">{hospital.availableIcuBeds}/{hospital.icuBeds}</span>
-                      </div>
-                    </div>
+          {/* Hospitals only shown after location is granted */}
+          {location && (
+            <div className="bg-white shadow rounded-lg p-6">
+              <h2 className="text-xl font-semibold mb-4">
+                Nearby Hospitals ({hospitals.length})
+                {hospitalRadius && (
+                  <span className="text-sm font-normal text-gray-500 ml-2">within {hospitalRadius}km</span>
+                )}
+              </h2>
 
-                    {hospital.specializations && hospital.specializations.length > 0 && (
-                      <div className="mt-2">
-                        <p className="text-xs text-gray-500">Specializations:</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {hospital.specializations.map((spec, idx) => (
-                            <span key={idx} className="text-xs bg-gray-100 px-2 py-1 rounded">
-                              {spec}
-                            </span>
-                          ))}
+              {hospitals.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">
+                  No hospitals found within 10km.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {hospitals.map((hospital) => (
+                    <div key={hospital._id} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-semibold text-lg">{hospital.hospitalName}</h3>
+                          <p className="text-sm text-gray-600">{hospital.address}, {hospital.city}</p>
+                          <p className="text-sm text-gray-600 mt-1">
+                            📞 {hospital.contactNumber}
+                            {hospital.emergencyNumber && ` | 🚨 ${hospital.emergencyNumber}`}
+                          </p>
+                        </div>
+                        {hospital.distance && (
+                          <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded whitespace-nowrap">
+                            {hospital.distance} km
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                        <div className="bg-green-50 p-2 rounded">
+                          <span className="text-gray-600">Available Beds:</span>
+                          <span className="font-semibold ml-1">{hospital.availableBeds}/{hospital.totalBeds}</span>
+                        </div>
+                        <div className="bg-red-50 p-2 rounded">
+                          <span className="text-gray-600">ICU Beds:</span>
+                          <span className="font-semibold ml-1">{hospital.availableIcuBeds}/{hospital.icuBeds}</span>
                         </div>
                       </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+
+                      {hospital.specializations?.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-xs text-gray-500">Specializations:</p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {hospital.specializations.map((spec, idx) => (
+                              <span key={idx} className="text-xs bg-gray-100 px-2 py-1 rounded">{spec}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </Layout>
