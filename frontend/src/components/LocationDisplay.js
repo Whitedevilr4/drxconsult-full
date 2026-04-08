@@ -81,7 +81,7 @@ export default function LocationDisplay() {
           setStatus('unavailable')
         }
       },
-      { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 }
+      { enableHighAccuracy: false, timeout: 20000, maximumAge: 300000 }
     )
   }, [])
 
