@@ -1,206 +1,130 @@
 import { useState } from 'react'
 import Link from 'next/link'
 
-const HospitalIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-  </svg>
-)
+// Compact top-bar location component
+// prompt  → shows "📍 Enable location" button
+// loading → shows spinner
+// success → shows city name pill + nearby hospital count (tappable → /locate-hospital)
+// hidden  → returns null (denied / any error)
 
-// States: 'prompt' | 'loading' | 'success' | 'hidden'
-// 'hidden' = denied/unavailable → component disappears entirely
 export default function LocationDisplay() {
   const [status, setStatus] = useState('prompt')
-  const [location, setLocation] = useState(null)
-  const [nearbyHospitals, setNearbyHospitals] = useState([])
-  const [userCoords, setUserCoords] = useState(null)
+  const [cityName, setCityName] = useState('')
+  const [hospitalCount, setHospitalCount] = useState(null)
 
-  // Hide entirely if geolocation not supported
   if (typeof window !== 'undefined' && !navigator.geolocation) return null
 
-  const fetchNearbyHospitals = async (latitude, longitude) => {
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/hospitals/nearby?latitude=${latitude}&longitude=${longitude}&radius=5`
-      )
-      if (response.ok) {
-        const data = await response.json()
-        setNearbyHospitals(data.hospitals || [])
-      }
-    } catch (err) {
-      console.log('Nearby hospitals fetch error:', err)
-    }
-  }
-
-  const handlePosition = async (position) => {
-    const { latitude, longitude } = position.coords
-    setUserCoords({ latitude, longitude })
-
+  const fetchNearbyHospitals = async (lat, lng) => {
     try {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`
+        `${process.env.NEXT_PUBLIC_API_URL}/hospitals/nearby?latitude=${lat}&longitude=${lng}&radius=5`
       )
-      const data = await res.json()
-      const city = data.address?.city || data.address?.town || data.address?.village || data.address?.county
-      const state = data.address?.state
-      const country = data.address?.country
-
-      let text = ''
-      if (city && state) text = `${city}, ${state}`
-      else if (city && country) text = `${city}, ${country}`
-      else if (state && country) text = `${state}, ${country}`
-      else text = country || 'Your Location'
-
-      setLocation(text)
+      if (res.ok) {
+        const data = await res.json()
+        setHospitalCount((data.hospitals || []).length)
+      }
     } catch {
-      setLocation(`${latitude.toFixed(2)}°, ${longitude.toFixed(2)}°`)
+      // silently ignore — hospital count is optional
     }
-
-    setStatus('success')
-    await fetchNearbyHospitals(latitude, longitude)
   }
 
-  // User tapped "Enable Location" — this is the direct user gesture
+  // Direct user gesture handler — browser popup fires from this click
   const handleEnableClick = () => {
     setStatus('loading')
     navigator.geolocation.getCurrentPosition(
-      handlePosition,
-      (err) => {
-        console.log('Geolocation error — code:', err.code, '| message:', err.message)
-        // Any error (denied, unavailable, timeout) → hide the component
+      async (position) => {
+        const { latitude, longitude } = position.coords
+        console.log('Location:', latitude, longitude)
+
+        // Reverse geocode for city name
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`
+          )
+          const data = await res.json()
+          const city =
+            data.address?.city ||
+            data.address?.town ||
+            data.address?.village ||
+            data.address?.county ||
+            data.address?.state ||
+            'Your Location'
+          setCityName(city)
+        } catch {
+          setCityName(`${latitude.toFixed(2)}°, ${longitude.toFixed(2)}°`)
+        }
+
+        setStatus('success')
+        fetchNearbyHospitals(latitude, longitude)
+      },
+      (error) => {
+        console.log('Geolocation error — code:', error.code, '| message:', error.message)
+        // Any error → hide the component entirely
         setStatus('hidden')
       },
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
     )
   }
 
-  const toRad = (d) => d * (Math.PI / 180)
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371
-    const dLat = toRad(lat2 - lat1)
-    const dLon = toRad(lon2 - lon1)
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  }
-
-  // Hidden — render nothing
   if (status === 'hidden') return null
 
-  // Loading — waiting for browser GPS response
   if (status === 'loading') {
     return (
-      <div className="flex items-center justify-center gap-2 text-sm text-gray-500 py-2">
-        <svg className="w-4 h-4 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
+      <div className="flex items-center justify-center gap-2 py-1 text-xs text-gray-500">
+        <svg className="w-3 h-3 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
         </svg>
-        <span>Detecting your location...</span>
+        <span>Detecting location...</span>
       </div>
     )
   }
 
-  // Prompt — Swiggy-style "Enable Location" card
-  if (status === 'prompt') {
+  if (status === 'success') {
     return (
-      <div className="flex items-center justify-center gap-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
-        <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-          <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="flex items-center justify-center gap-3 flex-wrap py-1">
+        {/* Location pill */}
+        <div className="flex items-center gap-1.5 text-xs text-gray-700 bg-blue-50 border border-blue-100 px-3 py-1 rounded-full">
+          <svg className="w-3 h-3 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
+          <span className="font-medium">{cityName}</span>
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-800">Find hospitals near you</p>
-          <p className="text-xs text-gray-500">Enable location to see nearby hospitals</p>
-        </div>
-        <button
-          onClick={handleEnableClick}
-          className="flex-shrink-0 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
-        >
-          Enable
-        </button>
-      </div>
-    )
-  }
 
-  // Success — show location + nearby hospitals
-  return (
-    <div className="w-full">
-      <div className="flex items-center justify-center space-x-3 flex-wrap">
-        <div className="flex items-center space-x-2 text-gray-700 text-sm bg-gradient-to-r from-blue-50 to-indigo-50 px-3 py-1.5 rounded-full shadow-sm">
-          <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          <span className="font-medium">{location}</span>
-        </div>
-        {nearbyHospitals.length > 0 && (
-          <div className="flex items-center space-x-2 text-sm bg-gradient-to-r from-green-50 to-emerald-50 px-3 py-1.5 rounded-full shadow-sm text-green-700 font-medium">
-            <HospitalIcon />
-            <span>{nearbyHospitals.length} Hospital{nearbyHospitals.length > 1 ? 's' : ''} Within 5km</span>
-          </div>
+        {/* Hospital count pill — only shown if hospitals found */}
+        {hospitalCount !== null && (
+          <Link
+            href="/locate-hospital"
+            className="flex items-center gap-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-100 px-3 py-1 rounded-full hover:bg-green-100 transition-colors"
+          >
+            <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+            <span>
+              {hospitalCount > 0
+                ? `${hospitalCount} hospital${hospitalCount > 1 ? 's' : ''} nearby`
+                : 'No hospitals within 5km'}
+            </span>
+          </Link>
         )}
       </div>
+    )
+  }
 
-      {nearbyHospitals.length > 0 && (
-        <div className="mt-3 bg-white rounded-lg shadow-md border border-gray-100 overflow-hidden">
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-2 border-b border-gray-100">
-            <h3 className="font-semibold text-gray-800 text-sm flex items-center space-x-2">
-              <HospitalIcon />
-              <span>Nearby Hospitals</span>
-            </h3>
-          </div>
-          <div className="max-h-64 overflow-y-auto">
-            {nearbyHospitals.slice(0, 5).map((hospital) => {
-              const distance = userCoords && hospital.latitude && hospital.longitude
-                ? calculateDistance(userCoords.latitude, userCoords.longitude, hospital.latitude, hospital.longitude)
-                : hospital.distance
-              return (
-                <div key={hospital._id} className="p-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0">
-                  <div className="flex justify-between items-start mb-1">
-                    <h4 className="font-semibold text-gray-800 text-sm">{hospital.hospitalName}</h4>
-                    {distance && (
-                      <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium whitespace-nowrap ml-2">
-                        {distance.toFixed(1)} km
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-600 mb-2">{hospital.address}, {hospital.city}</p>
-                  <div className="flex items-center justify-between text-xs">
-                    <div className="flex items-center space-x-3 flex-wrap">
-                      <span className="text-gray-600">🛏️ {hospital.availableBeds}/{hospital.totalBeds} beds</span>
-                      {hospital.availableIcuBeds > 0 && (
-                        <span className="text-red-600">🏥 {hospital.availableIcuBeds} ICU</span>
-                      )}
-                    </div>
-                    <a href={`tel:${hospital.contactNumber}`} className="text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap">
-                      📞 Call
-                    </a>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-          {nearbyHospitals.length > 5 && (
-            <div className="p-3 border-t border-gray-100 bg-gray-50 text-center">
-              <Link href="/locate-hospital" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-                View All {nearbyHospitals.length} Hospitals →
-              </Link>
-            </div>
-          )}
-        </div>
-      )}
-
-      {nearbyHospitals.length === 0 && (
-        <div className="mt-3 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center">
-          <p className="text-sm text-yellow-800">
-            No hospitals found within 5km.{' '}
-            <Link href="/locate-hospital" className="text-blue-600 hover:text-blue-700 font-medium">
-              Search wider area →
-            </Link>
-          </p>
-        </div>
-      )}
+  // prompt — compact inline button
+  return (
+    <div className="flex items-center justify-center py-1">
+      <button
+        onClick={handleEnableClick}
+        className="flex items-center gap-2 text-xs text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-full transition-colors font-medium"
+      >
+        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+        Enable location for nearby hospitals
+      </button>
     </div>
   )
 }
