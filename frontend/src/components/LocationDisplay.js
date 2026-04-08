@@ -81,18 +81,41 @@ export default function LocationDisplay() {
           setStatus('unavailable')
         }
       },
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 300000 }
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
     )
   }, [])
 
   useEffect(() => {
     if (!navigator.geolocation) {
       setStatus('unsupported')
+      return
     }
-    // Never auto-request location on mount — always require a user tap.
-    // Auto-requesting causes Android Chrome to silently deny or show "blocked"
-    // because the request isn't tied to a direct user gesture.
-  }, [])
+
+    // Use Permissions API to watch for state changes.
+    // If the user previously denied but then grants in settings, we auto-retry.
+    // If already granted, we can safely auto-request (no prompt shown, no Android block).
+    if (navigator.permissions) {
+      navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+        if (result.state === 'granted') {
+          // Permission already granted — safe to auto-request, no dialog will appear
+          requestLocation()
+        }
+        // Watch for changes (e.g. user goes to settings and grants/revokes)
+        result.onchange = () => {
+          if (result.state === 'granted') {
+            requestLocation()
+          } else if (result.state === 'denied') {
+            setStatus('denied')
+          } else {
+            // 'prompt' — reset to idle so the button shows again
+            setStatus('idle')
+          }
+        }
+      }).catch(() => {
+        // Permissions API not supported — fall through to manual button
+      })
+    }
+  }, [requestLocation])
 
   const toRad = (d) => d * (Math.PI / 180)
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -125,13 +148,24 @@ export default function LocationDisplay() {
 
   if (status === 'denied' || status === 'unavailable') {
     return (
-      <button
-        onClick={requestLocation}
-        className="flex items-center space-x-2 text-sm text-gray-500 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 px-3 py-1.5 rounded-full transition-colors border border-gray-200"
-      >
-        <LocationIcon />
-        <span>{status === 'denied' ? 'Location blocked — tap to retry' : 'Location unavailable — tap to retry'}</span>
-      </button>
+      <div className="flex flex-col items-center gap-2">
+        <button
+          onClick={requestLocation}
+          className="flex items-center space-x-2 text-sm text-gray-500 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 px-3 py-1.5 rounded-full transition-colors border border-gray-200"
+        >
+          <LocationIcon />
+          <span>
+            {status === 'denied'
+              ? 'Location blocked — tap to retry'
+              : 'Location unavailable — tap to retry'}
+          </span>
+        </button>
+        {status === 'denied' && (
+          <p className="text-xs text-gray-400 text-center px-2">
+            If you already granted permission in settings, tap retry above — it will update automatically.
+          </p>
+        )}
+      </div>
     )
   }
 
