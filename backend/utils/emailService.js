@@ -119,11 +119,11 @@ const emailTemplates = {
         
         <p>Hello,</p>
         
-        <p>You have received a new booking for a ${booking.serviceType === 'prescription_review' ? 'prescription review' : booking.serviceType === 'doctor_consultation' ? 'doctor consultation' : 'consultation'} session.</p>
+        <p>You have received a new booking for a ${booking.serviceType === 'prescription_review' ? 'prescription review' : booking.serviceType === 'doctor_consultation' ? 'doctor consultation' : booking.serviceType === 'nutritionist_consultation' ? 'nutritionist consultation' : 'consultation'} session.</p>
         
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <h3 style="margin-top: 0; color: #2c3e50;">Booking Details:</h3>
-          <p><strong>Service Type:</strong> ${booking.serviceType === 'prescription_review' ? 'Know Your Prescription (₹149)' : booking.serviceType === 'doctor_consultation' ? 'Doctor Consultation (₹499)' : 'Full Consultation (₹449)'}</p>
+          <p><strong>Service Type:</strong> ${booking.serviceType === 'prescription_review' ? 'Know Your Prescription (₹149)' : booking.serviceType === 'doctor_consultation' ? `Doctor Consultation (₹${booking.paymentAmount || 499})` : booking.serviceType === 'nutritionist_consultation' ? `Nutritionist Consultation (₹${booking.paymentAmount || 500})` : 'Full Consultation (₹449)'}</p>
           <p><strong>Patient:</strong> ${patientName}</p>
           <p><strong>Email:</strong> ${patientEmail}</p>
           ${patientPhone ? `<p><strong>Phone:</strong> ${patientPhone}</p>` : ''}
@@ -142,7 +142,7 @@ const emailTemplates = {
         
         <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0;">
           <h4 style="margin-top: 0; color: #856404;">Your Earnings:</h4>
-          <p><strong>Your Share:</strong> ₹${booking.pharmacistShare || booking.doctorShare || (booking.serviceType === 'prescription_review' ? Math.round(149 * 0.7) : booking.serviceType === 'doctor_consultation' ? 250 : Math.round(449 * 0.7))}</p>
+          <p><strong>Your Share:</strong> ₹${booking.pharmacistShare || booking.doctorShare || booking.nutritionistShare || (booking.serviceType === 'prescription_review' ? Math.round(149 * 0.7) : booking.serviceType === 'doctor_consultation' ? 250 : booking.serviceType === 'nutritionist_consultation' ? Math.round((booking.paymentAmount || 500) * 0.7) : Math.round(449 * 0.7))}</p>
           <p><em>70% of the total booking amount</em></p>
         </div>
         
@@ -155,7 +155,7 @@ const emailTemplates = {
         </ul>
         
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${process.env.FRONTEND_URL}/${booking.providerType || 'pharmacist'}/dashboard" 
+          <a href="${process.env.FRONTEND_URL}/${booking.providerType === 'nutritionist' ? 'nutritionist' : booking.providerType === 'doctor' ? 'doctor' : 'pharmacist'}/dashboard" 
              style="background-color: #3498db; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
             Go to Dashboard
           </a>
@@ -354,6 +354,8 @@ const emailTemplates = {
             <li><strong>📋 Prescription Reviews:</strong> Get expert guidance on your medications (₹149)</li>
             <li><strong>👨‍⚕️ Full Consultations:</strong> Comprehensive health consultations with doctors (₹449)</li>
             <li><strong>💊 Pharmacist Sessions:</strong> Medication counseling with certified pharmacists</li>
+            <li><strong>👨‍⚕️ Doctor Sessions:</strong> Health counseling with certified Doctors</li>
+            <li><strong>👨‍⚕️ Certified Nutritionist Sessions:</strong> Create Peronal Diet Chart with certified Nutritionist</li>
             <li><strong>📱 Easy Booking:</strong> Schedule sessions at your convenience</li>
             <li><strong>📄 Digital Reports:</strong> Access your consultation reports anytime</li>
           </ul>
@@ -1112,7 +1114,7 @@ const sendOTPEmail = async (email, otp, userName = '', type = 'signup') => {
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
             <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
               <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="color: #2563eb; margin: 0;">Medecil</h1>
+                <h1 style="color: #2563eb; margin: 0;">DrX Consult</h1>
                 <p style="color: #666; margin: 5px 0;">Email Verification Required</p>
               </div>
               
