@@ -421,7 +421,7 @@ export default function SubscriptionPlans() {
                       'Period & PCOS care',
                       'Weight management',
                       '1-to-1 Chat support',
-                      'Priority care'
+                      'Priority care',
                       'Surprice Gift'
                     ].map((item) => (
                       <li key={item} className="flex items-center text-gray-700">
@@ -522,7 +522,7 @@ export default function SubscriptionPlans() {
                       'Live yoga sessions',
                       'Weight sessions',
                       '1-to-1 Chat support',
-                      'Priority care'
+                      'Priority care',
                       'Surprice Gift'
                     ].map((item) => (
                       <li key={item} className="flex items-center text-gray-700">
@@ -622,7 +622,7 @@ export default function SubscriptionPlans() {
                       '1-to-1 Chat support',
                       'Craving care',
                       'Motivated week planning',
-                      'Cheat meal guidance'
+                      'Cheat meal guidance'.
                       'Surprice Gift'
                     ].map((item) => (
                       <li key={item} className="flex items-center text-gray-700">
