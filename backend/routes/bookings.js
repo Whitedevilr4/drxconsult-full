@@ -520,6 +520,17 @@ router.put('/:id/report', auth, async (req, res) => {
       }
     }
     
+    // Check if user is the nutritionist for this booking
+    if (booking.nutritionistId && !isAuthorized) {
+      const Nutritionist = require('../models/Nutritionist');
+      const nutritionist = await Nutritionist.findOne({ userId: req.user.userId });
+      if (nutritionist && booking.nutritionistId.toString() === nutritionist._id.toString()) {
+        professional = nutritionist;
+        professionalUser = await User.findById(nutritionist.userId);
+        isAuthorized = true;
+      }
+    }
+    
     if (!isAuthorized) {
       return res.status(403).json({ message: 'Not authorized to update this booking' });
     }
@@ -532,11 +543,13 @@ router.put('/:id/report', auth, async (req, res) => {
     const patient = await User.findById(booking.patientId);
     
     if (patient?.email) {
+      const professionalType = booking.nutritionistId ? 'nutritionist' : booking.doctorId ? 'doctor' : 'pharmacist';
       await sendReportSubmittedEmail(
         patient.email,
         booking,
         patient.name,
-        professionalUser?.name || (booking.doctorId ? 'Doctor' : 'Pharmacist')
+        professionalUser?.name || (booking.nutritionistId ? 'Nutritionist' : booking.doctorId ? 'Doctor' : 'Pharmacist'),
+        professionalType
       );
     }
     
