@@ -420,8 +420,9 @@ export default function SubscriptionPlans() {
                       'Live yoga sessions',
                       'Period & PCOS care',
                       'Weight management',
-                      '1-to-1 WhatsApp support',
+                      '1-to-1 Chat support',
                       'Priority care'
+                      'Surprice Gift'
                     ].map((item) => (
                       <li key={item} className="flex items-center text-gray-700">
                         <span className="text-pink-500 mr-2">✔</span>
@@ -512,7 +513,7 @@ export default function SubscriptionPlans() {
                   <ul className="space-y-2">
                     {[
                       '1-to-1 Doctor consultation monthly',
-                      'Dedicated diet coach',
+                      '1-to-1 Dedicated diet coach',
                       'Personalised diet chart',
                       'Comprehensive medical history',
                       'BP management',
@@ -520,8 +521,9 @@ export default function SubscriptionPlans() {
                       'Thyroid care',
                       'Live yoga sessions',
                       'Weight sessions',
-                      '1-to-1 WhatsApp support',
+                      '1-to-1 Chat support',
                       'Priority care'
+                      'Surprice Gift'
                     ].map((item) => (
                       <li key={item} className="flex items-center text-gray-700">
                         <span className="text-blue-500 mr-2">✔</span>
@@ -617,10 +619,11 @@ export default function SubscriptionPlans() {
                       '1 Comprehensive medical history',
                       'Personalised diet chart',
                       'Weight management',
-                      '1-to-1 WhatsApp support',
+                      '1-to-1 Chat support',
                       'Craving care',
                       'Motivated week planning',
                       'Cheat meal guidance'
+                      'Surprice Gift'
                     ].map((item) => (
                       <li key={item} className="flex items-center text-gray-700">
                         <span className="text-purple-500 mr-2">✔</span>
