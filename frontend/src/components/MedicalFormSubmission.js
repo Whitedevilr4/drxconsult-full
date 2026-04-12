@@ -252,7 +252,7 @@ const MedicalFormSubmission = ({ onFormSubmitted }) => {
                 <ul className="list-disc list-inside space-y-1">
                   <li>Your form will be reviewed by our admin team</li>
                   <li>A professional will be assigned to analyze your prescription</li>
-                  <li>Results will be available for download after payment of ₹29</li>
+                  <li>Results will be available for download after payment of ₹7</li>
                   <li>You'll receive notifications about the progress</li>
                 </ul>
               </div>
