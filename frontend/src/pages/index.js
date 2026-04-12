@@ -380,7 +380,7 @@ export default function Home() {
       <Layout>
       <div className="bg-gray-50 md:pt-0 -mt-1" suppressHydrationWarning>
         {/* Hero Slider Section */}
-        <div className="relative overflow-hidden min-h-[220px] md:min-h-[750px]" suppressHydrationWarning>
+        <div className="relative overflow-hidden min-h-[220px] md:min-h-[800px]" suppressHydrationWarning>
           {/* Slide Backgrounds */}
           {slides.map((slide, index) => (
             <div
