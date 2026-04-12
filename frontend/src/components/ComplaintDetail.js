@@ -4,7 +4,7 @@ import axios from 'axios';
 import { io } from 'socket.io-client';
 import { showBrowserNotification } from '@/utils/browserNotification';
 
-const SOCKET_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace('/api', '');
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace('/api', '');
 
 export default function ComplaintDetail({ complaint, onClose, onUpdate, isAdmin = false }) {
   const [adminResponse, setAdminResponse] = useState('');
