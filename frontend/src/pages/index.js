@@ -380,8 +380,8 @@ export default function Home() {
       <Layout>
       <div className="bg-gray-50 md:pt-0 -mt-1" suppressHydrationWarning>
         {/* Hero Slider Section */}
-        <div className="relative overflow-hidden" suppressHydrationWarning>
-          {/* Slide Backgrounds - Each slide has its own full-width background */}
+        <div className="relative overflow-hidden min-h-[220px] md:min-h-[750px]" suppressHydrationWarning>
+          {/* Slide Backgrounds */}
           {slides.map((slide, index) => (
             <div
               key={`bg-${index}`}
@@ -395,102 +395,92 @@ export default function Home() {
                   ? `url(${websiteSettings.heroSection.backgroundImage})`
                   : undefined,
                 backgroundSize: 'cover',
-                backgroundPosition: 'center',
+                backgroundPosition: 'center center',
                 backgroundRepeat: 'no-repeat',
-                backgroundColor: !slide.slideImage && !websiteSettings?.heroSection?.backgroundImage
-                  ? undefined
-                  : 'transparent'
               }}
             >
-              {/* Gradient overlay for better text readability */}
               {!slide.slideImage && !websiteSettings?.heroSection?.backgroundImage && (
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-blue-800"></div>
               )}
-              {/* Dark overlay for images */}
-              <div className="absolute inset-0 bg-black opacity-50"></div>
+              <div className="absolute inset-0 bg-black opacity-10 md:opacity-10"></div>
             </div>
           ))}
 
           {/* Content Container */}
-          <div className="container mx-auto px-4 py-8 sm:py-12 md:py-16 lg:py-20 relative z-10">
-            <div 
-              className="max-w-4xl mx-auto text-center rounded-2xl p-6 sm:p-8 text-white"
+          <div className="container mx-auto px-4 py-0 md:py-24 lg:py-32 relative z-10 min-h-[220px] md:min-h-0 flex items-center md:block">
+            <div
+              className="max-w-4xl mx-auto text-center rounded-2xl p-6 md:p-8 text-white w-full"
               style={{
-                backgroundImage: websiteSettings?.heroSection?.textBackgroundImage 
-                  ? `url(${websiteSettings.heroSection.textBackgroundImage})` 
+                backgroundImage: websiteSettings?.heroSection?.textBackgroundImage
+                  ? `url(${websiteSettings.heroSection.textBackgroundImage})`
                   : undefined,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
-                backgroundColor: websiteSettings?.heroSection?.textBackgroundImage 
-                  ? 'rgba(0, 0, 0, 0.3)' 
+                backgroundColor: websiteSettings?.heroSection?.textBackgroundImage
+                  ? 'rgba(0, 0, 0, 0.3)'
                   : 'transparent',
-                backdropFilter: websiteSettings?.heroSection?.textBackgroundImage 
-                  ? 'blur(2px)' 
+                backdropFilter: websiteSettings?.heroSection?.textBackgroundImage
+                  ? 'blur(2px)'
                   : 'none'
               }}
             >
-              {/* Sliding Content */}
-              <div className="relative" style={{ minHeight: '300px' }}>
+              {/* Sliding Content — no fixed height, let content size naturally */}
+              <div className="relative">
                 {slides.map((slide, index) => (
                   <div
                     key={index}
-                    className={`absolute inset-0 transition-all duration-1000 ${
-                      index === currentSlide
-                        ? 'opacity-100 transform translate-x-0'
-                        : index < currentSlide
-                        ? 'opacity-0 transform -translate-x-full'
-                        : 'opacity-0 transform translate-x-full'
+                    className={`transition-opacity duration-700 ${
+                      index === currentSlide ? 'opacity-100' : 'opacity-0 absolute inset-0 pointer-events-none'
                     }`}
                   >
                     {slide.isMainSlide ? (
                       /* Main Banner Slide */
-                      <div className="space-y-4 sm:space-y-6">
-                        {/* Icon only (no image display here since it's the background) */}
+                      <div className="space-y-3 md:space-y-5">
                         {!slide.slideImage && (
-                          <div className="mb-4 sm:mb-6 inline-block">
-                            <div className="bg-white bg-opacity-20 backdrop-blur-sm rounded-full p-3 sm:p-4 inline-flex">
-                              <svg className="w-8 h-8 sm:w-12 sm:h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <div className="mb-3 md:mb-5 inline-block">
+                            <div className="bg-white bg-opacity-20 backdrop-blur-sm rounded-full p-3 md:p-4 inline-flex">
+                              <svg className="w-8 h-8 md:w-12 md:h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                               </svg>
                             </div>
                           </div>
                         )}
 
-                        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold mb-3 sm:mb-4 leading-tight">
+                        <h1 className="text-2xl md:text-5xl lg:text-6xl font-extrabold leading-tight">
                           {websiteSettings?.heroSection?.title || slide.title}
                         </h1>
-                        
-                        <div className="space-y-2 sm:space-y-3">
-                          <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-semibold text-blue-100">
+
+                        <div className="space-y-1 md:space-y-2">
+                          <p className="text-base md:text-2xl lg:text-3xl font-semibold text-blue-100">
                             {websiteSettings?.heroSection?.subtitle || slide.subtitle}
                           </p>
-                          <p className="text-sm sm:text-base md:text-lg lg:text-xl text-blue-50 max-w-2xl mx-auto leading-relaxed px-4">
+                          <p className="text-sm md:text-lg text-blue-50 max-w-2xl mx-auto leading-relaxed">
                             {websiteSettings?.heroSection?.description || slide.description}
                           </p>
                         </div>
 
-                        {/* Key Features */}
-                        <div className="flex flex-wrap justify-center gap-2 sm:gap-4 mt-4 sm:mt-6 px-4">
+                        {/* Key Features — hidden on mobile, shown on desktop */}
+                        <div className="hidden md:flex flex-wrap justify-center gap-3 mt-5">
                           {slide.features.map((feature, idx) => (
-                            <div key={idx} className="bg-white bg-opacity-10 backdrop-blur-sm rounded-full px-3 sm:px-6 py-2 sm:py-3 flex items-center space-x-1 sm:space-x-2">
-                              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <div key={idx} className="bg-white bg-opacity-10 backdrop-blur-sm rounded-full px-5 py-2.5 flex items-center space-x-2">
+                              <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                               </svg>
-                              <span className="text-xs sm:text-sm font-medium">{feature.text}</span>
+                              <span className="text-sm font-medium whitespace-nowrap">{feature.text}</span>
                             </div>
                           ))}
                         </div>
 
-                        <p className="mt-4 sm:mt-6 text-sm sm:text-base text-blue-100 italic max-w-2xl mx-auto px-4">
+                        <p className="text-sm md:text-sm text-blue-100 italic max-w-2xl mx-auto">
                           "{slide.quote}"
                         </p>
 
                         {/* CTA Button */}
-                        <div className="mt-6 sm:mt-8">
+                        <div className="mt-4 md:mt-6">
                           <a
                             href="#pharmacists"
-                            className="inline-block bg-white text-blue-600 px-6 sm:px-8 py-3 sm:py-4 rounded-full font-semibold text-base sm:text-lg hover:bg-blue-50 transition-colors shadow-lg"
+                            className="inline-block bg-white text-blue-600 px-6 md:px-8 py-3 md:py-4 rounded-full font-semibold text-base md:text-lg hover:bg-blue-50 transition-colors shadow-lg"
                           >
                             {websiteSettings?.heroSection?.ctaText || 'Book Consultation'}
                           </a>
@@ -498,15 +488,14 @@ export default function Home() {
                       </div>
                     ) : (
                       /* Regular Slides */
-                      <div>
-                        {/* Icon only (no image display here since it's the background) */}
+                      <div className="space-y-2 md:space-y-4">
                         {!slide.slideImage && (
-                          <div className="text-4xl sm:text-6xl mb-4 sm:mb-6 animate-bounce">{slide.icon}</div>
+                          <div className="text-4xl md:text-6xl animate-bounce">{slide.icon}</div>
                         )}
-                        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4">{slide.title}</h1>
-                        <p className="text-base sm:text-lg lg:text-xl text-blue-100 px-4">{slide.description}</p>
+                        <h1 className="text-2xl md:text-4xl lg:text-5xl font-bold">{slide.title}</h1>
+                        <p className="text-sm md:text-lg lg:text-xl text-blue-100">{slide.description}</p>
                         {slide.quote && (
-                          <p className="mt-4 text-sm sm:text-base text-blue-100 italic max-w-2xl mx-auto px-4">
+                          <p className="text-sm md:text-sm text-blue-100 italic max-w-2xl mx-auto">
                             "{slide.quote}"
                           </p>
                         )}
@@ -516,19 +505,34 @@ export default function Home() {
                 ))}
               </div>
 
-              {/* Slide Indicators */}
-              <div className="flex justify-center space-x-2 mt-6 sm:mt-8">
-                {slides.map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setCurrentSlide(index)}
-                    className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full transition-all ${
-                      index === currentSlide ? 'bg-white w-6 sm:w-8' : 'bg-blue-300'
-                    }`}
-                  />
-                ))}
-              </div>
+              {/* Desktop dots — removed from content flow, rendered absolutely below */}
             </div>
+          </div>
+
+          {/* Mobile-only dots — absolutely pinned to bottom of banner */}
+          <div className="md:hidden absolute bottom-3 left-0 right-0 flex justify-center space-x-2 z-20">
+            {slides.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentSlide(index)}
+                className={`h-2 rounded-full transition-all ${
+                  index === currentSlide ? 'bg-white w-6 opacity-90' : 'bg-white w-2 opacity-60'
+                }`}
+              />
+            ))}
+          </div>
+
+          {/* Desktop dots — absolutely pinned to bottom of banner */}
+          <div className="hidden md:flex absolute bottom-6 left-0 right-0 justify-center space-x-2 z-20">
+            {slides.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentSlide(index)}
+                className={`h-3 rounded-full transition-all ${
+                  index === currentSlide ? 'bg-white w-10 opacity-95' : 'bg-white w-3 opacity-70'
+                }`}
+              />
+            ))}
           </div>
         </div>
 
