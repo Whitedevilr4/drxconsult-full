@@ -72,7 +72,7 @@ export default function Footer() {
               </h3>
             </div>
             <p className="text-gray-400 text-sm">
-              {websiteSettings?.footerText || 'Connecting patients with expert pharmacists for personalized online counselling sessions.'}
+              {websiteSettings?.footerText || 'Connecting patients with expert Medical Professional for personalized online counselling sessions.'}
             </p>
             
             {/* Social Media Links */}
