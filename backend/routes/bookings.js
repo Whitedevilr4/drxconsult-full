@@ -1274,12 +1274,10 @@ router.post('/:bookingId/chat', auth, async (req, res) => {
     const booking = await Booking.findById(req.params.bookingId)
     if (!booking) return res.status(404).json({ message: 'Booking not found' })
 
-    // Cancelled bookings: no chat at all
     if (booking.status === 'cancelled') {
       return res.status(403).json({ message: 'Chat is disabled for cancelled bookings.' })
     }
 
-    // Regular bookings only: enforce 48hr window after completion
     if (!booking.isSubscriptionBooking && booking.completedAt) {
       const chatWindowMs = 48 * 60 * 60 * 1000
       const chatExpiry = new Date(booking.completedAt.getTime() + chatWindowMs)
@@ -1288,7 +1286,6 @@ router.post('/:bookingId/chat', auth, async (req, res) => {
       }
     }
 
-    // Determine sender type
     const senderType = req.user.role === 'patient' ? 'patient' : 'professional'
 
     const chat = await BookingChat.create({
@@ -1301,36 +1298,40 @@ router.post('/:bookingId/chat', auth, async (req, res) => {
     await chat.populate('senderId', 'name profilePicture')
 
     const io = req.app.get('io')
-    // Emit message to booking room
     emitToRoom(io, `booking:${req.params.bookingId}`, 'new-booking-message', chat)
 
-    // Emit updated unread count to recipient's personal room
-    {
-      const populatedBooking = await Booking.findById(req.params.bookingId)
-        .populate('patientId', '_id')
-        .populate({ path: 'doctorId', populate: { path: 'userId', select: '_id' } })
-        .populate({ path: 'pharmacistId', populate: { path: 'userId', select: '_id' } })
-        .populate({ path: 'nutritionistId', populate: { path: 'userId', select: '_id' } })
-
-      const recipientUserId = req.user.role === 'patient'
-        ? (populatedBooking.doctorId?.userId?._id || populatedBooking.pharmacistId?.userId?._id || populatedBooking.nutritionistId?.userId?._id)
-        : populatedBooking.patientId?._id
-
-      if (recipientUserId) {
-        const BookingChat = require('../models/BookingChat')
-        const unread = await BookingChat.countDocuments({
-          bookingId: req.params.bookingId,
-          senderId: { $ne: recipientUserId },
-          isRead: false
-        })
-        emitToRoom(io, `user:${recipientUserId}`, 'chat-unread-update', {
-          bookingId: req.params.bookingId,
-          unread
-        })
-      }
-    }
-
+    // Respond immediately — don't block on unread count
     res.status(201).json(chat)
+
+    // Update unread badge in background
+    ;(async () => {
+      try {
+        const BookingChat = require('../models/BookingChat')
+        const populatedBooking = await Booking.findById(req.params.bookingId)
+          .populate('patientId', '_id')
+          .populate({ path: 'doctorId', populate: { path: 'userId', select: '_id' } })
+          .populate({ path: 'pharmacistId', populate: { path: 'userId', select: '_id' } })
+          .populate({ path: 'nutritionistId', populate: { path: 'userId', select: '_id' } })
+
+        const recipientUserId = req.user.role === 'patient'
+          ? (populatedBooking.doctorId?.userId?._id || populatedBooking.pharmacistId?.userId?._id || populatedBooking.nutritionistId?.userId?._id)
+          : populatedBooking.patientId?._id
+
+        if (recipientUserId) {
+          const unread = await BookingChat.countDocuments({
+            bookingId: req.params.bookingId,
+            senderId: { $ne: recipientUserId },
+            isRead: false
+          })
+          emitToRoom(io, `user:${recipientUserId}`, 'chat-unread-update', {
+            bookingId: req.params.bookingId,
+            unread
+          })
+        }
+      } catch (err) {
+        console.error('Background unread count error:', err.message)
+      }
+    })()
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message })
   }
