@@ -5,7 +5,7 @@ const HospitalQuery = require('../models/HospitalQuery');
 const Hospital = require('../models/Hospital');
 const HospitalChat = require('../models/HospitalChat');
 const { createNotification } = require('../utils/notificationHelper');
-const { notifyNearbyHospitals } = require('../utils/socketManager');
+const { notifyNearbyHospitals } = require('../utils/socketEmitter');
 
 // Create new query
 router.post('/', auth, async (req, res) => {
