@@ -7,8 +7,8 @@ import BedReservationTimer from '../../../components/BedReservationTimer';
 import axios from '../../../lib/axios';
 import { io } from 'socket.io-client';
 
-// Remove /api from socket URL - Socket.IO connects to root, not /api
-const SOCKET_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace('/api', '');
+// Use dedicated socket URL if set, otherwise strip /api from API URL
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace('/api', '');
 
 export default function HospitalChat() {
   const router = useRouter();
