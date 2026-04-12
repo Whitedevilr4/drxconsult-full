@@ -111,7 +111,7 @@ export default function PatientDashboard() {
 
   const fetchMedicineTracker = async (token) => {
     try {
-      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/medicine-tracker`, {
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/health-trackers/medicine-tracker`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       
