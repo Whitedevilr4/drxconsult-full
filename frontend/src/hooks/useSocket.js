@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 
-// Remove /api from socket URL - Socket.IO connects to root, not /api
-const SOCKET_URL = (process.env.NEXT_PUBLIC_API_URL).replace('/api', '');
+// NEXT_PUBLIC_SOCKET_URL points to the standalone socket server.
+// Falls back to stripping /api from the API URL for backwards compatibility.
+const SOCKET_URL =
+  process.env.NEXT_PUBLIC_SOCKET_URL ||
+  (process.env.NEXT_PUBLIC_API_URL || '').replace('/api', '');
 
 export const useSocket = () => {
   const socketRef = useRef(null);
