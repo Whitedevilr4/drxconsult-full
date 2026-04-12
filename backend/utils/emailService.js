@@ -741,7 +741,7 @@ const emailTemplates = {
             <li>Our admin team will review your form within 24 hours</li>
             <li>A qualified professional (pharmacist or doctor) will be assigned</li>
             <li>You'll receive an email notification once the analysis is complete</li>
-            <li>Results will be available for download after payment of ₹29</li>
+            <li>Results will be available for download after payment of ₹7</li>
           </ul>
         </div>
         
