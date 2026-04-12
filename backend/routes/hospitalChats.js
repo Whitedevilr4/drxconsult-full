@@ -57,7 +57,12 @@ router.post('/:queryId', auth, async (req, res) => {
     const { queryId } = req.params;
     const { message } = req.body;
 
-    const query = await HospitalQuery.findById(queryId);
+    // Run query fetch and hospital lookup in parallel
+    const [query, hospital] = await Promise.all([
+      HospitalQuery.findById(queryId),
+      Hospital.findOne({ userId: req.user.userId })
+    ]);
+
     if (!query) {
       return res.status(404).json({ message: 'Query not found' });
     }
@@ -66,8 +71,6 @@ router.post('/:queryId', auth, async (req, res) => {
       return res.status(400).json({ message: 'Chat only available for accepted queries' });
     }
 
-    // Determine sender type
-    const hospital = await Hospital.findOne({ userId: req.user.userId });
     const isUser = query.userId.toString() === req.user.userId;
     const isHospital = hospital && query.acceptedByHospitalId && query.acceptedByHospitalId.toString() === hospital._id.toString();
 
@@ -84,35 +87,9 @@ router.post('/:queryId', auth, async (req, res) => {
       message
     });
 
-    // Populate sender info
     await chatMessage.populate('senderId', 'name email');
 
-    // Send in-app notification to recipient
-    let recipientId, senderName;
-    
-    if (isHospital) {
-      // Hospital is sending, notify patient
-      recipientId = query.userId;
-      senderName = hospital.hospitalName;
-    } else {
-      // Patient is sending, notify hospital
-      const acceptedHospital = await Hospital.findById(query.acceptedByHospitalId);
-      if (acceptedHospital) {
-        recipientId = acceptedHospital.userId;
-        senderName = query.userId.name || 'Patient';
-      }
-    }
-
-    if (recipientId) {
-      await createNotification({
-        userId: recipientId,
-        type: 'hospital_chat_message',
-        title: 'New Message',
-        message: `${senderName}: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`
-      });
-    }
-
-    // Send real-time Socket.IO message to the query room
+    // Emit socket event immediately — don't wait for notification
     const messageData = {
       _id: chatMessage._id.toString(),
       queryId: queryId.toString(),
@@ -125,7 +102,35 @@ router.post('/:queryId', auth, async (req, res) => {
     const io = req.app.get('io');
     emitToRoom(io, `query:${queryId}`, 'new-message', messageData);
 
+    // Respond to client immediately
     res.status(201).json(chatMessage);
+
+    // Fire notification in background — does not block response
+    (async () => {
+      try {
+        let recipientId, senderName;
+        if (isHospital) {
+          recipientId = query.userId;
+          senderName = hospital.hospitalName;
+        } else {
+          const acceptedHospital = await Hospital.findById(query.acceptedByHospitalId);
+          if (acceptedHospital) {
+            recipientId = acceptedHospital.userId;
+            senderName = 'Patient';
+          }
+        }
+        if (recipientId) {
+          await createNotification({
+            userId: recipientId,
+            type: 'hospital_chat_message',
+            title: 'New Message',
+            message: `${senderName}: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`
+          });
+        }
+      } catch (err) {
+        console.error('Background notification error:', err.message);
+      }
+    })();
   } catch (error) {
     console.error('Error sending message:', error);
     res.status(500).json({ message: 'Server error' });
