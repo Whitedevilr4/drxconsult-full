@@ -61,6 +61,7 @@ export default function SubscriptionChatWindow({ bookingId, currentUserId, other
 
     socket.on('new-booking-message', (msg) => {
       setMessages(prev => {
+        // Deduplicate: skip if real _id already exists, or replace temp if same content
         if (prev.find(m => m._id === msg._id)) return prev
         return [...prev, msg]
       })
@@ -98,21 +99,43 @@ export default function SubscriptionChatWindow({ bookingId, currentUserId, other
 
   const sendMessage = async () => {
     if (!input.trim() || sending || !isChatOpen) return
+    const trimmed = input.trim()
+    const tempId = 'temp-' + Date.now()
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    const tempMsg = {
+      _id: tempId,
+      message: trimmed,
+      senderId: { _id: user._id || user.id, name: user.name },
+      createdAt: new Date().toISOString(),
+      sending: true
+    }
+
+    // 1. Show instantly in sender's UI
+    setMessages(prev => [...prev, tempMsg])
+    setInput('')
     setSending(true)
+
+    // 2. Relay to recipient instantly via socket
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('send-booking-message', {
+        bookingId,
+        messageData: { ...tempMsg, sending: false }
+      })
+    }
+
+    // 3. Persist to DB
     try {
       const token = localStorage.getItem('token')
       const res = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/bookings/${bookingId}/chat`,
-        { message: input.trim() },
+        { message: trimmed },
         { headers: { Authorization: `Bearer ${token}` } }
       )
-      setMessages(prev => {
-        if (prev.find(m => m._id === res.data._id)) return prev
-        return [...prev, res.data]
-      })
-      setInput('')
+      setMessages(prev => prev.map(m => m._id === tempId ? res.data : m))
     } catch (err) {
       console.error('Error sending message:', err)
+      setMessages(prev => prev.filter(m => m._id !== tempId))
+      setInput(trimmed)
     } finally {
       setSending(false)
     }
