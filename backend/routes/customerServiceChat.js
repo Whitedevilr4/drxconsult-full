@@ -3,6 +3,7 @@ const router = express.Router();
 const CustomerServiceChat = require('../models/CustomerServiceChat');
 const { auth } = require('../middleware/auth');
 const { v4: uuidv4 } = require('uuid');
+const { emitToRoom } = require('../utils/socketEmitter');
 
 // Create or get chat session
 router.post('/session', async (req, res) => {
@@ -82,17 +83,12 @@ router.post('/session/:sessionId/message', async (req, res) => {
     
     // Emit Socket.IO event
     const io = req.app.get('io');
-    if (io) {
-      // Notify admins of new message
-      io.to('admins').emit('customer-service-message', {
-        sessionId,
-        message: newMessage,
-        chatStatus: chat.status
-      });
-      
-      // Notify user in their session room
-      io.to(`cs-session:${sessionId}`).emit('new-cs-message', newMessage);
-    }
+    emitToRoom(io, 'admins', 'customer-service-message', {
+      sessionId,
+      message: newMessage,
+      chatStatus: chat.status
+    });
+    emitToRoom(io, `cs-session:${sessionId}`, 'new-cs-message', newMessage);
     
     res.json(newMessage);
   } catch (error) {
@@ -140,11 +136,9 @@ router.post('/admin/chats/:sessionId/assign', auth, async (req, res) => {
     
     // Notify user that admin joined
     const io = req.app.get('io');
-    if (io) {
-      io.to(`cs-session:${sessionId}`).emit('admin-joined', {
-        adminName: req.user.name || 'Support Agent'
-      });
-    }
+    emitToRoom(io, `cs-session:${sessionId}`, 'admin-joined', {
+      adminName: req.user.name || 'Support Agent'
+    });
     
     res.json(chat);
   } catch (error) {
@@ -173,9 +167,7 @@ router.post('/admin/chats/:sessionId/close', auth, async (req, res) => {
     
     // Notify user that chat is closed
     const io = req.app.get('io');
-    if (io) {
-      io.to(`cs-session:${sessionId}`).emit('chat-closed');
-    }
+    emitToRoom(io, `cs-session:${sessionId}`, 'chat-closed', {});
     
     res.json(chat);
   } catch (error) {
