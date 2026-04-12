@@ -2,7 +2,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const http = require('http');
-const { Server } = require('socket.io');
 require('dotenv').config();
 
 const { cleanupExpiredSlots } = require('./utils/slotCleanup');
@@ -12,13 +11,23 @@ const medicineScheduler = require('./utils/medicineScheduler');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    methods: ['GET', 'POST'],
-    credentials: true
-  }
-});
+
+// When SOCKET_SERVER_URL is set, Socket.IO runs on a separate server (e.g. Railway/Render).
+// In that case we skip creating a local io instance and use socketEmitter.js for outbound events.
+const USE_SEPARATE_SOCKET_SERVER = !!process.env.SOCKET_SERVER_URL;
+
+let io = null;
+if (!USE_SEPARATE_SOCKET_SERVER) {
+  const { Server } = require('socket.io');
+  io = new Server(server, {
+    cors: {
+      origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+      methods: ['GET', 'POST'],
+      credentials: true
+    }
+  });
+}
+
 
 // Make io accessible to routes
 app.set('io', io);
@@ -127,8 +136,13 @@ app.use('*', (req, res) => {
 // Server Start Sequence
 // =====================
 const PORT = process.env.PORT || 5000;
-const { initializeSocket } = require('./utils/socketManager');
-initializeSocket(io);
+if (!USE_SEPARATE_SOCKET_SERVER) {
+  const { initializeSocket } = require('./utils/socketManager');
+  initializeSocket(io);
+  console.log('✅ Local Socket.IO initialized');
+} else {
+  console.log(`✅ Using separate socket server: ${process.env.SOCKET_SERVER_URL}`);
+}
 
 // 🔥 The Fix: Connect to DB FIRST, then start listening
 const startServer = async () => {
