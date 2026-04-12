@@ -3,7 +3,7 @@ import axios from 'axios'
 import { io } from 'socket.io-client'
 import CallModal from '@/components/CallModal'
 
-const SOCKET_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace('/api', '')
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace('/api', '')
 
 export default function SubscriptionChatWindow({ bookingId, currentUserId, otherUserId, otherName, onClose }) {
   const [messages, setMessages] = useState([])
