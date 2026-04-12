@@ -500,6 +500,16 @@ const PeriodPCOSTracker = () => {
           >
             Cycle History
           </button>
+          <button
+            onClick={() => setActiveTab('ai-insights')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'ai-insights'
+                ? 'border-pink-500 text-pink-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            🤖 AI Insights
+          </button>
         </nav>
       </div>
 
@@ -1071,6 +1081,305 @@ const PeriodPCOSTracker = () => {
           </div>
         </div>
       )}
+      {/* AI Insights Tab */}
+      {activeTab === 'ai-insights' && (() => {
+        const periods = tracker?.periods || [];
+        const hasCycles = periods.length >= 1;
+
+        // --- Compute cycle gaps between consecutive logged periods ---
+        const sorted = [...periods].sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+        const gaps = [];
+        for (let i = 1; i < sorted.length; i++) {
+          const diff = Math.round(
+            (new Date(sorted[i].startDate) - new Date(sorted[i - 1].startDate)) / (1000 * 60 * 60 * 24)
+          );
+          if (diff > 0 && diff < 90) gaps.push(diff);
+        }
+        const avgActualCycle = gaps.length
+          ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length)
+          : tracker.averageCycleLength;
+
+        // --- Lateness analysis ---
+        const lateRecords = periods.filter(p => p.daysLate != null && p.daysLate > 0);
+        const earlyRecords = periods.filter(p => p.daysLate != null && p.daysLate < 0);
+        const onTimeRecords = periods.filter(p => p.daysLate != null && p.daysLate === 0);
+        const avgLate = lateRecords.length
+          ? (lateRecords.reduce((a, b) => a + b.daysLate, 0) / lateRecords.length).toFixed(1)
+          : 0;
+        const latePercent = periods.length
+          ? Math.round((lateRecords.length / periods.length) * 100)
+          : 0;
+
+        // --- PCOD / PCOS risk from cycle data ---
+        const irregularCycle = avgActualCycle < 21 || avgActualCycle > 35;
+        const frequentlyLate = latePercent >= 50;
+        const highLateDays = parseFloat(avgLate) >= 5;
+
+        let riskLevel = 'Low';
+        let riskColor = 'text-green-600';
+        let riskBg = 'bg-green-50 border-green-200';
+        let riskIcon = '✅';
+        let riskSignals = [];
+
+        if (irregularCycle) {
+          riskSignals.push(`Average cycle of ${avgActualCycle} days is outside the normal 21–35 day range`);
+        }
+        if (frequentlyLate) {
+          riskSignals.push(`${latePercent}% of your periods arrived late — frequent delays suggest hormonal irregularity`);
+        }
+        if (highLateDays) {
+          riskSignals.push(`Average lateness of ${avgLate} days per cycle may indicate ovulation issues`);
+        }
+        if (lateRecords.length >= 2 && avgActualCycle > 35) {
+          riskSignals.push('Consistently long cycles combined with late periods are a key PCOS indicator');
+        }
+
+        if (riskSignals.length >= 3) {
+          riskLevel = 'Moderate–High';
+          riskColor = 'text-red-600';
+          riskBg = 'bg-red-50 border-red-200';
+          riskIcon = '⚠️';
+        } else if (riskSignals.length >= 1) {
+          riskLevel = 'Moderate';
+          riskColor = 'text-orange-600';
+          riskBg = 'bg-orange-50 border-orange-200';
+          riskIcon = '⚡';
+        }
+
+        // --- Cycle regularity score (0–100) ---
+        const regularityScore = gaps.length
+          ? Math.max(0, Math.round(100 - (gaps.reduce((acc, g) => acc + Math.abs(g - avgActualCycle), 0) / gaps.length) * 5))
+          : null;
+
+        return (
+          <div className="max-w-4xl mx-auto space-y-6">
+
+            {/* Header */}
+            <div className="bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-200 rounded-xl p-6">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-3xl">🤖</span>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">AI Cycle Insights</h2>
+                  <p className="text-gray-500 text-sm">Personalised analysis based on your cycle history</p>
+                </div>
+              </div>
+              {!hasCycles && (
+                <div className="mt-3 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-yellow-800 text-sm">
+                  ℹ️ No cycle records logged yet. Log at least one period from the Overview tab to unlock full insights.
+                </div>
+              )}
+            </div>
+
+            {/* Cycle Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: 'Cycles Logged', value: periods.length, icon: '📅', color: 'text-pink-600', bg: 'bg-pink-50' },
+                { label: 'Avg Cycle Length', value: `${avgActualCycle} days`, icon: '🔄', color: 'text-purple-600', bg: 'bg-purple-50' },
+                { label: 'Times Late', value: lateRecords.length, icon: '⏰', color: 'text-orange-600', bg: 'bg-orange-50' },
+                { label: 'On Time', value: onTimeRecords.length, icon: '✅', color: 'text-green-600', bg: 'bg-green-50' },
+              ].map((stat) => (
+                <div key={stat.label} className={`${stat.bg} rounded-xl p-4 text-center`}>
+                  <div className="text-2xl mb-1">{stat.icon}</div>
+                  <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
+                  <div className="text-xs text-gray-600 mt-1">{stat.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Regularity Score */}
+            {regularityScore !== null && (
+              <div className="bg-white border border-gray-200 rounded-xl p-5">
+                <h3 className="font-semibold text-gray-800 mb-3">📊 Cycle Regularity Score</h3>
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <div className="w-full bg-gray-200 rounded-full h-4">
+                      <div
+                        className={`h-4 rounded-full transition-all duration-500 ${
+                          regularityScore >= 70 ? 'bg-green-500' : regularityScore >= 40 ? 'bg-orange-400' : 'bg-red-500'
+                        }`}
+                        style={{ width: `${Math.min(regularityScore, 100)}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                      <span>Irregular</span><span>Regular</span>
+                    </div>
+                  </div>
+                  <div className={`text-3xl font-bold ${regularityScore >= 70 ? 'text-green-600' : regularityScore >= 40 ? 'text-orange-500' : 'text-red-600'}`}>
+                    {regularityScore}%
+                  </div>
+                </div>
+                <p className="text-sm text-gray-600 mt-2">
+                  {regularityScore >= 70
+                    ? 'Your cycles are fairly regular — great sign of hormonal balance.'
+                    : regularityScore >= 40
+                    ? 'Some variation in your cycles. Monitor closely and consider a gynaecologist visit.'
+                    : 'High cycle variability detected. This warrants a medical evaluation.'}
+                </p>
+              </div>
+            )}
+
+            {/* PCOD / PCOS Risk from Cycle Data */}
+            <div className={`border rounded-xl p-5 ${riskBg}`}>
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-3xl">{riskIcon}</span>
+                <div>
+                  <h3 className="font-semibold text-gray-800 text-lg">PCOD / PCOS Risk Indicator</h3>
+                  <p className={`font-bold text-xl ${riskColor}`}>{riskLevel} Risk</p>
+                </div>
+              </div>
+
+              {riskSignals.length > 0 ? (
+                <div className="space-y-2 mb-3">
+                  <p className="text-sm font-medium text-gray-700">Signals detected from your cycle data:</p>
+                  {riskSignals.map((s, i) => (
+                    <div key={i} className="flex items-start gap-2 bg-white bg-opacity-60 rounded-lg p-2">
+                      <span className="text-red-500 mt-0.5">⚡</span>
+                      <span className="text-sm text-gray-700">{s}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-green-700 mb-3">
+                  No major irregularity signals found in your cycle history. Keep tracking consistently for more accurate insights.
+                </p>
+              )}
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-800">
+                ⚠️ This is a pattern-based indicator only, not a clinical diagnosis. Use the <strong>PCOS Assessment</strong> tab for a full symptom-based evaluation and consult a gynaecologist for confirmation.
+              </div>
+            </div>
+
+            {/* Lateness Pattern */}
+            {periods.length >= 2 && (
+              <div className="bg-white border border-gray-200 rounded-xl p-5">
+                <h3 className="font-semibold text-gray-800 mb-4">📈 Lateness Pattern</h3>
+                <div className="space-y-2">
+                  {[...sorted].reverse().slice(0, 6).map((record, i) => {
+                    const late = record.daysLate ?? null;
+                    const barWidth = late == null ? 0 : Math.min(Math.abs(late) * 10, 100);
+                    const isLate = late > 0;
+                    const isEarly = late < 0;
+                    return (
+                      <div key={i} className="flex items-center gap-3">
+                        <span className="text-xs text-gray-500 w-24 shrink-0">
+                          {new Date(record.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        </span>
+                        <div className="flex-1 bg-gray-100 rounded-full h-3 relative">
+                          <div
+                            className={`h-3 rounded-full ${isLate ? 'bg-red-400' : isEarly ? 'bg-blue-400' : 'bg-green-400'}`}
+                            style={{ width: late === 0 ? '8px' : `${barWidth}%` }}
+                          />
+                        </div>
+                        <span className={`text-xs font-medium w-20 text-right ${isLate ? 'text-red-600' : isEarly ? 'text-blue-600' : 'text-green-600'}`}>
+                          {late === null ? '—' : late === 0 ? 'On time' : isLate ? `+${late}d late` : `${Math.abs(late)}d early`}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Health Tips */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Hormonal & Cycle Health */}
+              <div className="bg-pink-50 border border-pink-200 rounded-xl p-5">
+                <h3 className="font-semibold text-pink-800 mb-3">🌸 Hormonal & Cycle Health</h3>
+                <ul className="space-y-2 text-sm text-gray-700">
+                  {[
+                    'Eat a low-glycemic diet — reduce refined sugar and white carbs to balance insulin and hormones.',
+                    'Include omega-3 rich foods (flaxseeds, walnuts, fish) to reduce inflammation linked to PCOS.',
+                    'Aim for 7–8 hours of sleep — poor sleep disrupts cortisol and estrogen balance.',
+                    'Manage stress with yoga, meditation or deep breathing — chronic stress raises cortisol and disrupts ovulation.',
+                    'Avoid skipping meals; irregular eating patterns worsen hormonal fluctuations.',
+                    irregularCycle
+                      ? '⚡ Your cycle length is irregular — consider consulting a gynaecologist for a hormonal panel.'
+                      : 'Your cycle length looks within normal range — keep tracking to maintain this.',
+                  ].map((tip, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="text-pink-500 mt-0.5 shrink-0">•</span>
+                      <span>{tip}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Sanitary & Hygiene Tips */}
+              <div className="bg-purple-50 border border-purple-200 rounded-xl p-5">
+                <h3 className="font-semibold text-purple-800 mb-3">🧴 Sanitary & Hygiene Tips</h3>
+                <ul className="space-y-2 text-sm text-gray-700">
+                  {[
+                    'Change sanitary pads every 4–6 hours and tampons every 4–8 hours to prevent bacterial growth.',
+                    'Wash the external genital area with plain water — avoid scented soaps or douching.',
+                    'Wear breathable cotton underwear during your period to reduce moisture and irritation.',
+                    'Dispose of used pads/tampons hygienically — wrap and bin, never flush.',
+                    'Menstrual cups are reusable and eco-friendly — sterilise before and after each cycle.',
+                    'Stay hydrated (2–3 litres/day) to reduce bloating and cramps during menstruation.',
+                  ].map((tip, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="text-purple-500 mt-0.5 shrink-0">•</span>
+                      <span>{tip}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Nutrition Tips */}
+              <div className="bg-green-50 border border-green-200 rounded-xl p-5">
+                <h3 className="font-semibold text-green-800 mb-3">🥗 Nutrition for Cycle Health</h3>
+                <ul className="space-y-2 text-sm text-gray-700">
+                  {[
+                    'Iron-rich foods (spinach, lentils, dates) help replenish blood loss during menstruation.',
+                    'Magnesium (dark chocolate, pumpkin seeds) reduces PMS cramps and mood swings.',
+                    'Vitamin D deficiency is common in PCOS — get sunlight or consider supplementation.',
+                    'Spearmint tea (2 cups/day) has shown mild anti-androgen effects in PCOS studies.',
+                    'Avoid excess dairy and processed foods during your period — they can worsen inflammation.',
+                  ].map((tip, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="text-green-500 mt-0.5 shrink-0">•</span>
+                      <span>{tip}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* When to See a Doctor */}
+              <div className="bg-red-50 border border-red-200 rounded-xl p-5">
+                <h3 className="font-semibold text-red-800 mb-3">🏥 When to See a Doctor</h3>
+                <ul className="space-y-2 text-sm text-gray-700">
+                  {[
+                    'Period is more than 7 days late and you are not pregnant.',
+                    'Cycles are consistently shorter than 21 days or longer than 35 days.',
+                    'Severe pain, heavy bleeding (soaking a pad in under 2 hours), or passing large clots.',
+                    'Noticing excess facial/body hair, acne, or unexplained weight gain.',
+                    'Trying to conceive for 6+ months without success.',
+                    frequentlyLate
+                      ? '⚡ Your history shows frequent late periods — a gynaecologist visit is recommended.'
+                      : 'Any sudden change in your usual cycle pattern.',
+                  ].map((tip, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="text-red-500 mt-0.5 shrink-0">•</span>
+                      <span>{tip}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {/* CTA */}
+            <div className="bg-gradient-to-r from-pink-100 to-purple-100 border border-pink-200 rounded-xl p-5 text-center">
+              <p className="text-gray-700 font-medium mb-3">Want a deeper assessment? Use the full PCOS symptom checker.</p>
+              <button
+                onClick={() => setActiveTab('pcos-assessment')}
+                className="bg-pink-600 hover:bg-pink-700 text-white px-6 py-2 rounded-lg transition-colors font-medium"
+              >
+                Go to PCOS Assessment →
+              </button>
+            </div>
+
+          </div>
+        );
+      })()}
     </div>
   );
 };
