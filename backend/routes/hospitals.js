@@ -6,7 +6,7 @@ const User = require('../models/User');
 const HospitalQuery = require('../models/HospitalQuery');
 const HospitalChat = require('../models/HospitalChat');
 const { createNotification } = require('../utils/notificationHelper');
-const { notifyQueryAccepted, notifyQueryRejected } = require('../utils/socketEmitter');
+const { notifyQueryAccepted, notifyQueryRejected, emitToRoom } = require('../utils/socketEmitter');
 
 // Get nearby hospitals (public endpoint)
 router.get('/nearby', async (req, res) => {
@@ -302,13 +302,11 @@ router.post('/queries/:queryId/close', auth, async (req, res) => {
 
     // Send real-time Socket.IO notification
     const io = req.app.get('io');
-    if (io) {
-      io.to(`query:${queryId}`).emit('query-closed', {
-        queryId: query._id,
-        hospitalName: hospital.hospitalName,
-        closedAt: new Date()
-      });
-    }
+    emitToRoom(io, `query:${queryId}`, 'query-closed', {
+      queryId: query._id,
+      hospitalName: hospital.hospitalName,
+      closedAt: new Date()
+    });
 
     res.json({ message: 'Query closed successfully', query });
   } catch (error) {
