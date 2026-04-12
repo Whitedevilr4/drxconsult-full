@@ -318,45 +318,46 @@ export default function HospitalChat() {
     e.preventDefault();
     if (!newMessage.trim()) return;
 
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const tempId = 'temp-' + Date.now();
     const tempMessage = {
-      _id: 'temp-' + Date.now(),
+      _id: tempId,
       message: newMessage,
       senderType: userRole === 'hospital' ? 'hospital' : 'user',
+      senderId: { _id: user._id || user.id, name: user.name },
+      queryId,
       createdAt: new Date().toISOString(),
       sending: true
     };
 
-    // Optimistically add message
+    // 1. Show message instantly in sender's UI
     setMessages(prev => [...prev, tempMessage]);
     const messageToSend = newMessage;
     setNewMessage('');
     setSending(true);
 
+    // 2. Relay to recipient instantly via socket (no backend hop)
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('send-chat-message', {
+        queryId,
+        messageData: { ...tempMessage, sending: false }
+      });
+      socketRef.current.emit('typing', { queryId, isTyping: false });
+    }
+
+    // 3. Persist to DB in background
     try {
       const response = await axios.post(`/hospital-chats/${queryId}`, {
         message: messageToSend
       });
-      
-      console.log('✅ Message sent successfully:', response.data);
-      
-      // Replace temp message with real one
-      setMessages(prev => prev.map(msg => 
-        msg._id === tempMessage._id ? response.data : msg
+      // Replace temp with real saved message (has real _id)
+      setMessages(prev => prev.map(msg =>
+        msg._id === tempId ? response.data : msg
       ));
-      
-      // Stop typing indicator
-      if (socketRef.current && socketRef.current.connected) {
-        socketRef.current.emit('typing', { queryId, isTyping: false });
-      }
-      
-      // Scroll will be handled by useEffect watching messages
     } catch (error) {
-      console.error('❌ Error sending message:', error);
-      console.error('Error response:', error.response?.data);
-      
-      // Remove temp message on error
-      setMessages(prev => prev.filter(msg => msg._id !== tempMessage._id));
-      setNewMessage(messageToSend); // Restore message
+      console.error('❌ Error saving message:', error);
+      setMessages(prev => prev.filter(msg => msg._id !== tempId));
+      setNewMessage(messageToSend);
       alert('Failed to send message: ' + (error.response?.data?.message || error.message));
     } finally {
       setSending(false);
