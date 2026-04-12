@@ -6,7 +6,7 @@ const User = require('../models/User');
 const HospitalQuery = require('../models/HospitalQuery');
 const HospitalChat = require('../models/HospitalChat');
 const { createNotification } = require('../utils/notificationHelper');
-const { notifyQueryAccepted, notifyQueryRejected } = require('../utils/socketManager');
+const { notifyQueryAccepted, notifyQueryRejected } = require('../utils/socketEmitter');
 
 // Get nearby hospitals (public endpoint)
 router.get('/nearby', async (req, res) => {
