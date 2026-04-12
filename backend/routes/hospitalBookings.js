@@ -241,7 +241,6 @@ router.post('/verify-payment', auth, async (req, res) => {
     if (hospital?.userId) {
       emitToRoom(io, `user:${hospital.userId._id}`, 'payment-confirmed', paymentData);
     }
-    }
 
     res.json({
       success: true,
