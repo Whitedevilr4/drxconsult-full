@@ -6,7 +6,6 @@ const HospitalQuery = require('../models/HospitalQuery');
 const Hospital = require('../models/Hospital');
 const User = require('../models/User');
 const { createNotification } = require('../utils/notificationHelper');
-const { emitToRoom } = require('../utils/socketEmitter');
 
 // Get chat messages for a query
 router.get('/:queryId', auth, async (req, res) => {
@@ -89,18 +88,9 @@ router.post('/:queryId', auth, async (req, res) => {
 
     await chatMessage.populate('senderId', 'name email');
 
-    // Emit socket event immediately — don't wait for notification
-    const messageData = {
-      _id: chatMessage._id.toString(),
-      queryId: queryId.toString(),
-      senderId: chatMessage.senderId._id || chatMessage.senderId,
-      senderType: chatMessage.senderType,
-      message: chatMessage.message,
-      createdAt: chatMessage.createdAt
-    };
-
     const io = req.app.get('io');
-    emitToRoom(io, `query:${queryId}`, 'new-message', messageData);
+    // Socket delivery is handled by the frontend's direct send-chat-message relay.
+    // No room emit needed here — just respond.
 
     // Respond to client immediately
     res.status(201).json(chatMessage);
