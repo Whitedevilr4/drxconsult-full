@@ -8093,7 +8093,7 @@ function LiveChatTab() {
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
 
-  const SOCKET_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace('/api', '');
+  const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace('/api', '');
 
   useEffect(() => {
     fetchChats();
