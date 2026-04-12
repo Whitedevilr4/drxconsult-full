@@ -5,6 +5,7 @@ const HospitalBooking = require('../models/HospitalBooking');
 const HospitalQuery = require('../models/HospitalQuery');
 const Hospital = require('../models/Hospital');
 const { createNotification } = require('../utils/notificationHelper');
+const { emitToRoom } = require('../utils/socketEmitter');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 
@@ -73,21 +74,18 @@ router.post('/bed/initiate', auth, async (req, res) => {
 
     // Send real-time notification
     const io = req.app.get('io');
-    if (io) {
-      io.to(`user:${query.userId}`).emit('booking-initiated', {
-        bookingId: booking._id,
-        queryId: query._id,
-        bookingType: 'bed',
-        paymentAmount: booking.paymentAmount,
-        hospitalName: hospital.hospitalName
-      });
-
-      io.to(`query:${queryId}`).emit('booking-initiated', {
-        bookingId: booking._id,
-        bookingType: 'bed',
-        paymentAmount: booking.paymentAmount
-      });
-    }
+    emitToRoom(io, `user:${query.userId}`, 'booking-initiated', {
+      bookingId: booking._id,
+      queryId: query._id,
+      bookingType: 'bed',
+      paymentAmount: booking.paymentAmount,
+      hospitalName: hospital.hospitalName
+    });
+    emitToRoom(io, `query:${queryId}`, 'booking-initiated', {
+      bookingId: booking._id,
+      bookingType: 'bed',
+      paymentAmount: booking.paymentAmount
+    });
 
     res.json({
       success: true,
@@ -213,14 +211,12 @@ router.post('/verify-payment', auth, async (req, res) => {
 
       // Send real-time notification to hospital
       const io = req.app.get('io');
-      if (io) {
-        io.to(`user:${hospital.userId._id}`).emit('booking-payment-confirmed', {
-          bookingId: booking._id,
-          bookingType: booking.bookingType,
-          amount: booking.paymentAmount,
-          queryId: booking.queryId._id
-        });
-      }
+      emitToRoom(io, `user:${hospital.userId._id}`, 'booking-payment-confirmed', {
+        bookingId: booking._id,
+        bookingType: booking.bookingType,
+        amount: booking.paymentAmount,
+        queryId: booking.queryId._id
+      });
     }
 
     // Notify patient
@@ -233,40 +229,18 @@ router.post('/verify-payment', auth, async (req, res) => {
 
     // Send real-time notification to patient and in query room
     const io = req.app.get('io');
-    if (io) {
-      console.log('💰 Payment confirmed - emitting events');
-      console.log('Query room:', `query:${booking.queryId._id}`);
-      console.log('Hospital user:', hospital.userId._id.toString());
-      console.log('Patient user:', req.user.userId);
-      
-      // Emit to patient's user room
-      io.to(`user:${req.user.userId}`).emit('payment-confirmed', {
-        bookingId: booking._id,
-        queryId: booking.queryId._id,
-        status: 'confirmed',
-        confirmedAt: booking.confirmedAt,
-        bookingType: booking.bookingType
-      });
-      
-      // Emit to query room (both hospital and patient should be in this room)
-      io.to(`query:${booking.queryId._id}`).emit('payment-confirmed', {
-        bookingId: booking._id,
-        queryId: booking.queryId._id,
-        status: 'confirmed',
-        confirmedAt: booking.confirmedAt,
-        bookingType: booking.bookingType
-      });
-      
-      // Also emit to hospital's user room for redundancy
-      io.to(`user:${hospital.userId._id}`).emit('payment-confirmed', {
-        bookingId: booking._id,
-        queryId: booking.queryId._id,
-        status: 'confirmed',
-        confirmedAt: booking.confirmedAt,
-        bookingType: booking.bookingType
-      });
-      
-      console.log('✅ Payment confirmation events emitted');
+    const paymentData = {
+      bookingId: booking._id,
+      queryId: booking.queryId._id,
+      status: 'confirmed',
+      confirmedAt: booking.confirmedAt,
+      bookingType: booking.bookingType
+    };
+    emitToRoom(io, `user:${req.user.userId}`, 'payment-confirmed', paymentData);
+    emitToRoom(io, `query:${booking.queryId._id}`, 'payment-confirmed', paymentData);
+    if (hospital?.userId) {
+      emitToRoom(io, `user:${hospital.userId._id}`, 'payment-confirmed', paymentData);
+    }
     }
 
     res.json({
@@ -362,21 +336,18 @@ router.post('/ambulance/create', auth, async (req, res) => {
 
     // Send real-time notification
     const io = req.app.get('io');
-    if (io) {
-      io.to(`user:${query.userId}`).emit('ambulance-booking-created', {
-        bookingId: booking._id,
-        queryId: query._id,
-        ambulanceDetails: booking.ambulanceDetails,
-        paymentAmount: booking.paymentAmount,
-        hospitalName: hospital.hospitalName
-      });
-
-      io.to(`query:${queryId}`).emit('ambulance-booking-created', {
-        bookingId: booking._id,
-        ambulanceDetails: booking.ambulanceDetails,
-        paymentAmount: booking.paymentAmount
-      });
-    }
+    emitToRoom(io, `user:${query.userId}`, 'ambulance-booking-created', {
+      bookingId: booking._id,
+      queryId: query._id,
+      ambulanceDetails: booking.ambulanceDetails,
+      paymentAmount: booking.paymentAmount,
+      hospitalName: hospital.hospitalName
+    });
+    emitToRoom(io, `query:${queryId}`, 'ambulance-booking-created', {
+      bookingId: booking._id,
+      ambulanceDetails: booking.ambulanceDetails,
+      paymentAmount: booking.paymentAmount
+    });
 
     res.json({
       success: true,
@@ -580,12 +551,10 @@ router.put('/ambulance/:bookingId/status', auth, async (req, res) => {
 
     // Send real-time notification
     const io = req.app.get('io');
-    if (io) {
-      io.to(`user:${booking.userId}`).emit('ambulance-status-updated', {
-        bookingId: booking._id,
-        status: booking.status
-      });
-    }
+    emitToRoom(io, `user:${booking.userId}`, 'ambulance-status-updated', {
+      bookingId: booking._id,
+      status: booking.status
+    });
 
     res.json({
       success: true,
@@ -642,19 +611,16 @@ router.put('/bed/:bookingId/patient-arrival', auth, async (req, res) => {
 
       // Send real-time notification
       const io = req.app.get('io');
-      if (io) {
-        io.to(`user:${booking.userId}`).emit('patient-arrival-updated', {
-          bookingId: booking._id,
-          arrivalStatus: booking.patientArrivalStatus,
-          status: booking.status
-        });
-
-        io.to(`query:${booking.queryId}`).emit('patient-arrival-updated', {
-          bookingId: booking._id,
-          arrivalStatus: booking.patientArrivalStatus,
-          status: booking.status
-        });
-      }
+      emitToRoom(io, `user:${booking.userId}`, 'patient-arrival-updated', {
+        bookingId: booking._id,
+        arrivalStatus: booking.patientArrivalStatus,
+        status: booking.status
+      });
+      emitToRoom(io, `query:${booking.queryId}`, 'patient-arrival-updated', {
+        bookingId: booking._id,
+        arrivalStatus: booking.patientArrivalStatus,
+        status: booking.status
+      });
 
       return res.json({
         success: true,
@@ -753,21 +719,18 @@ router.post('/bed/:bookingId/verify-arrival-otp', auth, async (req, res) => {
 
       // Send real-time notification
       const io = req.app.get('io');
-      if (io) {
-        io.to(`user:${booking.userId}`).emit('patient-arrival-updated', {
-          bookingId: booking._id,
-          arrivalStatus: booking.patientArrivalStatus,
-          status: booking.status,
-          otpVerified: true
-        });
-
-        io.to(`query:${booking.queryId}`).emit('patient-arrival-updated', {
-          bookingId: booking._id,
-          arrivalStatus: booking.patientArrivalStatus,
-          status: booking.status,
-          otpVerified: true
-        });
-      }
+      emitToRoom(io, `user:${booking.userId}`, 'patient-arrival-updated', {
+        bookingId: booking._id,
+        arrivalStatus: booking.patientArrivalStatus,
+        status: booking.status,
+        otpVerified: true
+      });
+      emitToRoom(io, `query:${booking.queryId}`, 'patient-arrival-updated', {
+        bookingId: booking._id,
+        arrivalStatus: booking.patientArrivalStatus,
+        status: booking.status,
+        otpVerified: true
+      });
 
       return res.json({
         success: true,
@@ -798,21 +761,18 @@ router.post('/bed/:bookingId/verify-arrival-otp', auth, async (req, res) => {
 
         // Send real-time notification
         const io = req.app.get('io');
-        if (io) {
-          io.to(`user:${booking.userId}`).emit('patient-arrival-updated', {
-            bookingId: booking._id,
-            arrivalStatus: booking.patientArrivalStatus,
-            status: booking.status,
-            otpFailed: true
-          });
-
-          io.to(`query:${booking.queryId}`).emit('patient-arrival-updated', {
-            bookingId: booking._id,
-            arrivalStatus: booking.patientArrivalStatus,
-            status: booking.status,
-            otpFailed: true
-          });
-        }
+        emitToRoom(io, `user:${booking.userId}`, 'patient-arrival-updated', {
+          bookingId: booking._id,
+          arrivalStatus: booking.patientArrivalStatus,
+          status: booking.status,
+          otpFailed: true
+        });
+        emitToRoom(io, `query:${booking.queryId}`, 'patient-arrival-updated', {
+          bookingId: booking._id,
+          arrivalStatus: booking.patientArrivalStatus,
+          status: booking.status,
+          otpFailed: true
+        });
 
         return res.status(400).json({
           success: false,
