@@ -7,7 +7,7 @@ const { auth, isPharmacist } = require('../middleware/auth');
 const { createMeetLink } = require('../utils/googleMeet');
 const { cleanupExpiredSlotsForPharmacist, cleanupExpiredSlotsForDoctor } = require('../utils/slotCleanup');
 const { notifyBookingConfirmed, notifyMeetingLinkAdded, notifyTestResultUploaded, notifyReviewSubmitted } = require('../utils/notificationHelper');
-const { notifyBookingCreated, notifyBookingConfirmedToPatient } = require('../utils/socketEmitter');
+const { notifyBookingCreated, notifyBookingConfirmedToPatient, emitToRoom } = require('../utils/socketEmitter');
 const { 
   sendBookingConfirmationEmail, 
   sendPharmacistBookingNotification, 
@@ -1300,15 +1300,12 @@ router.post('/:bookingId/chat', auth, async (req, res) => {
 
     await chat.populate('senderId', 'name profilePicture')
 
-    // Emit via socket to the booking room
     const io = req.app.get('io')
-    if (io) {
-      io.to(`booking:${req.params.bookingId}`).emit('new-booking-message', chat)
-    }
+    // Emit message to booking room
+    emitToRoom(io, `booking:${req.params.bookingId}`, 'new-booking-message', chat)
 
-    // Emit updated unread count to the recipient's personal room so badge updates in real-time
-    if (io) {
-      // Populate booking to find recipient userId
+    // Emit updated unread count to recipient's personal room
+    {
       const populatedBooking = await Booking.findById(req.params.bookingId)
         .populate('patientId', '_id')
         .populate({ path: 'doctorId', populate: { path: 'userId', select: '_id' } })
@@ -1326,7 +1323,7 @@ router.post('/:bookingId/chat', auth, async (req, res) => {
           senderId: { $ne: recipientUserId },
           isRead: false
         })
-        io.to(`user:${recipientUserId}`).emit('chat-unread-update', {
+        emitToRoom(io, `user:${recipientUserId}`, 'chat-unread-update', {
           bookingId: req.params.bookingId,
           unread
         })
