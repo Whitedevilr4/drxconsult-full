@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const Complaint = require('../models/Complaint');
 const { auth, isAdmin } = require('../middleware/auth');
 const { notifyComplaintSubmitted, notifyComplaintUpdated } = require('../utils/notificationHelper');
+const { emitToRoom } = require('../utils/socketEmitter');
 
 const router = express.Router();
 
@@ -372,14 +373,12 @@ router.put('/admin/:id/status', [
 
     // Emit Socket.IO event for real-time update
     const io = req.app.get('io');
-    if (io) {
-      io.to(`user:${complaint.userId._id}`).emit('complaint-updated', {
-        complaintId: complaint._id,
-        type: 'status_change',
-        status: status,
-        complaint: complaint
-      });
-    }
+    emitToRoom(io, `user:${complaint.userId._id}`, 'complaint-updated', {
+      complaintId: complaint._id,
+      type: 'status_change',
+      status: status,
+      complaint: complaint
+    });
 
     res.json({
       message: 'Complaint status updated successfully',
@@ -429,13 +428,11 @@ router.post('/admin/:id/respond', [
 
     // Emit Socket.IO event for real-time update
     const io = req.app.get('io');
-    if (io) {
-      io.to(`user:${complaint.userId._id}`).emit('complaint-updated', {
-        complaintId: complaint._id,
-        type: 'admin_response',
-        complaint: complaint
-      });
-    }
+    emitToRoom(io, `user:${complaint.userId._id}`, 'complaint-updated', {
+      complaintId: complaint._id,
+      type: 'admin_response',
+      complaint: complaint
+    });
 
     res.json({
       message: 'Response added successfully',
@@ -475,12 +472,10 @@ router.post('/admin/:id/note', [
 
     // Emit Socket.IO event to other admins for real-time update
     const io = req.app.get('io');
-    if (io) {
-      io.to('admins').emit('complaint-note-added', {
-        complaintId: complaint._id,
-        note: complaint.internalNotes[complaint.internalNotes.length - 1]
-      });
-    }
+    emitToRoom(io, 'admins', 'complaint-note-added', {
+      complaintId: complaint._id,
+      note: complaint.internalNotes[complaint.internalNotes.length - 1]
+    });
 
     res.json({
       message: 'Internal note added successfully',
