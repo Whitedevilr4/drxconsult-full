@@ -7,7 +7,7 @@ const { auth, isPharmacist } = require('../middleware/auth');
 const { createMeetLink } = require('../utils/googleMeet');
 const { cleanupExpiredSlotsForPharmacist, cleanupExpiredSlotsForDoctor } = require('../utils/slotCleanup');
 const { notifyBookingConfirmed, notifyMeetingLinkAdded, notifyTestResultUploaded, notifyReviewSubmitted } = require('../utils/notificationHelper');
-const { notifyBookingCreated, notifyBookingConfirmedToPatient } = require('../utils/socketManager');
+const { notifyBookingCreated, notifyBookingConfirmedToPatient } = require('../utils/socketEmitter');
 const { 
   sendBookingConfirmationEmail, 
   sendPharmacistBookingNotification, 
@@ -1124,7 +1124,7 @@ router.post('/subscription', auth, async (req, res) => {
     const io = req.app.get('io')
     const patient = await User.findById(req.user.userId)
     if (io && professionalUser) {
-      const { notifyBookingCreated } = require('../utils/socketManager')
+      const { notifyBookingCreated } = require('../utils/socketEmitter')
       notifyBookingCreated(io, professionalUser._id.toString(), {
         bookingId: booking._id,
         patientName: patient?.name || 'Patient',
