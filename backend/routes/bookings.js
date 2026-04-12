@@ -1298,9 +1298,10 @@ router.post('/:bookingId/chat', auth, async (req, res) => {
     await chat.populate('senderId', 'name profilePicture')
 
     const io = req.app.get('io')
-    emitToRoom(io, `booking:${req.params.bookingId}`, 'new-booking-message', chat)
+    // Socket delivery is handled by the frontend's direct send-booking-message relay.
+    // Only emit unread badge update to recipient's personal room.
 
-    // Respond immediately — don't block on unread count
+    // Respond immediately
     res.status(201).json(chat)
 
     // Update unread badge in background
