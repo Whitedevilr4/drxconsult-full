@@ -6,6 +6,7 @@ const HospitalQuery = require('../models/HospitalQuery');
 const Hospital = require('../models/Hospital');
 const User = require('../models/User');
 const { createNotification } = require('../utils/notificationHelper');
+const { emitToRoom } = require('../utils/socketEmitter');
 
 // Get chat messages for a query
 router.get('/:queryId', auth, async (req, res) => {
@@ -111,43 +112,18 @@ router.post('/:queryId', auth, async (req, res) => {
       });
     }
 
-    // Send real-time Socket.IO message to OTHER users (not sender)
+    // Send real-time Socket.IO message to the query room
+    const messageData = {
+      _id: chatMessage._id.toString(),
+      queryId: queryId.toString(),
+      senderId: chatMessage.senderId._id || chatMessage.senderId,
+      senderType: chatMessage.senderType,
+      message: chatMessage.message,
+      createdAt: chatMessage.createdAt
+    };
+
     const io = req.app.get('io');
-    if (io) {
-      const messageData = {
-        _id: chatMessage._id.toString(),
-        queryId: queryId.toString(),
-        senderId: chatMessage.senderId._id || chatMessage.senderId,
-        senderType: chatMessage.senderType,
-        message: chatMessage.message,
-        createdAt: chatMessage.createdAt
-      };
-      
-      console.log('📤 Broadcasting new-message to room (excluding sender):', `query:${queryId}`);
-      console.log('Message data:', messageData);
-      
-      // Get all sockets in the room
-      const room = io.sockets.adapter.rooms.get(`query:${queryId}`);
-      if (room) {
-        console.log('Room has', room.size, 'members');
-        
-        // Emit to all sockets in room EXCEPT the sender
-        room.forEach(socketId => {
-          const socket = io.sockets.sockets.get(socketId);
-          // Only emit if this socket doesn't belong to the sender
-          if (socket && socket.userId !== req.user.userId) {
-            socket.emit('new-message', messageData);
-            console.log('✅ Message sent to socket:', socketId);
-          } else if (socket && socket.userId === req.user.userId) {
-            console.log('⏭️ Skipping sender socket:', socketId);
-          }
-        });
-      } else {
-        console.log('⚠️ No members in room');
-      }
-    } else {
-      console.error('❌ Socket.IO not available');
-    }
+    emitToRoom(io, `query:${queryId}`, 'new-message', messageData);
 
     res.status(201).json(chatMessage);
   } catch (error) {
