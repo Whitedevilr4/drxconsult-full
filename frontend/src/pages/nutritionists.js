@@ -24,7 +24,10 @@ export default function NutritionistsPage() {
     { id: 'pediatric', name: 'Pediatric Nutrition', icon: '👶' },
     { id: 'geriatric', name: 'Geriatric Nutrition', icon: '👴' },
     { id: 'wellness', name: 'Wellness & Lifestyle', icon: '🧘' },
-    { id: 'therapeutic', name: 'Therapeutic Nutrition', icon: '💊' }
+    { id: 'therapeutic', name: 'Therapeutic Nutrition', icon: '💊' },
+    { id: 'PCOD', name: 'PCOD & PCOS', icon: '🌸'},
+    { id: 'pregnancy', name: 'Pregnancy care', icon: '🤰🏻'},
+    { id: 'disease', name: 'Disease Management', icon: '🤒'}
   ]
 
   useEffect(() => {
