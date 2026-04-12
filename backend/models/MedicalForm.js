@@ -30,7 +30,7 @@ const medicalFormSchema = new mongoose.Schema({
   
   // Payment
   paymentRequired: { type: Boolean, default: true },
-  paymentAmount: { type: Number, default: 29 },
+  paymentAmount: { type: Number, default: 7 },
   paymentId: { type: String },
   paidAt: { type: Date },
   
