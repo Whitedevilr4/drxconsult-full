@@ -55,7 +55,7 @@ export default function DoctorCard({ doctor }) {
             <img 
               src={doctor.photo || defaultPhoto} 
               alt={doctor.userId?.name}
-              className="w-16 h-16 sm:w-24 sm:h-24 rounded-full object-cover border-4 border-white shadow-lg"
+              className="w-24 h-24 sm:w-24 sm:h-24 rounded-full object-cover border-4 border-white shadow-lg"
               onError={(e) => { e.target.src = defaultPhoto }}
             />
             {/* Status indicator with blinking animation for online */}
