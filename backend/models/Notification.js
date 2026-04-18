@@ -45,6 +45,7 @@ const notificationSchema = new mongoose.Schema({
   medicalFormId: { type: mongoose.Schema.Types.ObjectId, ref: 'MedicalForm' },
   pharmacistId: { type: mongoose.Schema.Types.ObjectId, ref: 'Pharmacist' },
   doctorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Doctor' },
+  nutritionistId: { type: mongoose.Schema.Types.ObjectId, ref: 'Nutritionist' },
   patientId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   isRead: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now }
