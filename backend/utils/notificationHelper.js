@@ -4,7 +4,7 @@ const Pharmacist = require('../models/Pharmacist');
 const Doctor = require('../models/Doctor');
 
 // Create notification helper
-async function createNotification({ userId, type, title, message, bookingId, pharmacistId, doctorId, patientId }) {
+async function createNotification({ userId, type, title, message, bookingId, pharmacistId, doctorId, nutritionistId, patientId }) {
   try {
     const notification = new Notification({
       userId,
@@ -14,6 +14,7 @@ async function createNotification({ userId, type, title, message, bookingId, pha
       bookingId,
       pharmacistId,
       doctorId,
+      nutritionistId,
       patientId
     });
     await notification.save();
@@ -78,13 +79,17 @@ async function notifyBookingConfirmed({ booking, patientName, pharmacistName }) 
       message: `Your booking with ${professionalName} on ${bookingDate} at ${bookingTime} has been confirmed.`,
       bookingId: booking._id,
       pharmacistId: booking.pharmacistId,
-      doctorId: booking.doctorId
+      doctorId: booking.doctorId,
+      nutritionistId: booking.nutritionistId
     });
 
-    // Notify professional (pharmacist or doctor)
+    // Notify professional (pharmacist, doctor, or nutritionist)
     let professional;
     if (professionalType === 'doctor') {
       professional = await Doctor.findById(professionalId);
+    } else if (professionalType === 'nutritionist') {
+      const Nutritionist = require('../models/Nutritionist');
+      professional = await Nutritionist.findById(professionalId);
     } else {
       professional = await Pharmacist.findById(professionalId);
     }
@@ -98,6 +103,7 @@ async function notifyBookingConfirmed({ booking, patientName, pharmacistName }) 
         bookingId: booking._id,
         pharmacistId: booking.pharmacistId,
         doctorId: booking.doctorId,
+        nutritionistId: booking.nutritionistId,
         patientId: booking.patientId
       });
     }
@@ -114,6 +120,7 @@ async function notifyBookingConfirmed({ booking, patientName, pharmacistName }) 
         bookingId: booking._id,
         pharmacistId: booking.pharmacistId,
         doctorId: booking.doctorId,
+        nutritionistId: booking.nutritionistId,
         patientId: booking.patientId
       });
     }
