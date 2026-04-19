@@ -12,6 +12,12 @@ const medicineScheduler = require('../utils/medicineScheduler');
 const SubstanceUseTracker = require('../models/SubstanceUseTracker');
 const FoodTracker = require('../models/FoodTracker');
 const { auth } = require('../middleware/auth');
+const {
+  notifyPeriodStarted,
+  notifyPeriodComingSoon,
+  notifyOvulationDay,
+  notifyPeriodHygieneReminder
+} = require('../utils/notificationHelper');
 
 const router = express.Router();
 
@@ -232,6 +238,11 @@ router.post('/period-tracker/period', [
     tracker.lastPeriodDate = new Date(startDate);
     
     await tracker.save();
+
+    // Send period started notification
+    notifyPeriodStarted({ userId: req.user.userId })
+      .catch(err => console.error('Failed to send period started notification:', err));
+
     res.json(tracker);
   } catch (error) {
     console.error('Error adding period record:', error);
@@ -311,6 +322,11 @@ router.post('/period-tracker/log-cycle', [
     tracker.lastPeriodDate = actualStart;
 
     await tracker.save();
+
+    // Send period started notification + hygiene reminder
+    notifyPeriodStarted({ userId: req.user.userId })
+      .catch(err => console.error('Failed to send period started notification:', err));
+
     res.json(tracker);
   } catch (error) {
     console.error('Error logging cycle:', error);
