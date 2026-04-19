@@ -35,7 +35,16 @@ const notificationSchema = new mongoose.Schema({
       'hospital_booking_confirmed',
       'ambulance_booking_created',
       'ambulance_status_updated',
-      'bed_booking_status_updated'
+      'bed_booking_status_updated',
+      // Medicine tracker notification types
+      'medicine_reminder',
+      'medicine_missed',
+      'medicine_overdue',
+      // Period tracker notification types
+      'period_coming_soon',
+      'period_started',
+      'ovulation_day',
+      'period_hygiene_reminder'
     ], 
     required: true 
   },
