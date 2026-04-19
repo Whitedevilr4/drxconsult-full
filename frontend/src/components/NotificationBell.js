@@ -1,5 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from '@/lib/axios';
+import { showBrowserNotification, requestNotificationPermission } from '@/utils/browserNotification';
+
+// Map notification types to browser notification config
+function toBrowserNotif(notification) {
+  const { type, title, message } = notification;
+  const requireInteraction = [
+    'medicine_reminder', 'medicine_missed', 'medicine_overdue',
+    'period_started', 'period_coming_soon', 'ovulation_day'
+  ].includes(type);
+  return { title, body: message, tag: `${type}-${notification._id}`, requireInteraction };
+}
 
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState([]);
@@ -7,17 +18,17 @@ export default function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef(null);
+  const seenIdsRef = useRef(new Set());
 
   useEffect(() => {
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 30000); // Poll every 30 seconds
+    requestNotificationPermission();
+    pollForNew(); // initial load
+    const interval = setInterval(pollForNew, 30000);
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
-    if (isOpen) {
-      fetchNotifications();
-    }
+    if (isOpen) fetchNotifications();
   }, [isOpen]);
 
   useEffect(() => {
@@ -30,14 +41,36 @@ export default function NotificationBell() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const fetchUnreadCount = async () => {
+  // Poll server — update badge + fire browser popup for any new unread notifications
+  const pollForNew = async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
-      
-      const res = await axios.get('/notifications/unread-count');
-      setUnreadCount(res.data.count);    } catch (err) {
-      console.error('Error fetching unread count:', err);
+
+      const res = await axios.get('/notifications');
+      const all = res.data || [];
+
+      setUnreadCount(all.filter(n => !n.isRead).length);
+
+      all.forEach(n => {
+        if (!seenIdsRef.current.has(n._id)) {
+          seenIdsRef.current.add(n._id);
+          if (!n.isRead) {
+            const { title, body, tag, requireInteraction } = toBrowserNotif(n);
+            showBrowserNotification(title, { body, tag, requireInteraction });
+          }
+        }
+      });
+
+      // Prevent unbounded growth
+      if (seenIdsRef.current.size > 200) {
+        const arr = Array.from(seenIdsRef.current);
+        seenIdsRef.current = new Set(arr.slice(arr.length - 200));
+      }
+
+      if (isOpen) setNotifications(all);
+    } catch (err) {
+      // silently ignore poll errors
     }
   };
 
