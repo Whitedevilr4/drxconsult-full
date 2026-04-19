@@ -472,6 +472,106 @@ async function notifyMedicalFormPaid({ patientId, patientName, professionalId, p
   }
 }
 
+// ── Medicine Tracker Notifications ───────────────────────────────────────────
+
+// Notify user that a medicine dose is due soon (upcoming reminder)
+async function notifyMedicineReminder({ userId, medicineName, scheduledTime, dosage, instructions }) {
+  try {
+    const instrText = instructions ? ` (${instructions})` : '';
+    await createNotification({
+      userId,
+      type: 'medicine_reminder',
+      title: '💊 Medicine Reminder',
+      message: `Time to take ${medicineName} — ${dosage}${instrText} at ${scheduledTime}.`
+    });
+  } catch (err) {
+    console.error('Error in notifyMedicineReminder:', err);
+  }
+}
+
+// Notify user that a medicine dose was auto-marked as missed
+async function notifyMedicineMissed({ userId, medicineName, scheduledTime, dosage }) {
+  try {
+    await createNotification({
+      userId,
+      type: 'medicine_missed',
+      title: '⚠️ Missed Medicine Dose',
+      message: `You missed your ${medicineName} dose (${dosage}) scheduled at ${scheduledTime}. Please consult your doctor if this happens frequently.`
+    });
+  } catch (err) {
+    console.error('Error in notifyMedicineMissed:', err);
+  }
+}
+
+// ── Period Tracker Notifications ──────────────────────────────────────────────
+
+// Notify user that their period is coming soon
+async function notifyPeriodComingSoon({ userId, daysUntil, expectedDate }) {
+  try {
+    const dateStr = new Date(expectedDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long' });
+    await createNotification({
+      userId,
+      type: 'period_coming_soon',
+      title: '🩸 Period Coming Soon',
+      message: `Your period is expected in ${daysUntil} day${daysUntil === 1 ? '' : 's'} (around ${dateStr}). Stock up on pads/tampons and stay hydrated.`
+    });
+  } catch (err) {
+    console.error('Error in notifyPeriodComingSoon:', err);
+  }
+}
+
+// Notify user that today is their ovulation day
+async function notifyOvulationDay({ userId, ovulationDate }) {
+  try {
+    await createNotification({
+      userId,
+      type: 'ovulation_day',
+      title: '🌸 Ovulation Day',
+      message: `Today is your estimated ovulation day. This is your most fertile window. Track any symptoms you experience.`
+    });
+  } catch (err) {
+    console.error('Error in notifyOvulationDay:', err);
+  }
+}
+
+// Notify user that their period has started (after they mark it)
+async function notifyPeriodStarted({ userId }) {
+  try {
+    await createNotification({
+      userId,
+      type: 'period_started',
+      title: '🩸 Period Started',
+      message: `Your period has been logged. Remember to stay hydrated, use a heating pad for cramps, and change your pad/tampon every 4–6 hours for hygiene.`
+    });
+  } catch (err) {
+    console.error('Error in notifyPeriodStarted:', err);
+  }
+}
+
+// Hygiene reminder during period (sent daily while period is active)
+async function notifyPeriodHygieneReminder({ userId, dayNumber }) {
+  try {
+    const tips = [
+      'Change your pad or tampon every 4–6 hours to prevent infections.',
+      'Wash your hands before and after changing sanitary products.',
+      'Stay hydrated — drink at least 8 glasses of water today.',
+      'Wear breathable cotton underwear to maintain hygiene.',
+      'Dispose of used sanitary products properly — wrap and bin them.',
+      'A warm bath can help relieve cramps and keep you fresh.',
+      'Avoid scented products in the intimate area — they disrupt pH balance.'
+    ];
+    const tip = tips[(dayNumber - 1) % tips.length];
+    await createNotification({
+      userId,
+      type: 'period_hygiene_reminder',
+      title: '🧼 Period Hygiene Tip',
+      message: tip
+    });
+  } catch (err) {
+    console.error('Error in notifyPeriodHygieneReminder:', err);
+  }
+}
+
 module.exports = {
   createNotification,
   notifyBookingConfirmed,
@@ -485,5 +585,13 @@ module.exports = {
   notifyMedicalFormSubmitted,
   notifyMedicalFormAssigned,
   notifyMedicalFormCompleted,
-  notifyMedicalFormPaid
+  notifyMedicalFormPaid,
+  // Medicine Tracker Notifications
+  notifyMedicineReminder,
+  notifyMedicineMissed,
+  // Period Tracker Notifications
+  notifyPeriodComingSoon,
+  notifyOvulationDay,
+  notifyPeriodStarted,
+  notifyPeriodHygieneReminder
 };
