@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import axios from '@/lib/axios';
 
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState([]);
@@ -35,11 +35,8 @@ export default function NotificationBell() {
       const token = localStorage.getItem('token');
       if (!token) return;
       
-      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/notifications/unread-count`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setUnreadCount(res.data.count);
-    } catch (err) {
+      const res = await axios.get('/notifications/unread-count');
+      setUnreadCount(res.data.count);    } catch (err) {
       console.error('Error fetching unread count:', err);
     }
   };
@@ -47,10 +44,7 @@ export default function NotificationBell() {
   const fetchNotifications = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/notifications`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await axios.get('/notifications');
       setNotifications(res.data);
     } catch (err) {
       console.error('Error fetching notifications:', err);
@@ -61,12 +55,7 @@ export default function NotificationBell() {
 
   const markAsRead = async (notificationId) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.patch(
-        `${process.env.NEXT_PUBLIC_API_URL}/notifications/${notificationId}/read`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await axios.patch(`/notifications/${notificationId}/read`, {});
       
       setNotifications(prev =>
         prev.map(n => n._id === notificationId ? { ...n, isRead: true } : n)
@@ -79,12 +68,7 @@ export default function NotificationBell() {
 
   const markAllAsRead = async () => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.patch(
-        `${process.env.NEXT_PUBLIC_API_URL}/notifications/mark-all-read`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await axios.patch('/notifications/mark-all-read', {});
       
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
       setUnreadCount(0);
@@ -95,11 +79,7 @@ export default function NotificationBell() {
 
   const deleteNotification = async (notificationId) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(
-        `${process.env.NEXT_PUBLIC_API_URL}/notifications/${notificationId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await axios.delete(`/notifications/${notificationId}`);
       
       const notification = notifications.find(n => n._id === notificationId);
       setNotifications(prev => prev.filter(n => n._id !== notificationId));
@@ -115,11 +95,7 @@ export default function NotificationBell() {
     if (!confirm('Are you sure you want to delete all notifications?')) return;
     
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(
-        `${process.env.NEXT_PUBLIC_API_URL}/notifications`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await axios.delete('/notifications');
       
       setNotifications([]);
       setUnreadCount(0);
@@ -130,24 +106,32 @@ export default function NotificationBell() {
 
   const getNotificationIcon = (type) => {
     switch (type) {
-      case 'booking_confirmed':
-        return '✅';
-      case 'new_booking':
-        return '📅';
-      case 'meeting_link_added':
-        return '🔗';
-      case 'test_result_uploaded':
-        return '📄';
-      case 'session_completed':
-        return '✔️';
-      case 'payment_approved':
-        return '💰';
-      case 'new_complaint':
-        return '📝';
-      case 'complaint_updated':
-        return '🔄';
-      default:
-        return '🔔';
+      case 'booking_confirmed': return '✅';
+      case 'new_booking': return '📅';
+      case 'meeting_link_added': return '🔗';
+      case 'test_result_uploaded': return '📄';
+      case 'session_completed': return '✔️';
+      case 'payment_approved': return '💰';
+      case 'review_received': return '⭐';
+      case 'new_complaint': return '📝';
+      case 'complaint_updated': return '🔄';
+      case 'medical_form_submitted':
+      case 'medical_form_new':
+      case 'medical_form_assigned':
+      case 'medical_form_assignment':
+      case 'medical_form_completed':
+      case 'medical_form_result_uploaded':
+      case 'medical_form_paid': return '📋';
+      // Medicine tracker
+      case 'medicine_reminder': return '💊';
+      case 'medicine_missed':
+      case 'medicine_overdue': return '⚠️';
+      // Period tracker
+      case 'period_coming_soon':
+      case 'period_started': return '🩸';
+      case 'ovulation_day': return '🌸';
+      case 'period_hygiene_reminder': return '🧼';
+      default: return '🔔';
     }
   };
 
