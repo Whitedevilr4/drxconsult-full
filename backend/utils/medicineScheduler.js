@@ -1,4 +1,5 @@
 const MedicineTracker = require('../models/MedicineTracker');
+const { notifyMedicineReminder, notifyMedicineMissed } = require('./notificationHelper');
 
 class MedicineScheduler {
   constructor() {
@@ -96,6 +97,9 @@ class MedicineScheduler {
         const result = await this.processTrackerOverdueMedicines(tracker, now);
         totalProcessed += result.processed;
         totalMarkedMissed += result.markedMissed;
+
+        // Send upcoming dose reminders (15-min window)
+        await this.sendUpcomingReminders(tracker, now);
       }
 
       if (totalMarkedMissed > 0) {
@@ -104,6 +108,46 @@ class MedicineScheduler {
 
     } catch (error) {
       console.error('Error processing overdue medicines:', error);
+    }
+  }
+
+  // Send reminders for doses due in the next 15 minutes
+  async sendUpcomingReminders(tracker, now) {
+    try {
+      const windowMs = 15 * 60 * 1000; // 15 minutes ahead
+      const windowEnd = new Date(now.getTime() + windowMs);
+
+      const today = new Date(now);
+      today.setHours(0, 0, 0, 0);
+
+      for (const logEntry of tracker.medicineLog) {
+        if (logEntry.status !== 'due') continue;
+
+        const scheduledDate = new Date(logEntry.scheduledDate);
+        scheduledDate.setHours(0, 0, 0, 0);
+        if (scheduledDate.getTime() !== today.getTime()) continue;
+
+        const [hours, minutes] = logEntry.scheduledTime.split(':').map(Number);
+        const scheduledDateTime = new Date(logEntry.scheduledDate);
+        scheduledDateTime.setHours(hours, minutes, 0, 0);
+
+        // Only remind if the dose is within the next 15 minutes (and not already past)
+        if (scheduledDateTime >= now && scheduledDateTime <= windowEnd) {
+          const medicine = tracker.medicines.id(logEntry.medicineId);
+          if (!medicine) continue;
+
+          const schedule = medicine.schedule.find(s => s.time === logEntry.scheduledTime);
+          await notifyMedicineReminder({
+            userId: tracker.userId,
+            medicineName: medicine.medicineName,
+            scheduledTime: logEntry.scheduledTime,
+            dosage: schedule?.dosage || logEntry.actualDosage || '',
+            instructions: schedule?.instructions || ''
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error sending upcoming medicine reminders:', err);
     }
   }
 
@@ -147,6 +191,18 @@ class MedicineScheduler {
         
         markedMissed++;
         hasChanges = true;
+
+        // Send missed-dose notification
+        const medicine = tracker.medicines.id(logEntry.medicineId);
+        if (medicine) {
+          const schedule = medicine.schedule.find(s => s.time === logEntry.scheduledTime);
+          notifyMedicineMissed({
+            userId: tracker.userId,
+            medicineName: medicine.medicineName,
+            scheduledTime: logEntry.scheduledTime,
+            dosage: schedule?.dosage || logEntry.actualDosage || ''
+          }).catch(err => console.error('Failed to send missed medicine notification:', err));
+        }
 
         console.log(`Marked medicine as missed: ${logEntry.medicineId} scheduled for ${scheduledDateTime.toISOString()}`);
       }
