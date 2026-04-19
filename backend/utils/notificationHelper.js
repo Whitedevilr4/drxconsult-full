@@ -4,7 +4,7 @@ const Pharmacist = require('../models/Pharmacist');
 const Doctor = require('../models/Doctor');
 
 // Create notification helper
-async function createNotification({ userId, type, title, message, bookingId, pharmacistId, doctorId, nutritionistId, patientId }) {
+async function createNotification({ userId, type, title, message, bookingId, medicalFormId, pharmacistId, doctorId, nutritionistId, patientId }) {
   try {
     const notification = new Notification({
       userId,
@@ -12,6 +12,7 @@ async function createNotification({ userId, type, title, message, bookingId, pha
       title,
       message,
       bookingId,
+      medicalFormId,
       pharmacistId,
       doctorId,
       nutritionistId,
@@ -303,16 +304,6 @@ async function notifyComplaintUpdated(complaint) {
   }
 }
 
-module.exports = {
-  createNotification,
-  notifyBookingConfirmed,
-  notifyMeetingLinkAdded,
-  notifyTestResultUploaded,
-  notifyPaymentApproved,
-  notifyReviewSubmitted,
-  notifyComplaintSubmitted,
-  notifyComplaintUpdated
-};
 // Medical Form Notifications
 
 // Notify when medical form is submitted
@@ -489,7 +480,34 @@ async function notifyMedicineReminder({ userId, medicineName, scheduledTime, dos
   }
 }
 
-// Notify user that a medicine dose was auto-marked as missed
+// Notify user 5 minutes before a dose is due
+async function notifyMedicineReminderBefore({ userId, medicineName, scheduledTime, dosage }) {
+  try {
+    await createNotification({
+      userId,
+      type: 'medicine_reminder',
+      title: '⏰ Medicine in 5 Minutes',
+      message: `${medicineName} (${dosage}) is due at ${scheduledTime}. Get ready to take it.`
+    });
+  } catch (err) {
+    console.error('Error in notifyMedicineReminderBefore:', err);
+  }
+}
+
+// Notify user 5 minutes after a dose was due (follow-up)
+async function notifyMedicineReminderFollowup({ userId, medicineName, scheduledTime, dosage }) {
+  try {
+    await createNotification({
+      userId,
+      type: 'medicine_reminder',
+      title: '❓ Did You Take Your Medicine?',
+      message: `${medicineName} (${dosage}) was due at ${scheduledTime}. Mark it as taken or missed in the tracker.`
+    });
+  } catch (err) {
+    console.error('Error in notifyMedicineReminderFollowup:', err);
+  }
+}
+
 async function notifyMedicineMissed({ userId, medicineName, scheduledTime, dosage }) {
   try {
     await createNotification({
@@ -588,6 +606,8 @@ module.exports = {
   notifyMedicalFormPaid,
   // Medicine Tracker Notifications
   notifyMedicineReminder,
+  notifyMedicineReminderBefore,
+  notifyMedicineReminderFollowup,
   notifyMedicineMissed,
   // Period Tracker Notifications
   notifyPeriodComingSoon,
