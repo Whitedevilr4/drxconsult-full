@@ -8,6 +8,7 @@ const { cleanupExpiredSlots } = require('./utils/slotCleanup');
 const { cleanupExpiredOTPs } = require('./utils/otpService');
 const { testSupabaseConnection, initializeStorageBuckets } = require('./config/supabase');
 const medicineScheduler = require('./utils/medicineScheduler');
+const periodNotificationScheduler = require('./utils/periodNotificationScheduler');
 
 const app = express();
 const server = http.createServer(app);
@@ -182,6 +183,14 @@ const startServer = async () => {
         console.log('✅ Medicine scheduler started');
       } catch (error) {
         console.error('❌ Scheduler error:', error);
+      }
+
+      // Period notification scheduler
+      try {
+        periodNotificationScheduler.start();
+        console.log('✅ Period notification scheduler started');
+      } catch (error) {
+        console.error('❌ Period scheduler error:', error);
       }
 
       console.log('✅ Server initialization complete');
