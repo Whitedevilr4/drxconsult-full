@@ -19,57 +19,17 @@ export default function NotificationBell() {
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef(null);
   const seenIdsRef = useRef(new Set());
-  const isOpenRef = useRef(false);
-  const pollRef = useRef(null);
-
-  // Keep isOpenRef in sync so pollForNew can read it without stale closure
-  useEffect(() => {
-    isOpenRef.current = isOpen;
-    if (isOpen) fetchNotifications();
-  }, [isOpen]);
 
   useEffect(() => {
     requestNotificationPermission();
-
-    // Define poll inside ref so interval always calls latest version
-    pollRef.current = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) return;
-
-        const res = await axios.get('/notifications');
-        const all = res.data || [];
-
-        setUnreadCount(all.filter(n => !n.isRead).length);
-
-        // Fire browser popup for any notification we haven't seen yet
-        all.forEach(n => {
-          if (!seenIdsRef.current.has(n._id)) {
-            seenIdsRef.current.add(n._id);
-            if (!n.isRead) {
-              const { title, body, tag, requireInteraction } = toBrowserNotif(n);
-              showBrowserNotification(title, { body, tag, requireInteraction });
-            }
-          }
-        });
-
-        // Prevent unbounded growth
-        if (seenIdsRef.current.size > 200) {
-          const arr = Array.from(seenIdsRef.current);
-          seenIdsRef.current = new Set(arr.slice(arr.length - 200));
-        }
-
-        // Update dropdown list if it's open
-        if (isOpenRef.current) setNotifications(all);
-      } catch (err) {
-        // silently ignore poll errors
-      }
-    };
-
-    pollRef.current(); // run immediately on mount
-    const interval = setInterval(() => pollRef.current?.(), 30000);
+    pollForNew(); // initial load
+    const interval = setInterval(pollForNew, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (isOpen) fetchNotifications();
+  }, [isOpen]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -80,6 +40,39 @@ export default function NotificationBell() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Poll server — update badge + fire browser popup for any new unread notifications
+  const pollForNew = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const res = await axios.get('/notifications');
+      const all = res.data || [];
+
+      setUnreadCount(all.filter(n => !n.isRead).length);
+
+      all.forEach(n => {
+        if (!seenIdsRef.current.has(n._id)) {
+          seenIdsRef.current.add(n._id);
+          if (!n.isRead) {
+            const { title, body, tag, requireInteraction } = toBrowserNotif(n);
+            showBrowserNotification(title, { body, tag, requireInteraction });
+          }
+        }
+      });
+
+      // Prevent unbounded growth
+      if (seenIdsRef.current.size > 200) {
+        const arr = Array.from(seenIdsRef.current);
+        seenIdsRef.current = new Set(arr.slice(arr.length - 200));
+      }
+
+      if (isOpen) setNotifications(all);
+    } catch (err) {
+      // silently ignore poll errors
+    }
+  };
 
   const fetchNotifications = async () => {
     try {
