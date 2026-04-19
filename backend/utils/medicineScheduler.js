@@ -1,5 +1,10 @@
 const MedicineTracker = require('../models/MedicineTracker');
-const { notifyMedicineReminder, notifyMedicineMissed } = require('./notificationHelper');
+const {
+  notifyMedicineReminder,
+  notifyMedicineReminderBefore,
+  notifyMedicineReminderFollowup,
+  notifyMedicineMissed
+} = require('./notificationHelper');
 
 class MedicineScheduler {
   constructor() {
@@ -27,53 +32,61 @@ class MedicineScheduler {
     console.log('Starting automatic medicine tracking system...');
     
     try {
-      // Try to use node-cron first
       const cron = require('node-cron');
       
-      // Run every 15 minutes to check for missed doses
+      // Every 15 minutes — mark overdue doses as missed
       this.cronJob = cron.schedule('*/15 * * * *', async () => {
         try {
           await this.processOverdueMedicines();
         } catch (error) {
-          console.error('Error in medicine scheduler:', error);
+          console.error('Error in medicine overdue scheduler:', error);
         }
-      }, {
-        scheduled: false
-      });
-
+      }, { scheduled: false });
       this.cronJob.start();
+
+      // Every minute — send upcoming dose reminders (30-min lookahead, deduplicated)
+      this.reminderCronJob = cron.schedule('* * * * *', async () => {
+        try {
+          await this.sendAllUpcomingReminders();
+        } catch (error) {
+          console.error('Error in medicine reminder scheduler:', error);
+        }
+      }, { scheduled: false });
+      this.reminderCronJob.start();
+
       this.isRunning = true;
-      console.log('Medicine scheduler started with cron - checking every 15 minutes');
+      console.log('Medicine scheduler started — overdue check every 15 min, reminders every 1 min');
       
     } catch (error) {
       console.warn('node-cron not available, falling back to setInterval');
       
-      // Fallback to setInterval (15 minutes = 900000 ms)
       this.intervalId = setInterval(async () => {
         try {
           await this.processOverdueMedicines();
         } catch (error) {
           console.error('Error in medicine scheduler:', error);
         }
-      }, 15 * 60 * 1000); // 15 minutes
+      }, 15 * 60 * 1000);
+
+      this.reminderIntervalId = setInterval(async () => {
+        try {
+          await this.sendAllUpcomingReminders();
+        } catch (error) {
+          console.error('Error in medicine reminder scheduler:', error);
+        }
+      }, 60 * 1000);
       
       this.isRunning = true;
-      console.log('Medicine scheduler started with setInterval - checking every 15 minutes');
+      console.log('Medicine scheduler started with setInterval');
     }
   }
 
   // Stop the scheduler
   stop() {
-    if (this.cronJob) {
-      this.cronJob.stop();
-      this.cronJob = null;
-    }
-    
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-    }
-    
+    if (this.cronJob) { this.cronJob.stop(); this.cronJob = null; }
+    if (this.reminderCronJob) { this.reminderCronJob.stop(); this.reminderCronJob = null; }
+    if (this.intervalId) { clearInterval(this.intervalId); this.intervalId = null; }
+    if (this.reminderIntervalId) { clearInterval(this.reminderIntervalId); this.reminderIntervalId = null; }
     this.isRunning = false;
     console.log('Medicine scheduler stopped');
   }
@@ -84,7 +97,6 @@ class MedicineScheduler {
       const now = new Date();
       console.log(`Checking for overdue medicines at ${now.toISOString()}`);
 
-      // Find all medicine trackers with active medicines
       const trackers = await MedicineTracker.find({
         'medicines.isActive': true,
         'medicines.endDate': { $gte: now }
@@ -97,9 +109,6 @@ class MedicineScheduler {
         const result = await this.processTrackerOverdueMedicines(tracker, now);
         totalProcessed += result.processed;
         totalMarkedMissed += result.markedMissed;
-
-        // Send upcoming dose reminders (15-min window)
-        await this.sendUpcomingReminders(tracker, now);
       }
 
       if (totalMarkedMissed > 0) {
@@ -111,17 +120,34 @@ class MedicineScheduler {
     }
   }
 
-  // Send reminders for doses due in the next 15 minutes
-  async sendUpcomingReminders(tracker, now) {
+  // Send reminders for all users — 3-stage: 5 min before, on time, 5 min after
+  async sendAllUpcomingReminders() {
     try {
-      const windowMs = 15 * 60 * 1000; // 15 minutes ahead
-      const windowEnd = new Date(now.getTime() + windowMs);
-
+      const now = new Date();
       const today = new Date(now);
       today.setHours(0, 0, 0, 0);
 
+      const trackers = await MedicineTracker.find({
+        'medicines.isActive': true,
+        'medicines.endDate': { $gte: now }
+      });
+
+      for (const tracker of trackers) {
+        await this.sendUpcomingReminders(tracker, now, null, today);
+      }
+    } catch (err) {
+      console.error('Error in sendAllUpcomingReminders:', err);
+    }
+  }
+
+  // Send reminders for a single tracker — 3 stages: before (−5 min), due (0), followup (+5 min)
+  async sendUpcomingReminders(tracker, now, windowEnd, today) {
+    try {
+      let hasChanges = false;
+
       for (const logEntry of tracker.medicineLog) {
-        if (logEntry.status !== 'due') continue;
+        // Only process 'due' entries that haven't completed all 3 stages
+        if (logEntry.status !== 'due' || logEntry.reminderStage === 'followup') continue;
 
         const scheduledDate = new Date(logEntry.scheduledDate);
         scheduledDate.setHours(0, 0, 0, 0);
@@ -131,20 +157,50 @@ class MedicineScheduler {
         const scheduledDateTime = new Date(logEntry.scheduledDate);
         scheduledDateTime.setHours(hours, minutes, 0, 0);
 
-        // Only remind if the dose is within the next 15 minutes (and not already past)
-        if (scheduledDateTime >= now && scheduledDateTime <= windowEnd) {
-          const medicine = tracker.medicines.id(logEntry.medicineId);
-          if (!medicine) continue;
+        const diffMs = scheduledDateTime.getTime() - now.getTime(); // positive = future, negative = past
+        const medicine = tracker.medicines.id(logEntry.medicineId);
+        if (!medicine) continue;
 
-          const schedule = medicine.schedule.find(s => s.time === logEntry.scheduledTime);
-          await notifyMedicineReminder({
-            userId: tracker.userId,
-            medicineName: medicine.medicineName,
-            scheduledTime: logEntry.scheduledTime,
-            dosage: schedule?.dosage || logEntry.actualDosage || '',
-            instructions: schedule?.instructions || ''
-          });
+        const scheduleSlot = medicine.schedule.find(s => s.time === logEntry.scheduledTime);
+        const dosage = scheduleSlot?.dosage || logEntry.actualDosage || '';
+        const args = {
+          userId: tracker.userId,
+          medicineName: medicine.medicineName,
+          scheduledTime: logEntry.scheduledTime,
+          dosage,
+          instructions: scheduleSlot?.instructions || ''
+        };
+
+        const stage = logEntry.reminderStage || 'none';
+
+        // Stage 1 — "5 minutes before": fire when 3–7 min remain (±2 min tolerance)
+        if (stage === 'none' && diffMs >= 3 * 60 * 1000 && diffMs <= 7 * 60 * 1000) {
+          await notifyMedicineReminderBefore(args);
+          logEntry.reminderStage = 'before';
+          hasChanges = true;
+          console.log(`[before] Reminder for ${medicine.medicineName} at ${logEntry.scheduledTime}`);
         }
+
+        // Stage 2 — "on time": fire when within ±2 min of scheduled time
+        else if (stage !== 'due' && stage !== 'followup' && diffMs >= -2 * 60 * 1000 && diffMs <= 2 * 60 * 1000) {
+          await notifyMedicineReminder(args);
+          logEntry.reminderStage = 'due';
+          hasChanges = true;
+          console.log(`[due] Reminder for ${medicine.medicineName} at ${logEntry.scheduledTime}`);
+        }
+
+        // Stage 3 — "follow-up": fire when 3–7 min past scheduled time
+        else if (stage === 'due' && diffMs >= -7 * 60 * 1000 && diffMs <= -3 * 60 * 1000) {
+          await notifyMedicineReminderFollowup(args);
+          logEntry.reminderStage = 'followup';
+          hasChanges = true;
+          console.log(`[followup] Reminder for ${medicine.medicineName} at ${logEntry.scheduledTime}`);
+        }
+      }
+
+      if (hasChanges) {
+        tracker.updatedAt = new Date();
+        await tracker.save();
       }
     } catch (err) {
       console.error('Error sending upcoming medicine reminders:', err);
