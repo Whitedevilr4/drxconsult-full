@@ -37,56 +37,44 @@ class MedicineReminderService {
     const now = new Date();
     const [hours, minutes] = time.split(':').map(Number);
     
-    // Create scheduled time for today
     const scheduledTime = new Date();
     scheduledTime.setHours(hours, minutes, 0, 0);
 
-    // If time has passed today, schedule for tomorrow
+    // If time has already passed today, don't schedule — server handles missed notifications
     if (scheduledTime <= now) {
-      scheduledTime.setDate(scheduledTime.getDate() + 1);
+      console.log(`⏭️ ${medicineName} at ${time} already passed today, skipping client timer`);
+      return;
     }
 
     const timerId = `${medicineId}-${scheduleIndex}`;
-
-    // Calculate delays
     const timeUntilScheduled = scheduledTime.getTime() - now.getTime();
     const fiveMinutesBefore = timeUntilScheduled - (5 * 60 * 1000);
-    const twoMinutesAfter = timeUntilScheduled + (2 * 60 * 1000);
+    const fiveMinutesAfter = timeUntilScheduled + (5 * 60 * 1000);
 
-    // Schedule 5 minutes before notification
+    // 5 minutes before
     if (fiveMinutesBefore > 0) {
       const beforeTimer = setTimeout(() => {
-        console.log(`⏰ 5 minutes before reminder for ${medicineName}`);
+        console.log(`⏰ 5 min before reminder for ${medicineName}`);
         showNotification('medicineReminderBefore', medicineName, time, 5);
       }, fiveMinutesBefore);
-
       this.timers.set(`${timerId}-before`, beforeTimer);
     }
 
-    // Schedule at-time notification
-    if (timeUntilScheduled > 0) {
-      const atTimeTimer = setTimeout(() => {
-        console.log(`💊 Time to take ${medicineName}`);
-        showNotification('medicineReminder', medicineName, time);
-      }, timeUntilScheduled);
+    // At scheduled time
+    const atTimeTimer = setTimeout(() => {
+      console.log(`💊 Time to take ${medicineName}`);
+      showNotification('medicineReminder', medicineName, time);
+    }, timeUntilScheduled);
+    this.timers.set(`${timerId}-attime`, atTimeTimer);
 
-      this.timers.set(`${timerId}-attime`, atTimeTimer);
-    }
+    // 5 minutes after (follow-up)
+    const afterTimer = setTimeout(() => {
+      console.log(`❓ Follow-up for ${medicineName}`);
+      showNotification('medicineReminderAfter', medicineName, time, 5);
+    }, fiveMinutesAfter);
+    this.timers.set(`${timerId}-after`, afterTimer);
 
-    // Schedule 2 minutes after notification
-    if (twoMinutesAfter > 0) {
-      const afterTimer = setTimeout(() => {
-        console.log(`⚠️ 2 minutes after reminder for ${medicineName}`);
-        showNotification('medicineReminderAfter', medicineName, time, 2);
-        
-        // Reschedule for next day
-        this.scheduleRemindersForTime(medicineId, medicineName, time, scheduleIndex);
-      }, twoMinutesAfter);
-
-      this.timers.set(`${timerId}-after`, afterTimer);
-    }
-
-    console.log(`✅ Reminders scheduled for ${medicineName} at ${time}`);
+    console.log(`✅ Client timers set for ${medicineName} at ${time}`);
   }
 
   /**
