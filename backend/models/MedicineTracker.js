@@ -101,7 +101,16 @@ const medicineLogSchema = new mongoose.Schema({
       'rash', 'fatigue', 'insomnia', 'dry_mouth', 'constipation',
       'diarrhea', 'loss_of_appetite', 'weight_gain', 'weight_loss', 'other'
     ]
-  }]
+  }],
+  reminderSent: {
+    type: Boolean,
+    default: false
+  },
+  reminderStage: {
+    type: String,
+    enum: ['none', 'before', 'due', 'followup'],
+    default: 'none'
+  }
 });
 
 const medicineTrackerSchema = new mongoose.Schema({
