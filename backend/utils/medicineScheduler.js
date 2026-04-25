@@ -98,8 +98,7 @@ class MedicineScheduler {
       console.log(`Checking for overdue medicines at ${now.toISOString()}`);
 
       const trackers = await MedicineTracker.find({
-        'medicines.isActive': true,
-        'medicines.endDate': { $gte: now }
+        medicines: { $elemMatch: { isActive: true, endDate: { $gte: now } } }
       });
 
       let totalProcessed = 0;
@@ -128,8 +127,7 @@ class MedicineScheduler {
       today.setHours(0, 0, 0, 0);
 
       const trackers = await MedicineTracker.find({
-        'medicines.isActive': true,
-        'medicines.endDate': { $gte: now }
+        medicines: { $elemMatch: { isActive: true, endDate: { $gte: now } } }
       });
 
       for (const tracker of trackers) {
@@ -150,8 +148,9 @@ class MedicineScheduler {
         if (logEntry.status !== 'due' || logEntry.reminderStage === 'followup') continue;
 
         const scheduledDate = new Date(logEntry.scheduledDate);
-        scheduledDate.setHours(0, 0, 0, 0);
-        if (scheduledDate.getTime() !== today.getTime()) continue;
+        const scheduledDateOnly = new Date(scheduledDate);
+        scheduledDateOnly.setHours(0, 0, 0, 0);
+        if (scheduledDateOnly.getTime() !== today.getTime()) continue;
 
         const [hours, minutes] = logEntry.scheduledTime.split(':').map(Number);
         const scheduledDateTime = new Date(logEntry.scheduledDate);
