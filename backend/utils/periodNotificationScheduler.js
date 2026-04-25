@@ -71,8 +71,20 @@ class PeriodNotificationScheduler {
   async checkForUser(tracker, today) {
     try {
       const userId = tracker.userId;
-      const cycleLength = tracker.averageCycleLength || 28;
+
+      // Guard: skip if lastPeriodDate is missing or invalid
+      if (!tracker.lastPeriodDate) {
+        console.warn(`Period tracker for user ${userId} has no lastPeriodDate — skipping`);
+        return;
+      }
+
+      const cycleLength = tracker.averageCycleLength > 0 ? tracker.averageCycleLength : 28;
       const lastPeriod = new Date(tracker.lastPeriodDate);
+
+      if (isNaN(lastPeriod.getTime())) {
+        console.warn(`Period tracker for user ${userId} has invalid lastPeriodDate — skipping`);
+        return;
+      }
 
       // --- Next period date ---
       const nextPeriod = new Date(lastPeriod);
