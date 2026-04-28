@@ -20,19 +20,8 @@
       "maxDuration": 30
     }
   },
-  "crons": [
-    {
-      "path": "/api/cron/medicine-reminders",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/cron/period-notifications",
-      "schedule": "0 8 * * *"
-    }
-  ],
   "env": {
     "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
     "PUPPETEER_EXECUTABLE_PATH": "/usr/bin/google-chrome-stable"
   }
 }
-
