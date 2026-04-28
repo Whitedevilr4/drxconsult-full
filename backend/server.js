@@ -103,6 +103,7 @@ app.use('/api/hospital-queries', require('./routes/hospitalQueries'));
 app.use('/api/hospital-chats', require('./routes/hospitalChats'));
 app.use('/api/hospital-bookings', require('./routes/hospitalBookings'));
 app.use('/api/customer-service-chat', require('./routes/customerServiceChat'));
+app.use('/api/cron', require('./routes/cron'));
 
 app.get('/', (req, res) => {
   res.json({
