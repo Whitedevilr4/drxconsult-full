@@ -28,7 +28,7 @@ const signatureUpload = multer({
 router.get('/', async (req, res) => {
   try {
     const doctors = await Doctor.find()
-      .populate('userId', 'name email phone profilePicture')
+      .populate('userId', 'name profilePicture')
       .sort({ createdAt: -1 });
     
     // Calculate rating and session statistics for each doctor
@@ -59,6 +59,10 @@ router.get('/', async (req, res) => {
       doctorObj.averageRating = Math.round(averageRating * 10) / 10; // Round to 1 decimal
       doctorObj.totalReviews = totalReviews;
       doctorObj.completedSessions = completedBookings.length;
+      
+      // Strip sensitive fields from public response
+      delete doctorObj.userId?.email;
+      delete doctorObj.userId?.phone;
       
       return doctorObj;
     }));
@@ -219,13 +223,18 @@ router.put('/slots', auth, async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const doctor = await Doctor.findById(req.params.id)
-      .populate('userId', 'name email phone profilePicture');
+      .populate('userId', 'name profilePicture');
     
     if (!doctor) {
       return res.status(404).json({ message: 'Doctor not found' });
     }
     
-    res.json(doctor);
+    const doctorObj = doctor.toObject();
+    // Strip sensitive fields from public response
+    delete doctorObj.userId?.email;
+    delete doctorObj.userId?.phone;
+    
+    res.json(doctorObj);
   } catch (error) {
     console.error('Error fetching doctor:', error);
     res.status(500).json({ message: 'Server error' });
