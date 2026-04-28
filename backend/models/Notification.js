@@ -44,7 +44,9 @@ const notificationSchema = new mongoose.Schema({
       'period_coming_soon',
       'period_started',
       'ovulation_day',
-      'period_hygiene_reminder'
+      'period_hygiene_reminder',
+      // Admin custom notifications
+      'admin_custom'
     ], 
     required: true 
   },
