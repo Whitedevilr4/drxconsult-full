@@ -3,13 +3,31 @@
   "builds": [
     {
       "src": "server.js",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": {
+        "maxLambdaSize": "50mb"
+      }
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
       "dest": "server.js"
+    }
+  ],
+  "functions": {
+    "server.js": {
+      "maxDuration": 30
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/medicine-reminders",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/period-notifications",
+      "schedule": "0 8 * * *"
     }
   ],
   "env": {
