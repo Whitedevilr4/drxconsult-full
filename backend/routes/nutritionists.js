@@ -9,7 +9,7 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const nutritionists = await Nutritionist.find()
-      .populate('userId', 'name email phone')
+      .populate('userId', 'name')
       .sort({ createdAt: -1 });
     
     // Calculate rating and session statistics for each nutritionist
@@ -41,6 +41,10 @@ router.get('/', async (req, res) => {
       nutritionistObj.averageRating = Math.round(averageRating * 10) / 10; // Round to 1 decimal
       nutritionistObj.totalReviews = totalReviews;
       nutritionistObj.completedSessions = completedBookings.length;
+      
+      // Strip sensitive fields from public response
+      delete nutritionistObj.userId?.email;
+      delete nutritionistObj.userId?.phone;
       
       return nutritionistObj;
     }));
@@ -187,13 +191,18 @@ router.patch('/status', auth, async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const nutritionist = await Nutritionist.findById(req.params.id)
-      .populate('userId', 'name email phone');
+      .populate('userId', 'name');
     
     if (!nutritionist) {
       return res.status(404).json({ message: 'Nutritionist not found' });
     }
     
-    res.json(nutritionist);
+    const nutritionistObj = nutritionist.toObject();
+    // Strip sensitive fields from public response
+    delete nutritionistObj.userId?.email;
+    delete nutritionistObj.userId?.phone;
+    
+    res.json(nutritionistObj);
   } catch (err) {
     console.error('Error fetching nutritionist:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
