@@ -9,7 +9,7 @@ const router = express.Router();
 // Get all pharmacists (public)
 router.get('/', async (req, res) => {
   try {
-    const pharmacists = await Pharmacist.find().populate('userId', 'name email');
+    const pharmacists = await Pharmacist.find().populate('userId', 'name');
     
     // Clean up expired slots for each pharmacist before returning
     for (const pharmacist of pharmacists) {
@@ -19,7 +19,7 @@ router.get('/', async (req, res) => {
     }
     
     // Fetch again after cleanup and add rating/session data
-    const updatedPharmacists = await Pharmacist.find().populate('userId', 'name email');
+    const updatedPharmacists = await Pharmacist.find().populate('userId', 'name');
     
     // Add rating and completed sessions data
     const Booking = require('../models/Booking');
@@ -41,6 +41,10 @@ router.get('/', async (req, res) => {
         pharmacistObj.averageRating = Math.round(averageRating * 10) / 10;
         pharmacistObj.totalReviews = reviewedBookings.length;
         pharmacistObj.completedSessions = completedBookings.length;
+        
+        // Strip sensitive fields from public response
+        delete pharmacistObj.userId?.email;
+        delete pharmacistObj.userId?.phone;
         
         return pharmacistObj;
       })
@@ -130,7 +134,7 @@ router.get('/:id', async (req, res) => {
     // Clean up expired slots first
     await cleanupExpiredSlotsForPharmacist(req.params.id);
     
-    const pharmacist = await Pharmacist.findById(req.params.id).populate('userId', 'name email');
+    const pharmacist = await Pharmacist.findById(req.params.id).populate('userId', 'name');
     if (!pharmacist) {
       return res.status(404).json({ message: 'Pharmacist not found' });
     }
@@ -152,6 +156,10 @@ router.get('/:id', async (req, res) => {
     pharmacistObj.averageRating = Math.round(averageRating * 10) / 10;
     pharmacistObj.totalReviews = reviewedBookings.length;
     pharmacistObj.completedSessions = completedBookings.length;
+    
+    // Strip sensitive fields from public response
+    delete pharmacistObj.userId?.email;
+    delete pharmacistObj.userId?.phone;
     
     res.json(pharmacistObj);
   } catch (err) {
