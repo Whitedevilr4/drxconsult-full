@@ -3,7 +3,10 @@ const bcrypt = require('bcryptjs');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const Pharmacist = require('../models/Pharmacist');
+const Doctor = require('../models/Doctor');
+const Nutritionist = require('../models/Nutritionist');
 const MedicalHistory = require('../models/MedicalHistory');
+const Notification = require('../models/Notification');
 const { auth, isAdmin } = require('../middleware/auth');
 const { sendUserSuspensionEmail, sendUserUnsuspensionEmail, sendPaymentReceivedEmail } = require('../utils/emailService');
 const { notifyPaymentApproved } = require('../utils/notificationHelper');
@@ -1763,6 +1766,119 @@ router.get('/subscription-bookings', auth, isAdmin, async (req, res) => {
       .sort({ createdAt: -1 });
 
     res.json(bookings);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// =====================
+// Admin Notification Routes
+// =====================
+
+// Get all users list for targeting (admin only)
+router.get('/notification-targets', auth, isAdmin, async (req, res) => {
+  try {
+    const [users, pharmacists, doctors, nutritionists] = await Promise.all([
+      User.find({ role: 'patient' }).select('_id name email role').sort({ name: 1 }),
+      Pharmacist.find().populate('userId', '_id name email').select('userId name').sort({ name: 1 }),
+      Doctor.find().populate('userId', '_id name email').select('userId name').sort({ name: 1 }),
+      Nutritionist.find().populate('userId', '_id name email').select('userId name').sort({ name: 1 }),
+    ]);
+
+    res.json({
+      patients: users,
+      pharmacists: pharmacists.map(p => ({ _id: p.userId?._id, name: p.name || p.userId?.name, email: p.userId?.email, role: 'pharmacist' })).filter(p => p._id),
+      doctors: doctors.map(d => ({ _id: d.userId?._id, name: d.name || d.userId?.name, email: d.userId?.email, role: 'doctor' })).filter(d => d._id),
+      nutritionists: nutritionists.map(n => ({ _id: n.userId?._id, name: n.name || n.userId?.name, email: n.userId?.email, role: 'nutritionist' })).filter(n => n._id),
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Send custom notification (admin only)
+// Body: { title, message, target: 'all' | 'all_patients' | 'all_professionals' | 'all_pharmacists' | 'all_doctors' | 'all_nutritionists' | 'individual', userIds: [] }
+router.post('/send-notification', auth, isAdmin, async (req, res) => {
+  try {
+    const { title, message, target, userIds } = req.body;
+
+    if (!title || !message || !target) {
+      return res.status(400).json({ message: 'title, message, and target are required' });
+    }
+
+    let recipientIds = [];
+
+    if (target === 'individual') {
+      if (!userIds || !userIds.length) {
+        return res.status(400).json({ message: 'userIds required for individual target' });
+      }
+      recipientIds = userIds;
+    } else {
+      let roleFilter = null;
+      if (target === 'all_patients') roleFilter = 'patient';
+      else if (target === 'all_pharmacists') roleFilter = 'pharmacist';
+      else if (target === 'all_doctors') roleFilter = 'doctor';
+      else if (target === 'all_nutritionists') roleFilter = 'nutritionist';
+      else if (target === 'all_professionals') roleFilter = ['pharmacist', 'doctor', 'nutritionist'];
+      // 'all' = no filter
+
+      const query = roleFilter
+        ? { role: Array.isArray(roleFilter) ? { $in: roleFilter } : roleFilter }
+        : { role: { $ne: 'admin' } };
+
+      const users = await User.find(query).select('_id');
+      recipientIds = users.map(u => u._id);
+    }
+
+    if (!recipientIds.length) {
+      return res.status(400).json({ message: 'No recipients found for the selected target' });
+    }
+
+    const notifications = recipientIds.map(userId => ({
+      userId,
+      type: 'admin_custom',
+      title,
+      message,
+    }));
+
+    await Notification.insertMany(notifications);
+
+    // Emit real-time socket events if io is available
+    const io = req.app.get('io');
+    if (io) {
+      recipientIds.forEach(userId => {
+        io.to(`user:${userId.toString()}`).emit('new-notification', {
+          type: 'admin_custom',
+          title,
+          message,
+        });
+      });
+    }
+
+    res.json({ message: `Notification sent to ${recipientIds.length} recipient(s)`, count: recipientIds.length });
+  } catch (err) {
+    console.error('Error sending admin notification:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Get sent notifications history (admin only)
+router.get('/notifications-history', auth, isAdmin, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = 20;
+    const skip = (page - 1) * limit;
+
+    const [notifications, total] = await Promise.all([
+      Notification.find({ type: 'admin_custom' })
+        .populate('userId', 'name email role')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Notification.countDocuments({ type: 'admin_custom' }),
+    ]);
+
+    res.json({ notifications, total, page, pages: Math.ceil(total / limit) });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
