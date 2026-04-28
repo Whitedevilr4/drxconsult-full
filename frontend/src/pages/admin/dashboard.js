@@ -6,6 +6,7 @@ import PdfUploader from '@/components/EnhancedUploader'
 import ImageUploader from '@/components/EnhancedUploader'
 import ComplaintList from '@/components/ComplaintList'
 import ComplaintDetail from '@/components/ComplaintDetail'
+import AdminNotificationsTab from '@/components/admin/AdminNotificationsTab'
 import { toast } from 'react-toastify'
 import { io } from 'socket.io-client'
 
@@ -267,6 +268,7 @@ export default function AdminDashboard() {
                   <option value="users">👥 User Management</option>
                   <option value="subscriptions">💳 Subscriptions</option>
                   <option value="medical-forms">📋 Medical Forms</option>
+                  <option value="notifications">🔔 Notifications</option>
                 </select>
               </div>
 
@@ -522,6 +524,16 @@ export default function AdminDashboard() {
                 >
                   📋 Medical Forms
                 </button>
+                <button
+                  onClick={() => setActiveTab('notifications')}
+                  className={`py-4 px-4 lg:px-6 font-medium text-sm whitespace-nowrap ${
+                    activeTab === 'notifications'
+                      ? 'border-b-2 border-blue-600 text-blue-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  🔔 Notifications
+                </button>
               </nav>
             </div>
 
@@ -552,6 +564,7 @@ export default function AdminDashboard() {
               {activeTab === 'users' && <UserManagementTab />}
               {activeTab === 'subscriptions' && <SubscriptionManagementTab />}
               {activeTab === 'medical-forms' && <MedicalFormsTab />}
+              {activeTab === 'notifications' && <AdminNotificationsTab />}
             </div>
           </div>
         </div>
