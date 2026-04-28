@@ -164,6 +164,7 @@ export default function NotificationBell() {
       case 'period_started': return '🩸';
       case 'ovulation_day': return '🌸';
       case 'period_hygiene_reminder': return '🧼';
+      case 'admin_custom': return '📢';
       default: return '🔔';
     }
   };
